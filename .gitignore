@@ -1,0 +1,15 @@
+# 不部署的开发/调试文件
+ocr-demo.html
+verify.js
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# 其它
+*.log
+.env
+.env.local

@@ -1,0 +1,3250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0891b2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="家庭健康">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230891b2'/%3E%3Ctext x='32' y='42' font-size='36' text-anchor='middle' fill='white'%3E🏥%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%230891b2'/%3E%3Ctext x='90' y='118' font-size='100' text-anchor='middle' fill='white'%3E🏥%3C/text%3E%3C/svg%3E">
+<title>家庭健康记录</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --primary: #f59e0b; --primary-light: #fbbf24; --primary-dark: #d97706;
+    --accent-1: #fb923c; --accent-2: #f472b6;
+    --success: #84cc16; --warning: #f59e0b; --danger: #ef4444; --info: #3b82f6;
+    --bg: #fff8f0; --bg-2: #ffedd5; --bg-soft: #fef3c7; --card: #fffefb;
+    --text: #451a03; --text-2: #78350f; --text-3: #a8a29e;
+    --border: #fde6c8;
+    --shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.08), 0 2px 4px -1px rgba(0,0,0,0.02);
+    --shadow-lg: 0 20px 25px -5px rgba(245, 158, 11, 0.12), 0 10px 10px -5px rgba(0,0,0,0.02);
+    --shadow-md: 0 10px 15px -3px rgba(245, 158, 11, 0.1), 0 4px 6px -2px rgba(0,0,0,0.04);
+    --radius: 18px; --radius-sm: 12px;
+  }
+  html, body { background: linear-gradient(135deg, #fff8f0 0%, #ffedd5 50%, #fef3c7 100%); }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Quicksand", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--text); min-height: 100vh; line-height: 1.7; -webkit-font-smoothing: antialiased;
+  }
+
+  /* 桌面布局容器 */
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(360px, 460px) 1fr;
+    grid-template-areas:
+      "header header"
+      "left   right";
+    gap: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+    min-height: 100vh;
+  }
+  .area-header { grid-area: header; }
+  .area-left   { grid-area: left;  position: sticky; top: 20px; align-self: start; max-height: calc(100vh - 40px); overflow-y: auto; padding-right: 6px; }
+  .area-right  { grid-area: right; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .area-left::-webkit-scrollbar { width: 6px; }
+  .area-left::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+  /* 顶部 */
+  header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding: 16px 20px; background: linear-gradient(135deg, #fffefb 0%, #fff7ed 100%); border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo { width: 44px; height: 44px; background: linear-gradient(135deg, #fbbf24, #f59e0b 50%, #fb923c); border-radius: 14px; display: flex; align-items: center; justify-content: center; color: white; font-size: 22px; box-shadow: 0 6px 16px rgba(245, 158, 11, 0.35); }
+  .brand h1 { font-size: 22px; font-weight: 700; color: #78350f; }
+  .brand .subtitle { font-size: 12px; color: #a16207; margin-top: 2px; }
+  .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .sync-indicator { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; background: #fff7ed; color: #9a3412; }
+  .sync-indicator .dot { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; }
+  .sync-indicator.synced { background: #ecfdf5; color: #166534; }
+  .sync-indicator.synced .dot { background: #10b981; animation: pulse 1.6s ease-in-out infinite; }
+  .sync-indicator.syncing { background: #fef3c7; color: #92400e; }
+  .sync-indicator.syncing .dot { background: #f59e0b; animation: pulse 0.8s ease-in-out infinite; }
+  .sync-indicator.offline { background: #fee2e2; color: #991b1b; }
+  .sync-indicator.offline .dot { background: #ef4444; }
+  .sync-indicator.local { background: #fef3c7; color: #92400e; }
+  .sync-indicator.local .dot { background: #f59e0b; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:.5;transform:scale(1.3);} }
+  .settings-btn { width: 36px; height: 36px; border-radius: 12px; border: 1px solid var(--border); background: white; color: var(--text-2); cursor: pointer; font-size: 16px; transition: all 0.2s; }
+  .settings-btn:hover { border-color: var(--primary); color: var(--primary); background: #fff7ed; }
+  .clock { background: linear-gradient(135deg, #fff7ed, #ffedd5); padding: 8px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); text-align: right; }
+  .clock .time { font-size: 20px; font-weight: 700; color: #9a3412; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; }
+  .clock .time .pulse { display: inline-block; width: 6px; height: 6px; background: var(--primary); border-radius: 50%; margin-right: 6px; animation: pulse 1.6s ease-in-out infinite; vertical-align: middle; }
+  .clock .date { font-size: 11px; color: var(--text-3); margin-top: 0; }
+
+  /* 配置横幅（只显示在本地模式时） */
+  .config-banner {
+    background: linear-gradient(135deg, #fff7ed, #ffedd5);
+    border: 1px solid #fdba74; border-radius: var(--radius);
+    padding: 14px 18px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .config-banner .icon { font-size: 22px; }
+  .config-banner .text { flex: 1; min-width: 220px; font-size: 13px; color: #9a3412; line-height: 1.6; }
+  .config-banner .btn { background: linear-gradient(135deg, #f59e0b, #fb923c); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3); }
+  .config-banner .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4); }
+  .config-banner .btn-sec { background: white; color: #9a3412; border: 1px solid #fdba74; }
+
+  /* Hero (输入区) */
+  .hero { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #fb923c 100%); border-radius: var(--radius); padding: 22px 22px; color: white; box-shadow: 0 20px 40px -8px rgba(245, 158, 11, 0.35), inset 0 1px 0 rgba(255,255,255,0.2); position: relative; overflow: hidden; margin-bottom: 16px; }
+  .hero::before { content: ''; position: absolute; top: -50%; right: -20%; width: 60%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 60%); pointer-events: none; }
+  .hero-label { display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.95; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600; margin-bottom: 4px; }
+  .hero-time { font-size: 13px; opacity: 0.85; margin-bottom: 14px; font-variant-numeric: tabular-nums; }
+  .text-input-wrap { display: flex; gap: 8px; margin-bottom: 12px; }
+  .text-input { flex: 1; min-width: 0; min-height: 48px; max-height: 240px; padding: 13px 16px; border: 2px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.95); border-radius: 14px; color: var(--text); font-size: 16px; font-weight: 500; font-family: inherit; line-height: 1.5; resize: none; overflow-y: auto; transition: all 0.2s; scrollbar-width: thin; scrollbar-color: #fdba74 transparent; }
+  .text-input::-webkit-scrollbar { width: 6px; }
+  .text-input::-webkit-scrollbar-track { background: transparent; }
+  .text-input::-webkit-scrollbar-thumb { background: #fdba74; border-radius: 3px; }
+  .text-input.no-scroll { overflow-y: hidden; }
+  .text-input:focus { outline: none; border-color: white; background: white; box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
+  .text-input::placeholder { color: #a8a29e; font-weight: 400; font-size: 13px; }
+  .btn-parse { background: white; color: #9a3412; border: none; padding: 0 22px; border-radius: 14px; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .btn-parse:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,0.15); }
+  .btn-ai { background: linear-gradient(135deg, #f472b6, #fb923c); color: white; border: none; padding: 0 18px; border-radius: 14px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; white-space: nowrap; box-shadow: 0 4px 12px rgba(244, 114, 182, 0.3); display: inline-flex; align-items: center; gap: 4px; }
+  .btn-ai:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(244, 114, 182, 0.5); }
+  .btn-ai:disabled { background: #cbd5e1; cursor: wait; opacity: 0.7; }
+  .file-btn { display: inline-flex; align-items: center; gap: 4px; padding: 8px 14px; border-radius: 10px; background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border: 1px dashed rgba(255,255,255,0.4); color: white; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .file-btn:hover { background: rgba(255,255,255,0.35); }
+  .quick-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 5px 11px; border-radius: 999px; background: rgba(255,255,255,0.25); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.35); color: white; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .chip:hover { background: rgba(255,255,255,0.4); }
+  .chip-custom { background: rgba(255,255,255,0.1); border: 1px dashed rgba(255,255,255,0.4); }
+  .range-hint { text-align: center; font-size: 11px; opacity: 0.75; }
+
+  /* Modal */
+  .modal-mask { position: fixed; inset: 0; background: rgba(67, 20, 7, 0.45); display: none; align-items: center; justify-content: center; z-index: 9999; padding: 20px; animation: fadeIn 0.2s; backdrop-filter: blur(2px); }
+  .modal-mask.show { display: flex; }
+  .modal { background: white; border-radius: 20px; padding: 24px; max-width: 460px; width: 100%; box-shadow: 0 25px 50px -12px rgba(120, 53, 15, 0.4); max-height: 90vh; overflow-y: auto; position: relative; z-index: 10000; animation: slideUp 0.25s; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .modal h3 { font-size: 18px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; color: #78350f; }
+  .modal .modal-sub { font-size: 13px; color: var(--text-3); margin-bottom: 16px; }
+  .modal-close { position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; border-radius: 50%; border: none; background: #fff7ed; color: #9a3412; font-size: 18px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; z-index: 2; }
+  .modal-close:hover { background: #fbbf24; color: white; transform: rotate(90deg); }
+
+  /* 配置弹窗专用字段 */
+  .cfg-field { margin-bottom: 14px; }
+  .cfg-field label { display: block; font-size: 13px; color: var(--text-2); font-weight: 600; margin-bottom: 6px; }
+  .cfg-field input { width: 100%; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 14px; font-family: inherit; color: var(--text); background: #fffefb; transition: all 0.2s; }
+  .cfg-field input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15); }
+  .cfg-field input.key-input { font-family: 'SF Mono', Menlo, 'Consolas', monospace; font-size: 12px; word-break: break-all; line-height: 1.5; }
+  .cfg-field .hint { font-size: 12px; color: var(--text-3); margin-top: 4px; line-height: 1.5; }
+  .cfg-field select { width: 100%; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 14px; font-family: inherit; color: var(--text); background: white; cursor: pointer; }
+  .cfg-field select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15); }
+  .cfg-actions-row { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+  .cfg-actions-row button { flex: 1; min-width: 120px; }
+
+  /* 预览弹窗字段 */
+  .preview-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px dashed #fde6c8; }
+  .preview-row:last-of-type { border-bottom: none; }
+  .preview-row label { flex-shrink: 0; width: 70px; font-size: 13px; color: var(--text-2); font-weight: 500; }
+  .preview-input { flex: 1; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 14px; font-family: inherit; color: var(--text); background: white; transition: all 0.2s; min-width: 0; }
+  .preview-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15); }
+  .preview-values { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; min-width: 0; }
+  .preview-value-item { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 10px; }
+  .preview-value-item input { width: 70px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+  .preview-value-item .label { font-size: 12px; color: var(--text-2); }
+  .preview-value-item .unit { font-size: 12px; color: var(--text-3); }
+  .new-badge { display: inline-block; padding: 2px 8px; background: linear-gradient(135deg, #f472b6, #fb923c); color: white; border-radius: 6px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; vertical-align: middle; margin-left: 6px; }
+  .preview-status { margin: 12px 0 0; padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 500; }
+  .preview-status.normal { background: #ecfdf5; color: #166534; }
+  .preview-status.abnormal { background: #fee2e2; color: #991b1b; }
+  .preview-status.warning { background: #fef3c7; color: #92400e; }
+  .preview-status.danger { background: #fee2e2; color: #991b1b; }
+  .preview-status.info { background: #fef3c7; color: #92400e; }
+  .preview-status.empty { background: #fff7ed; color: var(--text-3); }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+
+  /* 按钮 */
+  .btn-secondary { padding: 8px 14px; border: 1px solid var(--border); background: white; color: var(--text-2); border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; }
+  .btn-secondary:hover { border-color: var(--primary); color: var(--primary); background: #fff7ed; }
+  .btn-primary { background: linear-gradient(135deg, #f59e0b, #fb923c); color: white; border: none; padding: 10px 18px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3); }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4); }
+  .btn-primary:disabled { background: #cbd5e1; cursor: not-allowed; box-shadow: none; }
+  .btn-danger { padding: 8px 14px; border: 1px solid #fecaca; background: white; color: var(--danger); border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .btn-danger:hover { background: var(--danger); color: white; }
+
+  /* 统计 */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .stat-card { background: var(--card); border-radius: var(--radius-sm); padding: 14px; box-shadow: var(--shadow); border: 1px solid var(--border); transition: all 0.2s; position: relative; overflow: hidden; cursor: pointer; }
+  .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .stat-card:active { transform: translateY(0); }
+  .stat-card.active { background: linear-gradient(135deg, #fff7ed, #ffedd5); border-color: var(--primary); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2); }
+  .stat-card::after { content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%; background: var(--accent, var(--primary)); }
+  .stat-card.s-today { --accent: #f59e0b; }
+  .stat-card.s-week { --accent: #fb923c; }
+  .stat-card.s-cats { --accent: #f472b6; }
+  .stat-card.s-members { --accent: #84cc16; }
+  .stat-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .stat-title { font-size: 11px; color: var(--text-2); font-weight: 500; }
+  .stat-icon { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .stat-card.s-today .stat-icon { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #b45309; }
+  .stat-card.s-week .stat-icon { background: linear-gradient(135deg, #fed7aa, #fdba74); color: #c2410c; }
+  .stat-card.s-cats .stat-icon { background: linear-gradient(135deg, #fce7f3, #fbcfe8); color: #be185d; }
+  .stat-card.s-members .stat-icon { background: linear-gradient(135deg, #ecfccb, #d9f99d); color: #4d7c0f; }
+  .stat-value { font-size: 24px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .stat-value .unit { font-size: 13px; color: var(--text-3); font-weight: 500; margin-left: 2px; }
+  .stat-sub { font-size: 11px; color: var(--text-3); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* 右侧通用卡片 */
+  .card { background: var(--card); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+  .card-title { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; color: #78350f; }
+  .card-title .badge { font-size: 11px; background: linear-gradient(135deg, #fff7ed, #ffedd5); color: #9a3412; padding: 2px 8px; border-radius: 6px; font-weight: 600; }
+  .tabs { display: inline-flex; background: #fff7ed; border-radius: 10px; padding: 3px; }
+  .tab { padding: 6px 12px; border-radius: 7px; border: none; background: transparent; color: var(--text-2); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .tab.active { background: white; color: #9a3412; box-shadow: 0 1px 3px rgba(245, 158, 11, 0.2); }
+
+  /* 类别网格已废弃：合并到 stat-card 类别总览 */
+
+  /* 折叠 */
+  .card-toggle { background: transparent; border: none; color: var(--text-3); font-size: 16px; cursor: pointer; padding: 4px 8px; transition: transform 0.2s; }
+  .card-toggle.open { transform: rotate(180deg); }
+
+  /* 趋势图类别 chips */
+  .chip-selected { display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:999px;background:linear-gradient(135deg, #fef3c7, #fde68a);color:#92400e;border:1px solid #fbbf24;font-size:12px;font-weight:600;cursor:pointer; }
+  .chip-selected:hover { background:linear-gradient(135deg, #fde68a, #fcd34d); }
+  .cat-toggle-chip { display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:999px;background:#fff7ed;color:var(--text-2);font-size:12px;font-weight:600;cursor:pointer;border:1px solid #fde6c8; }
+  .cat-toggle-chip.on { background:linear-gradient(135deg, #fef3c7, #fde68a);color:#92400e;border-color:#fbbf24; }
+  .cat-toggle-chip small { color:var(--text-3);font-size:10px; }
+  .cat-icon-btn:hover { background: #fff7ed !important; transform: scale(1.1); transition: all 0.15s; }
+
+  /* 图表 - 多张小图 */
+  .chart-wrap { position: relative; height: 280px; }
+  .mini-charts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .mini-chart-card { background: linear-gradient(135deg, #fffbf5 0%, #fff5e6 100%); border: 1px solid #fde6c8; border-radius: 16px; padding: 12px 14px; transition: all 0.2s; box-shadow: 0 1px 3px rgba(251, 191, 36, 0.08); }
+  .mini-chart-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(251, 191, 36, 0.15); border-color: #fdba74; }
+  .mini-chart-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .mini-chart-title { display: flex; align-items: center; gap: 6px; }
+  .mini-icon { width: 26px; height: 26px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; }
+  .mini-name { font-size: 14px; font-weight: 700; color: #78350f; }
+  .mini-chart-trend { font-size: 16px; font-weight: 700; }
+  .mini-chart-canvas-wrap { position: relative; height: 110px; }
+  .mini-chart-foot { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--text-3); }
+  .mini-stat b { color: #78350f; font-size: 13px; }
+
+  /* 历史 */
+  .history-list { display: flex; flex-direction: column; gap: 6px; max-height: 540px; overflow-y: auto; padding-right: 4px; }
+  .history-list::-webkit-scrollbar { width: 6px; }
+  .history-list::-webkit-scrollbar-thumb { background: #fdba74; border-radius: 3px; }
+  .history-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: linear-gradient(135deg, #fffefb, #fffaf3); border-radius: var(--radius-sm); border: 1px solid var(--border); transition: all 0.2s; }
+  .history-item:hover { background: linear-gradient(135deg, #fff7ed, #ffedd5); border-color: #fdba74; }
+  .h-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white; flex-shrink: 0; }
+  .h-info { flex: 1; min-width: 0; }
+  .h-line1 { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; margin-bottom: 2px; flex-wrap: wrap; }
+  .h-line1 .member { background: linear-gradient(135deg, #fce7f3, #fbcfe8); color: #be185d; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .h-line1 .values { color: var(--text); }
+  .h-line2 { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-3); flex-wrap: wrap; }
+  .h-status { padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; border: none; cursor: default; }
+  .h-status.normal { background: #ecfdf5; color: #166534; }
+  .h-status.abnormal { background: #fee2e2; color: #991b1b; }
+  .h-status.warning { background: #fef3c7; color: #92400e; }
+  .h-status.danger { background: #fee2e2; color: #991b1b; }
+  .h-status-clickable { cursor: pointer; transition: all 0.2s; font-family: inherit; }
+  .h-status-clickable:hover { transform: scale(1.05); box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+  .h-range-info { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 500; background: #fff7ed; color: #92400e; border: 1px dashed #fdba74; }
+  .h-pending { font-size: 10px; background: #fef3c7; color: #92400e; padding: 1px 6px; border-radius: 4px; }
+  .h-note { background: white; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .h-delete { display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0 12px; height: 30px; border-radius: 8px; border: 1px solid #fecaca; background: white; color: var(--danger); cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; flex-shrink: 0; }
+  .h-delete:hover { background: var(--danger); color: white; border-color: var(--danger); }
+  .h-status-btn { display: inline-flex; align-items: center; justify-content: center; gap: 2px; padding: 0 12px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: white; color: var(--text-2); cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; flex-shrink: 0; min-width: 56px; }
+  .h-status-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+  .h-status-btn.normal { border-color: #86efac; color: #166534; }
+  .h-status-btn.normal:hover { background: #ecfdf5; }
+  .h-status-btn.abnormal { border-color: #fca5a5; color: #991b1b; }
+  .h-status-btn.abnormal:hover { background: #fee2e2; }
+  .h-status-toggle { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: white; color: var(--text-2); cursor: pointer; font-size: 14px; transition: all 0.2s; flex-shrink: 0; }
+  .h-status-toggle:hover { background: #fff7ed; color: #d97706; border-color: #fbbf24; }
+  .empty-state { text-align: center; padding: 48px 20px; color: var(--text-3); }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
+  .time-filter-chip { display:inline-flex;align-items:center;gap:6px;padding:6px 10px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;border:1px solid #fbbf24;border-radius:999px;font-size:12px;font-weight:600; }
+  .time-filter-clear { background:transparent;border:none;color:#92400e;cursor:pointer;font-size:13px;padding:0 2px;line-height:1; }
+  .time-filter-clear:hover { color:var(--danger); }
+  .empty-state .text { font-size: 14px; }
+
+  /* 成员筛选 */
+  .member-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .member-chip { padding: 5px 12px; border-radius: 999px; background: #f1f5f9; color: var(--text-2); font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
+  .member-chip:hover { background: #fef3c7; }
+  .member-chip.active { background: linear-gradient(135deg, #f59e0b, #fb923c); color: white; border-color: #f59e0b; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3); }
+  .member-chip-manage { /* 已废弃：成员管理改到点击 stat-card */ }
+
+  /* Toast */
+  .toast { position: fixed; top: 24px; right: 24px; background: white; border-left: 4px solid var(--primary); padding: 12px 18px; border-radius: 12px; box-shadow: 0 8px 24px rgba(245, 158, 11, 0.2); font-size: 13px; font-weight: 600; transform: translateX(420px); transition: transform 0.3s; z-index: 1001; max-width: 320px; }
+  .toast.show { transform: translateX(0); }
+  .toast.success { border-left-color: var(--success); }
+  .toast.warning { border-left-color: var(--warning); }
+  .toast.error { border-left-color: var(--danger); }
+
+  footer { grid-column: 1 / -1; text-align: center; color: var(--text-3); font-size: 12px; padding: 16px 0 8px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+  /* 移动端：单列布局 */
+  @media (max-width: 900px) {
+    .layout {
+      grid-template-columns: 1fr;
+      grid-template-areas: "header" "left" "right";
+      padding: 12px;
+      gap: 14px;
+    }
+    .area-left { position: static; max-height: none; overflow: visible; }
+    .area-right { gap: 14px; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .chart-wrap { height: 240px; }
+    .mini-charts-grid { grid-template-columns: 1fr; }
+    .brand h1 { font-size: 18px; }
+    .clock .time { font-size: 18px; }
+    .hero { padding: 18px 16px; }
+    .text-input { font-size: 14px; padding: 12px 14px; }
+    .btn-parse { padding: 0 16px; font-size: 13px; }
+  }
+  @media (max-width: 500px) {
+    .stats-grid { grid-template-columns: 1fr; }
+    header { padding: 12px 14px; }
+    .brand .subtitle { display: none; }
+    .preview-row { flex-wrap: wrap; }
+    .preview-row label { width: 60px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <header class="area-header">
+    <div class="brand">
+      <div class="logo">🏠</div>
+      <div>
+        <h1>龙龙＆文文の小家</h1>
+        <div class="subtitle">健康数据记录</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="sync-indicator" id="syncIndicator">
+        <span class="dot"></span><span id="syncText">连接中…</span>
+      </span>
+      <div class="clock">
+        <div class="time"><span class="pulse"></span><span id="currentTime">--:--:--</span></div>
+        <div class="date" id="currentDate">--</div>
+      </div>
+      <button class="settings-btn" id="settingsBtn" title="设置">⚙</button>
+    </div>
+  </header>
+
+  <!-- 左侧：输入 + 统计 -->
+  <div class="area-left">
+
+    <div class="config-banner" id="configBanner" style="display:none;">
+      <div class="icon">💡</div>
+      <div class="text">
+        <b>本地模式</b> · 数据存在本浏览器（不跨设备）<br>
+        配置云端后所有设备实时共享：
+      </div>
+      <button class="btn" id="bannerConfigBtn">⚙ 配置云端</button>
+    </div>
+
+    <section class="hero">
+      <div class="hero-label">🌿 健健康康平平安安！</div>
+      <div class="hero-time" id="heroTime">记录时间：--</div>
+
+      <div class="text-input-wrap">
+        <textarea class="text-input" id="textInput" rows="1"
+               placeholder='例：体温 36.5 / 文 血压 128/82 / 尿酸 380'></textarea>
+        <button class="btn-parse" id="btnParse">添加</button>
+      </div>
+
+      <div class="text-input-wrap" style="margin-top:8px;">
+        <label class="file-btn" for="fileInput" title="上传图片让 AI 识别">
+          📷 上传报告图片
+          <input type="file" id="fileInput" accept="image/*,.pdf" style="display:none;">
+        </label>
+        <span id="fileName" style="font-size:12px;color:var(--text-3);"></span>
+      </div>
+
+      <div class="quick-chips" id="quickChips">
+        <span class="chip" data-cat="体温">🌡 体温</span>
+        <span class="chip" data-cat="血压">💉 血压</span>
+        <span class="chip" data-cat="血糖">🩸 血糖</span>
+        <span class="chip" data-cat="心率">❤️ 心率</span>
+        <span class="chip" data-cat="体重">⚖ 体重</span>
+        <span class="chip" data-cat="血氧">🫁 血氧</span>
+        <span class="chip" data-cat="身高">📏 身高</span>
+      </div>
+
+      <div class="range-hint">💡 没有的类别会自动创建 · 解析后可编辑确认</div>
+    </section>
+
+    <div class="stats-grid">
+      <div class="stat-card s-today" data-action="today" title="点击查看今日记录">
+        <div class="stat-head">
+          <div class="stat-title">今日记录</div>
+          <div class="stat-icon">📝</div>
+        </div>
+        <div class="stat-value"><span id="statTodayCount">0</span><span class="unit">条</span></div>
+        <div class="stat-sub" id="statTodaySub">尚无记录</div>
+      </div>
+      <div class="stat-card s-week" data-action="week" title="点击查看本周记录">
+        <div class="stat-head">
+          <div class="stat-title">本周记录</div>
+          <div class="stat-icon">📅</div>
+        </div>
+        <div class="stat-value"><span id="statWeekCount">0</span><span class="unit">条</span></div>
+        <div class="stat-sub" id="statWeekSub">--</div>
+      </div>
+      <div class="stat-card s-cats" data-action="cats" title="点击管理类别">
+        <div class="stat-head">
+          <div class="stat-title">类别总览</div>
+          <div class="stat-icon">🏷</div>
+        </div>
+        <div class="stat-value"><span id="statCatsCount">0</span><span class="unit">种</span></div>
+        <div class="stat-sub" id="statCatsSub">--</div>
+      </div>
+      <div class="stat-card s-members" data-action="members" title="点击管理家庭成员">
+        <div class="stat-head">
+          <div class="stat-title">家庭成员</div>
+          <div class="stat-icon">🏡</div>
+        </div>
+        <div class="stat-value"><span id="statMembersCount">0</span><span class="unit">位</span></div>
+        <div class="stat-sub" id="statMembersSub">--</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右侧：趋势 + 历史 -->
+  <div class="area-right">
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">📈 各项趋势 <span class="badge" id="chartBadge">最近 100 条</span></div>
+        <div class="tabs" id="chartTabs">
+          <button class="tab active" data-range="30">最近 100 条</button>
+          <button class="tab" data-range="7">近 7 天</button>
+          <button class="tab" data-range="all">全部</button>
+        </div>
+      </div>
+      <div class="mini-charts-grid" id="miniChartsGrid"></div>
+      <div style="margin-top:12px;" id="chartCatsWrap">
+        <div style="font-size:12px;color:var(--text-3);margin-bottom:6px;">👁 显示中：</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;" id="chartCatsShown"></div>
+        <button class="btn-secondary" id="chartMoreCatsBtn" style="margin-top:8px;font-size:12px;display:none;">还有更多类别，点开选择</button>
+        <div id="chartMoreCatsPanel" style="margin-top:10px;display:none;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);">
+          <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;">勾选要显示的类别：</div>
+          <div id="chartAllCats" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">📋 全部记录 <span class="badge" id="historyCount">0 条</span></div>
+        <div class="actions">
+          <span class="time-filter-chip" id="timeFilterChip" style="display:none;">📅 <span id="timeFilterLabel"></span> <button class="time-filter-clear" id="timeFilterClear" title="清除时间筛选">✕</button></span>
+          <button class="btn-secondary" id="btnExport">📤 JSON</button>
+          <button class="btn-secondary" id="btnExportCSV">📊 CSV</button>
+          <button class="btn-danger" id="btnDelete">🗑 删除</button>
+        </div>
+      </div>
+      <div class="member-filter" id="memberFilter"></div>
+      <div style="position:relative;margin-bottom:10px;">
+        <input type="search" id="historySearch" class="preview-input" placeholder="🔍 搜索类别、家人、数值..." style="width:100%;padding-left:36px;">
+        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-3);font-size:14px;">🔍</span>
+      </div>
+      <div class="history-list" id="historyList"></div>
+    </div>
+
+  </div>
+
+  <footer>
+    <span id="footerText">数据存于本浏览器（本地模式）· 建议定期导出 CSV 备份</span>
+  </footer>
+</div>
+
+<!-- ===== 预览弹窗 ===== -->
+<div class="modal-mask" id="previewMask">
+  <div class="modal" style="max-width:520px;">
+    <button class="modal-close" data-close="previewMask" title="关闭">×</button>
+    <h3>📋 确认记录</h3>
+    <div class="modal-sub" id="previewSub">原文：「--」</div>
+
+    <div class="preview-row">
+      <label>👤 家人</label>
+      <select class="preview-input" id="previewMember" style="flex:1;"></select>
+      <button class="btn-secondary" id="previewAddMember" type="button" style="padding:8px 12px;font-size:12px;flex-shrink:0;" title="添加新家人">＋ 新成员</button>
+    </div>
+
+    <div class="preview-row">
+      <label>📂 类别</label>
+      <input type="text" class="preview-input" id="previewCategory" placeholder="类别名">
+      <span id="previewCategoryNew" class="new-badge" style="display:none">新类别</span>
+    </div>
+
+    <div class="preview-row" id="previewCategoryPicker" style="display:none;">
+      <label></label>
+      <select class="preview-input" id="previewCategorySelect" style="font-size:13px;color:var(--text-3);">
+      </select>
+    </div>
+
+    <div class="preview-row" id="previewValuesRow">
+      <label>📊 数值</label>
+      <div class="preview-values" id="previewValues"></div>
+    </div>
+
+    <div class="preview-row" id="previewItemsRow" style="display:none;">
+      <label>📋 体检项目</label>
+      <div id="previewItems" style="flex:1;"></div>
+    </div>
+
+    <div class="preview-row">
+      <label>🕐 时间</label>
+      <input type="datetime-local" class="preview-input" id="previewTime">
+    </div>
+
+    <div class="preview-row">
+      <label>📝 备注</label>
+      <input type="text" class="preview-input" id="previewNote" placeholder="可选">
+    </div>
+
+    <div class="preview-row" id="previewRangeRow">
+      <label>📐 参考区间</label>
+      <div style="flex:1;display:flex;gap:6px;align-items:center;font-size:13px;">
+        <input type="number" step="0.1" id="previewRangeLow" placeholder="下限" class="preview-input" style="width:30%;text-align:center;">
+        <span style="color:var(--text-3);">~</span>
+        <input type="number" step="0.1" id="previewRangeHigh" placeholder="上限" class="preview-input" style="width:30%;text-align:center;">
+        <span id="previewRangeUnit" style="color:var(--text-3);font-size:12px;margin-left:4px;"></span>
+        <button class="btn-secondary" id="previewRangeClear" type="button" style="padding:4px 10px;font-size:11px;">清除</button>
+      </div>
+    </div>
+
+    <div class="preview-status empty" id="previewStatus">--</div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" id="previewCancel">取消</button>
+      <button class="btn-primary" id="previewConfirm">✓ 确认保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 删除筛选弹窗 ===== -->
+<div class="modal-mask" id="deleteMask">
+  <div class="modal" style="max-width:520px;">
+    <button class="modal-close" data-close="deleteMask" title="关闭">×</button>
+    <h3>🗑 删除记录</h3>
+    <div class="modal-sub">按筛选条件批量删除（误录数据清理）</div>
+
+    <div class="preview-row">
+      <label>👤 家人</label>
+      <select class="preview-input" id="delMember">
+        <option value="all">全部家人</option>
+      </select>
+    </div>
+
+    <div class="preview-row">
+      <label>📂 类别</label>
+      <select class="preview-input" id="delCategory">
+        <option value="all">全部类别</option>
+      </select>
+    </div>
+
+    <div class="preview-row">
+      <label>📅 时间</label>
+      <select class="preview-input" id="delTimeRange">
+        <option value="all">全部时间</option>
+        <option value="24h">最近 24 小时</option>
+        <option value="7d">最近 7 天</option>
+        <option value="30d">最近 30 天</option>
+        <option value="custom">指定时间段…</option>
+      </select>
+    </div>
+
+    <div class="preview-row" id="delCustomRange" style="display:none;">
+      <label></label>
+      <div style="flex:1;display:flex;gap:6px;align-items:center;">
+        <input type="date" class="preview-input" id="delStart" style="flex:1;">
+        <span style="color:var(--text-3);">→</span>
+        <input type="date" class="preview-input" id="delEnd" style="flex:1;">
+      </div>
+    </div>
+
+    <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;font-size:13px;color:#92400e;margin-top:12px;line-height:1.6;">
+      ⚠️ <b>将匹配 <span id="delMatchCount">0</span> 条记录</b>，被删除后无法恢复（建议先导出 CSV 备份）
+    </div>
+
+    <div class="preview-row" id="delConfirmWrap" style="display:none;">
+      <label></label>
+      <input type="text" class="preview-input" id="delConfirmInput" placeholder='输入"删除"两字确认' style="border-color:#fecaca;">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" id="delCancel">取消</button>
+      <button class="btn-danger" id="delConfirmBtn">🗑 删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 配置弹窗 ===== -->
+<div class="modal-mask" id="configMask">
+  <div class="modal">
+    <button class="modal-close" data-close="configMask" title="关闭">×</button>
+    <h3>⚙ Supabase 配置</h3>
+    <div class="modal-sub">配置后所有设备实时同步；未配置则使用本地模式（只本浏览器可见）</div>
+
+    <div class="cfg-field">
+      <label>Supabase URL</label>
+      <input type="text" id="cfgUrl" placeholder="https://dlnqhosjodkgyuojbyxo.supabase.co">
+      <div class="hint">格式：https://你的项目ID.supabase.co</div>
+    </div>
+
+    <div class="cfg-field">
+      <label>Publishable Key（Anon Key）</label>
+      <input type="text" id="cfgKey" class="key-input" placeholder="sb_publishable_xxxxxxxxxxxxx...">
+      <div class="hint">从 Supabase → Project Settings → API Keys 复制</div>
+    </div>
+
+    <details style="margin: 8px 0 12px;">
+      <summary style="cursor:pointer;color:#0891b2;font-size:13px;font-weight:600;">📖 第一次用？点开看教程</summary>
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px;font-size:12px;color:#475569;margin-top:8px;line-height:1.7;">
+        1. 打开 <a href="https://supabase.com" target="_blank">supabase.com</a> → 注册 → New Project<br>
+        2. 项目创建后，左侧 <b>Project Settings → API Keys</b><br>
+        3. 复制 <b>Project URL</b> 和 <b>publishable key</b>（anon）<br>
+        4. 左侧 <b>SQL Editor</b> → New Query → 粘贴下方建表 SQL → Run
+      </div>
+    </details>
+
+    <details style="margin: 0 0 12px;">
+      <summary style="cursor:pointer;color:#0891b2;font-size:13px;font-weight:600;">📋 建表 SQL（点开复制）</summary>
+      <pre style="background:#1e293b;color:#e2e8f0;padding:12px;border-radius:8px;font-size:11px;margin-top:8px;overflow-x:auto;line-height:1.6;white-space:pre;">CREATE TABLE health_records (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ts BIGINT NOT NULL,
+  member TEXT NOT NULL,
+  category JSONB NOT NULL,
+  values JSONB NOT NULL,
+  note TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_health_records_ts ON health_records(ts DESC);
+ALTER TABLE health_records ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public_all" ON health_records FOR ALL
+  TO anon USING (true) WITH CHECK (true);
+ALTER PUBLICATION supabase_realtime ADD TABLE health_records;</pre>
+    </details>
+
+    <div class="cfg-actions-row">
+      <button class="btn-secondary" id="cfgLocalMode">仅本地模式</button>
+      <button class="btn-primary" id="cfgSave">💾 保存并刷新</button>
+    </div>
+    <div style="margin-top:10px;text-align:right;">
+      <button class="btn-secondary" id="cfgCancel" style="font-size:11px;">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== AI 配置弹窗 ===== -->
+<div class="modal-mask" id="aiConfigMask">
+  <div class="modal" style="max-width:520px;">
+    <button class="modal-close" data-close="aiConfigMask" title="关闭">×</button>
+    <h3>🤖 AI 智能识别配置</h3>
+    <div class="modal-sub">使用 OpenAI 兼容 API，支持通义千问/DeepSeek/OpenAI 等</div>
+
+    <div class="cfg-field">
+      <label>API 平台</label>
+      <select class="cfg-field-input" id="aiProvider">
+        <option value="dashscope">🇨🇳 通义千问 DashScope（推荐，免费）</option>
+        <option value="deepseek">🇨🇳 DeepSeek（中文好，便宜）</option>
+        <option value="openai">🌍 OpenAI（需科学上网）</option>
+        <option value="zhipu">🇨🇳 智谱 GLM</option>
+        <option value="custom">⚙️ 自定义（OpenAI 兼容）</option>
+      </select>
+    </div>
+
+    <div class="cfg-field">
+      <label>API 地址 (Base URL)</label>
+      <input type="text" id="aiBaseUrl" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1">
+      <div class="hint">切换平台会自动填默认值</div>
+    </div>
+
+    <div class="cfg-field">
+      <label>API Key</label>
+      <input type="text" id="aiApiKey" class="key-input" placeholder="sk-xxxxxxxxxxxxxxxx">
+      <div class="hint">👆 key 仅存在你的浏览器，不上传任何服务器</div>
+    </div>
+
+    <div class="cfg-field">
+      <label>模型</label>
+      <input type="text" id="aiModel" placeholder="qwen-turbo">
+      <div class="hint">默认 qwen-turbo；要识图可填 qwen-vl-plus</div>
+    </div>
+
+    <details style="margin: 0 0 12px;">
+      <summary style="cursor:pointer;color:#0891b2;font-size:13px;font-weight:600;">📖 怎么获取 API Key？（点开看教程）</summary>
+      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px;font-size:12px;color:#475569;margin-top:8px;line-height:1.7;">
+        <b>🇨🇳 通义千问（推荐，免费 100 万 token/月）：</b><br>
+        1. 打开 <a href="https://bailian.console.aliyun.com" target="_blank">bailian.console.aliyun.com</a> 注册<br>
+        2. 开通「模型服务」→ 创建 API Key<br>
+        3. 复制 sk-xxxxxx 填到上面<br><br>
+
+        <b>🇨🇳 DeepSeek：</b><br>
+        1. <a href="https://platform.deepseek.com" target="_blank">platform.deepseek.com</a> 注册<br>
+        2. API Keys → 创建新 key<br><br>
+
+        <b>🌍 OpenAI：</b><br>
+        需要海外工具，Base URL 填 <code>https://api.openai.com/v1</code>，模型 <code>gpt-4o-mini</code>
+      </div>
+    </details>
+
+    <div class="cfg-actions-row">
+      <button class="btn-secondary" id="aiCfgCancel">取消</button>
+      <button class="btn-primary" id="aiCfgSave">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   配置（Supabase 信息）
+   ============================================================ */
+const CFG_URL_KEY = 'sb_url';
+const CFG_KEY_KEY = 'sb_key';
+const CFG_LOCAL_KEY = 'sb_local_mode';
+
+let SUPABASE_URL = localStorage.getItem(CFG_URL_KEY) || '';
+let SUPABASE_ANON_KEY = localStorage.getItem(CFG_KEY_KEY) || '';
+let LOCAL_MODE = localStorage.getItem(CFG_LOCAL_KEY) === '1';
+
+// 支持 ?url=...&key=... 一键配置
+(function checkUrlConfig() {
+  try {
+    const params = new URLSearchParams(location.search);
+    const u = params.get('url');
+    const k = params.get('key');
+    if (u && k) {
+      SUPABASE_URL = u; SUPABASE_ANON_KEY = k;
+      localStorage.setItem(CFG_URL_KEY, u);
+      localStorage.setItem(CFG_KEY_KEY, k);
+      LOCAL_MODE = false;
+      localStorage.removeItem(CFG_LOCAL_KEY);
+      // 清掉 query 参数，刷新一次
+      history.replaceState(null, '', location.pathname);
+    }
+  } catch (e) {}
+})();
+
+const isConfigured = !LOCAL_MODE && SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL.startsWith('http');
+
+/* ============================================================
+   标准类别
+   ============================================================ */
+const STANDARD_CATEGORIES = {
+  '体温':       { icon: '🌡', unit: '°C',     defaultRange: [36.0, 37.3] },
+  '体温(口)':   { icon: '🌡', unit: '°C',     defaultRange: [36.3, 37.2] },
+  '体温(肛)':   { icon: '🌡', unit: '°C',     defaultRange: [36.5, 37.7] },
+  '体温(额)':   { icon: '🌡', unit: '°C',     defaultRange: [35.0, 37.0] },
+  '血压':       { icon: '💉', unit: 'mmHg',  multi: true },
+  '血糖':       { icon: '🩸', unit: 'mmol/L', defaultRange: [3.9, 6.1] },
+  '心率':       { icon: '❤️', unit: 'bpm',   defaultRange: [60, 100] },
+  '体重':       { icon: '⚖', unit: 'kg' },
+  '血氧':       { icon: '🫁', unit: '%',     defaultRange: [95, 100] },
+  '身高':       { icon: '📏', unit: 'cm' },
+  '尿酸':       { icon: '🧪', unit: 'umol/L', defaultRange: [150, 420] },
+  '胆固醇':     { icon: '💊', unit: 'mmol/L', defaultRange: [2.8, 5.2] },
+  '甘油三酯':   { icon: '💊', unit: 'mmol/L', defaultRange: [0.4, 1.7] }
+};
+
+const STORAGE_KEYS = { CACHE: 'sb_local_cache', CATS: 'sb_custom_cats', MEMBERS: 'sb_members' };
+let records = [];
+let customCategories = JSON.parse(localStorage.getItem(STORAGE_KEYS.CATS) || '{}');
+// 一次性迁移：把保存的旧 📊 图标替换为更温馨的图标
+Object.keys(customCategories).forEach(name => {
+  if (customCategories[name].icon === '📊') {
+    customCategories[name].icon = suggestIcon(name);
+  }
+});
+let familyMembers = JSON.parse(localStorage.getItem(STORAGE_KEYS.MEMBERS) || '["我"]');
+let chart = null;
+let miniCharts = {};
+let currentMemberFilter = 'all';
+let currentTimeFilter = 'all';   // 'all' | 'today' | 'week'
+let currentChartRange = '30';
+let historySearch = '';
+let realtimeChannel = null;
+let currentParsed = null;
+
+let dbClient = null;
+
+/* ============================================================
+   工具
+   ============================================================ */
+function getCategoryInfo(name) {
+  if (STANDARD_CATEGORIES[name]) {
+    const s = STANDARD_CATEGORIES[name];
+    return { ...s, name, range: s.defaultRange || null, isStandard: true };
+  }
+  if (customCategories[name]) {
+    return { ...customCategories[name], name, isStandard: false };
+  }
+  return { name, icon: suggestIcon(name), unit: '', range: null, isStandard: false };
+}
+
+// 根据类别名推荐温馨的图标
+function suggestIcon(name) {
+  const n = name || '';
+  if (/体温|温度|发热|低热|高热/.test(n)) return '🌡';
+  if (/血压|高压|低压|mmHg/.test(n)) return '💗';
+  if (/血糖|葡萄糖|糖化/.test(n)) return '🍬';
+  if (/心率|脉搏|心跳/.test(n)) return '❤️';
+  if (/体重|体重|斤|kg/.test(n)) return '⚖';
+  if (/身高|身高|cm/.test(n)) return '📏';
+  if (/血氧|spo2|SpO2/.test(n)) return '🫁';
+  if (/酸碱|ph|PH|pH/.test(n)) return '🧪';
+  if (/尿|比重|酮体|白细胞|红细胞|蛋白|胆红素|胆原|亚硝酸|沉渣/.test(n)) return '💧';
+  if (/血|红细胞|白细胞|血红|血浆|血清/.test(n)) return '🩸';
+  if (/比值|ratio|指数/.test(n)) return '🔬';
+  if (/艾滋|HIV|梅毒|抗体|特异性|免疫|阳性|阴性/.test(n)) return '🛡';
+  if (/尿酸|urid|cholester|胆固醇|甘油|血脂|三酰/.test(n)) return '🍯';
+  if (/肝|转氨|ALT|AST|酶|胆固/.test(n)) return '🫀';
+  if (/肾|肌酐|尿素|UREA|CR/.test(n)) return '🫘';
+  if (/睡眠|深睡|深眠|起床|入睡/.test(n)) return '🌙';
+  if (/压力|紧张|焦虑|心理/.test(n)) return '🌸';
+  if (/步|运动|走路|距离|公里|km|卡路里|消耗/.test(n)) return '🏃';
+  if (/温度|湿度|环境|空气/.test(n)) return '🌿';
+  if (/月经|经期/.test(n)) return '🌷';
+  if (/维生素|维A|维B|维C|维D|钙|铁|锌|镁|补/.test(n)) return '🌻';
+  if (/药|服药|剂量|毫克|mg|ml|ml/.test(n)) return '💊';
+  return '📋';
+}
+
+// 温馨图标候选集（用户可在类别管理中挑选）
+const WARM_ICON_OPTIONS = [
+  '🌡','💗','🍬','❤️','⚖','📏','🫁','🧪','💧','🩸',
+  '🔬','🛡','🍯','🫀','🫘','🌙','🌸','🏃','🌿','🌷',
+  '🌻','💊','🍎','🥗','☕','🍵','🌈','⭐','🌟','✨',
+  '🎀','🌺','🌼','🌳','🌲','🍀','🐝','🦋','🐞','🐣',
+  '📋','📌','📍','🪄'
+];
+function showToast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + type;
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => el.classList.remove('show'), 2400);
+}
+function formatTime(ts) { return new Date(ts).toTimeString().slice(0, 8); }
+function formatDate(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function formatDateTime(ts) { return `${formatDate(ts)} ${formatTime(ts)}`; }
+function isSameDay(a, b) {
+  const x = new Date(a), y = new Date(b);
+  return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth() && x.getDate() === y.getDate();
+}
+function relativeTime(ts) {
+  const diff = Date.now() - ts;
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return '刚刚';
+  if (min < 60) return `${min} 分钟前`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h} 小时前`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d} 天前`;
+  return formatDate(ts);
+}
+function toDatetimeLocal(ts) {
+  const d = new Date(ts); const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function fromDatetimeLocal(str) { return new Date(str).getTime(); }
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function loadLocalCache() {
+  try { const c = localStorage.getItem(STORAGE_KEYS.CACHE); if (c) records = JSON.parse(c); } catch (e) { records = []; }
+  // 一次性迁移：把旧记录的 📊 图标更新为建议图标
+  records.forEach(r => {
+    if (r.category && r.category.icon === '📊') {
+      r.category.icon = suggestIcon(r.category.name);
+    }
+  });
+}
+function saveLocalCache() {
+  try { localStorage.setItem(STORAGE_KEYS.CACHE, JSON.stringify(records)); } catch (e) {}
+}
+function saveCustomCategories() { localStorage.setItem(STORAGE_KEYS.CATS, JSON.stringify(customCategories)); }
+function saveMembers() { localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(familyMembers)); }
+
+/* ============================================================
+   文字解析
+   ============================================================ */
+function parseText(text) {
+  text = (text || '').trim();
+  if (!text) return null;
+
+  const ctx = { member: '我', time: Date.now(), note: '' };
+
+  // 优先级 1：检测是否为体检报告格式（含「参考区间」关键字）
+  if (/参考区间|参考值|正常参考/.test(text)) {
+    const labItems = parseLabReport(text);
+    if (labItems.length >= 2) {
+      const tr = parseTimeFromText(text);
+      if (tr.ts) { ctx.time = tr.ts; text = text.replace(tr.matched, '').trim(); }
+      const memberMatch = text.match(/^([\u4e00-\u9fa5]{1,4})\s+(.+)$/);
+      if (memberMatch && isLikelyMember(memberMatch[1])) {
+        ctx.member = memberMatch[1];
+        if (!familyMembers.includes(memberMatch[1])) { familyMembers.push(memberMatch[1]); saveMembers(); }
+      }
+      return { ...ctx, raw: text, multi: true, isLabReport: true, items: labItems };
+    }
+  }
+
+  // 优先级 2：普通多组 / 单条解析
+  const tr = parseTimeFromText(text);
+  if (tr.ts) { ctx.time = tr.ts; text = text.replace(tr.matched, '').trim(); }
+
+  const noteMatch = text.match(/\s*(早上|中午|下午|晚上|睡前|餐前|餐后|起床|空腹|饭后|服药后)$/);
+  if (noteMatch) { ctx.note = noteMatch[1]; text = text.slice(0, noteMatch.index).trim(); }
+
+  const memberMatch = text.match(/^([\u4e00-\u9fa5]{1,4})\s+(.+)$/);
+  if (memberMatch && isLikelyMember(memberMatch[1])) {
+    ctx.member = memberMatch[1];
+    if (!familyMembers.includes(memberMatch[1])) { familyMembers.push(memberMatch[1]); saveMembers(); }
+    text = memberMatch[2];
+  }
+
+  const records = parseMultiRecords(text);
+  if (records.length === 0) return null;
+  if (records.length === 1) {
+    const r = records[0];
+    return { ...ctx, raw: text, category: r.category, values: r.values, isNewCategory: r.isNewCategory };
+  }
+  return { ...ctx, raw: text, multi: true, items: records.map(r => ({ category: r.category, values: r.values, isNewCategory: r.isNewCategory })) };
+}
+
+// 体检报告解析：识别 "指标名：值，参考区间..." 格式
+function parseLabReport(text) {
+  const lines = text.split(/[\r\n]+/).map(s => s.trim()).filter(Boolean);
+  const items = [];
+  // 多种分隔符兼容
+  const re = /^(.+?)[:：]\s*(.+?)[,，]\s*参考区间\s*[:：]?\s*(.+)$/;
+  const reSimple = /^(.+?)[:：]\s*(.+)$/;
+  for (const line of lines) {
+    let m = line.match(re);
+    let name, rawValue, rangeText;
+    if (m) {
+      name = m[1].trim();
+      rawValue = m[2].trim();
+      rangeText = m[3].trim();
+    } else if ((m = line.match(reSimple)) && /参考/.test(text)) {
+      // 整段多行的兜底
+      continue;
+    } else {
+      continue;
+    }
+    if (!name || name.length > 60) continue;
+
+    // 解析数值 vs 定性
+    const numericValue = extractNumeric(rawValue);
+    const range = parseRange(rangeText);
+
+    items.push({
+      category: name,
+      values: [{
+        label: '结果',
+        value: numericValue !== null ? numericValue : rawValue,
+        unit: extractUnit(rawValue) || extractUnit(rangeText) || '',
+        isQualitative: numericValue === null,
+        displayValue: rawValue
+      }],
+      range: range.numbers,
+      rangeText: range.text,
+      isNewCategory: !STANDARD_CATEGORIES[name] && !customCategories[name]
+    });
+  }
+  return items;
+}
+
+// 提取数字（处理"比值0.070"这种带前缀的情况）
+function extractNumeric(text) {
+  // 优先匹配显式的"X.X"格式
+  const m = text.match(/-?\d+(?:\.\d+)?/);
+  if (!m) return null;
+  return parseFloat(m[0]);
+}
+
+// 提取单位
+function extractUnit(text) {
+  const u = text.match(/([a-zA-Z]+\/[A-Z]+|mmol\/L|umol\/L|mg\/dL|个\/(?:HPF|LPF)|bpm|mmHg|°C|kg|cm|%|mmol)/);
+  return u ? u[1] : '';
+}
+
+// 解析参考区间文本
+function parseRange(text) {
+  // 数字范围：4.5‑8.0 / 1.003-1.030 / 0‑5个/HPF
+  const numRange = text.match(/(-?\d+(?:\.\d+)?)\s*[-‑]\s*(-?\d+(?:\.\d+)?)/);
+  if (numRange) {
+    return { numbers: [parseFloat(numRange[1]), parseFloat(numRange[2])], text };
+  }
+  // 上限：<1.000 / ≤1.000
+  const upperOnly = text.match(/[<≤]\s*(\d+(?:\.\d+)?)/);
+  if (upperOnly) {
+    return { numbers: [null, parseFloat(upperOnly[1])], text };
+  }
+  return { numbers: null, text };
+}
+
+// 评估体检结果状态
+function evalLabResult(item) {
+  const v = item.values[0];
+  if (item.range && !v.isQualitative && typeof v.value === 'number') {
+    const [lo, hi] = item.range;
+    const inRange = (lo == null || v.value >= lo) && (hi == null || v.value <= hi);
+    return inRange ? { label: '✓ 正常', cls: 'normal' } : { label: '⚠ 异常', cls: 'abnormal' };
+  }
+  if (v.isQualitative && item.rangeText) {
+    if (item.rangeText.includes(v.value)) return { label: '✓ 正常', cls: 'normal' };
+    const refHasNeg = /阴性|正常|透明|淡黄色/.test(item.rangeText);
+    if (refHasNeg && /阳性|升高|黄色|浑浊|\+/.test(v.value)) return { label: '⚠ 异常', cls: 'abnormal' };
+    return { label: '⚠ 异常', cls: 'abnormal' };
+  }
+  return { label: '⚠ 异常', cls: 'abnormal' };
+}
+
+// 把文本拆成多组数据，每组是一个类别 + 数值
+function parseMultiRecords(text) {
+  const found = [];
+
+  // 先尝试用换行/分号/逗号分隔
+  const parts = text.split(/[\n;；]+/).map(s => s.trim()).filter(Boolean);
+
+  if (parts.length > 1) {
+    for (const p of parts) {
+      const r = parseSingleRecord(p);
+      if (r) found.push(r);
+    }
+    if (found.length > 0) return found;
+  }
+
+  // 不分隔，尝试在原文本里识别多个类别
+  // 策略：从左到右贪婪匹配，每次匹配后从文本移除
+  let rest = text;
+  let safety = 0;
+  while (rest.length > 0 && safety++ < 20) {
+    const before = rest;
+    // 试试逐个类别匹配
+    let matched = false;
+    for (const catName of Object.keys(STANDARD_CATEGORIES)) {
+      const patterns = getCategoryPatterns(catName);
+      for (const p of patterns) {
+        const m = rest.match(p);
+        if (m) {
+          const values = extractValues(catName, m);
+          if (values && values.length) {
+            found.push({ category: catName, values, isNewCategory: false });
+            rest = (rest.slice(0, m.index) + rest.slice(m.index + m[0].length)).trim();
+            matched = true;
+            break;
+          }
+        }
+      }
+      if (matched) break;
+    }
+    if (!matched) {
+      // 通用类别
+      const genericMatch = rest.match(/^([\u4e00-\u9fa5a-zA-Z（）()·\.]+?)\s*(\d+(?:\.\d+)?)\s*(.*)$/);
+      if (genericMatch) {
+        const catName = genericMatch[1].trim();
+        const value = parseFloat(genericMatch[2]);
+        const unit = genericMatch[3].trim();
+        if (catName && !isNaN(value) && catName.length <= 8) {
+          const info = getCategoryInfo(catName);
+          found.push({ category: catName, values: [{ label: catName, value, unit: unit || info.unit || '' }], isNewCategory: !info.isStandard });
+          rest = '';
+          matched = true;
+        }
+      }
+    }
+    if (!matched || rest === before) break;
+  }
+
+  return found;
+}
+
+function parseSingleRecord(text) {
+  text = text.trim();
+  if (!text) return null;
+  for (const catName of Object.keys(STANDARD_CATEGORIES)) {
+    const patterns = getCategoryPatterns(catName);
+    for (const p of patterns) {
+      const m = text.match(p);
+      if (m) {
+        const values = extractValues(catName, m);
+        if (values && values.length) return { category: catName, values, isNewCategory: false };
+      }
+    }
+  }
+  const genericMatch = text.match(/^([\u4e00-\u9fa5a-zA-Z（）()·\.]+?)\s*(\d+(?:\.\d+)?)\s*(.*)$/);
+  if (genericMatch) {
+    const catName = genericMatch[1].trim();
+    const value = parseFloat(genericMatch[2]);
+    const unit = genericMatch[3].trim();
+    if (catName && !isNaN(value) && catName.length <= 8) {
+      const info = getCategoryInfo(catName);
+      return { category: catName, values: [{ label: catName, value, unit: unit || info.unit || '' }], isNewCategory: !info.isStandard };
+    }
+  }
+  return null;
+}
+
+function isLikelyMember(name) {
+  if (familyMembers.includes(name)) return true;
+  if (STANDARD_CATEGORIES[name]) return false;
+  if (!/^[\u4e00-\u9fa5]+$/.test(name)) return false;
+  if (name.length < 2 || name.length > 4) return false;
+  if (['体温','血压','血糖','心率','体重','血氧','身高'].some(k => name.includes(k))) return false;
+  return true;
+}
+
+function parseTimeFromText(text) {
+  const now = new Date();
+  let matched = '';
+
+  // 1) ISO 完整日期 + 时间：2025-08-01 14:30 / 2025-08-01T14:30
+  const isoMatch = text.match(/(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})(?:[\sT](\d{1,2}):(\d{1,2}))?/);
+  if (isoMatch) {
+    const d = new Date(+isoMatch[1], +isoMatch[2]-1, +isoMatch[3], +(isoMatch[4]||0), +(isoMatch[5]||0), 0, 0);
+    return { ts: d.getTime(), matched: isoMatch[0] };
+  }
+
+  // 2) 中文完整日期：2025年8月1日 14:30 / 2025年8月1日 / 2025年8月
+  const cnDate = text.match(/(\d{4})年(?:(\d{1,2})月(?:(\d{1,2})日?)?)?(?:[\s]*(\d{1,2}):(\d{1,2}))?/);
+  if (cnDate) {
+    const y = +cnDate[1]; const m = cnDate[2] ? +cnDate[2] : 1;
+    const day = cnDate[3] ? +cnDate[3] : 1;
+    const hr = cnDate[4] ? +cnDate[4] : 0;
+    const mn = cnDate[5] ? +cnDate[5] : 0;
+    const d = new Date(y, m-1, day, hr, mn, 0, 0);
+    return { ts: d.getTime(), matched: cnDate[0] };
+  }
+
+  // 3) 短日期：8月1日 / 8/1 / 8.1 （默认今年）
+  const shortDate = text.match(/(?<![\d.])(\d{1,2})[-\/.月](\d{1,2})日?/);
+  if (shortDate) {
+    const m = +shortDate[1]; const day = +shortDate[2];
+    let y = now.getFullYear();
+    let d = new Date(y, m-1, day, now.getHours(), now.getMinutes(), 0, 0);
+    // 如果日期在未来，回退到去年
+    if (d.getTime() > now.getTime() + 86400000) { y--; d = new Date(y, m-1, day, now.getHours(), now.getMinutes(), 0, 0); }
+    return { ts: d.getTime(), matched: shortDate[0] };
+  }
+
+  // 4) 相对月：N个月前 / 半年前 / 1年前
+  const monthMatch = text.match(/(\d+)\s*个?月前/);
+  if (monthMatch) {
+    const n = +monthMatch[1];
+    const d = new Date(now); d.setMonth(d.getMonth() - n);
+    return { ts: d.getTime(), matched: monthMatch[0] };
+  }
+  const yearMatch = text.match(/(\d+)\s*年前/);
+  if (yearMatch) {
+    const n = +yearMatch[1];
+    const d = new Date(now); d.setFullYear(d.getFullYear() - n);
+    return { ts: d.getTime(), matched: yearMatch[0] };
+  }
+  if (/半年前/.test(text)) { const d = new Date(now); d.setMonth(d.getMonth() - 6); return { ts: d.getTime(), matched: '半年前' }; }
+
+  // 5) 相对周：N周前 / 上周 / 上上周
+  const weekMatch = text.match(/(\d+)\s*周前/);
+  if (weekMatch) {
+    const n = +weekMatch[1]; const d = new Date(now);
+    d.setDate(d.getDate() - n * 7); return { ts: d.getTime(), matched: weekMatch[0] };
+  }
+  if (/上上周/.test(text)) { const d = new Date(now); d.setDate(d.getDate() - 14); return { ts: d.getTime(), matched: '上上周' }; }
+  if (/上周/.test(text)) { const d = new Date(now); d.setDate(d.getDate() - 7); return { ts: d.getTime(), matched: '上周' }; }
+
+  // 6) 相对天：N天前 / 前天 / 大前天
+  const dayMatch = text.match(/(\d+)\s*天前/);
+  if (dayMatch) {
+    const n = +dayMatch[1]; const d = new Date(now);
+    d.setDate(d.getDate() - n); return { ts: d.getTime(), matched: dayMatch[0] };
+  }
+  if (/大前天/.test(text)) { const d = new Date(now); d.setDate(d.getDate() - 3); return { ts: d.getTime(), matched: '大前天' }; }
+  if (/前天/.test(text)) { const d = new Date(now); d.setDate(d.getDate() - 2); return { ts: d.getTime(), matched: '前天' }; }
+
+  // 7) 相对时间：刚刚 / N分钟前 / N小时前
+  if (/^(刚刚|刚才|现在)/.test(text)) return { ts: now.getTime(), matched: text.match(/^(刚刚|刚才|现在)/)[0] };
+  const m1 = text.match(/(\d+)\s*分钟前/);
+  if (m1) return { ts: now.getTime() - parseInt(m1[1]) * 60000, matched: m1[0] };
+  const m2 = text.match(/(\d+)\s*小时前/);
+  if (m2) return { ts: now.getTime() - parseInt(m2[1]) * 3600000, matched: m2[0] };
+
+  // 8) 自然日期：今天/明天/后天（带可选上午/下午/晚上）/ 昨天 / 上个月 / 去年
+  if (/明天/.test(text)) {
+    const d = new Date(now); d.setDate(d.getDate() + 1);
+    setTimePeriod(d, text); return { ts: d.getTime(), matched: text.match(/明天/)[0] };
+  }
+  if (/后天/.test(text)) {
+    const d = new Date(now); d.setDate(d.getDate() + 2);
+    setTimePeriod(d, text); return { ts: d.getTime(), matched: text.match(/后天/)[0] };
+  }
+  if (/昨天/.test(text)) { const d = new Date(now); d.setDate(d.getDate() - 1); return { ts: d.getTime(), matched: '昨天' }; }
+  if (/今天/.test(text)) {
+    const d = new Date(now);
+    setTimePeriod(d, text);
+    return { ts: d.getTime(), matched: text.match(/今天/)[0] };
+  }
+  if (/上(?:个)?月/.test(text)) {
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 15, 0, 0, 0, 0);
+    return { ts: d.getTime(), matched: text.match(/上(?:个)?月/)[0] };
+  }
+  if (/去年/.test(text)) {
+    const d = new Date(now.getFullYear() - 1, 5, 15, 0, 0, 0, 0);
+    return { ts: d.getTime(), matched: '去年' };
+  }
+
+  // 9) 只匹配时间 HH:MM（默认今天）
+  const m3 = text.match(/(?<!\d)(\d{1,2}):(\d{2})(?!\d)/);
+  if (m3) {
+    const hr = parseInt(m3[1]), mn = parseInt(m3[2]);
+    const d = new Date(now); d.setHours(hr, mn, 0, 0);
+    return { ts: d.getTime(), matched: m3[0] };
+  }
+
+  return { ts: null, matched: '' };
+}
+
+// 设置时间段：上午=9点，下午=15点，晚上=20点，凌晨=2点
+function setTimePeriod(d, text) {
+  if (/凌晨|深夜|午夜/.test(text)) d.setHours(2, 0, 0, 0);
+  else if (/早上|早晨|清晨/.test(text)) d.setHours(7, 0, 0, 0);
+  else if (/上午/.test(text)) d.setHours(9, 0, 0, 0);
+  else if (/中午|午间|正午/.test(text)) d.setHours(12, 0, 0, 0);
+  else if (/下午/.test(text)) d.setHours(15, 0, 0, 0);
+  else if (/傍晚/.test(text)) d.setHours(18, 0, 0, 0);
+  else if (/晚上|夜里|夜间|睡前/.test(text)) d.setHours(21, 0, 0, 0);
+}
+
+function getCategoryPatterns(name) {
+  switch (name) {
+    case '体温': case '体温(口)': case '体温(肛)': case '体温(额)':
+      return [/体温\s*(\d{2}\.?\d?)/, /(\d{2}\.?\d?)\s*°\s*C/i, /(\d{2}\.?\d?)\s*度/];
+    case '血压': return [/血压\s*(\d{2,3})\s*[\/\\]\s*(\d{2,3})/, /(\d{2,3})\s*[\/\\]\s*(\d{2,3})\b/];
+    case '血糖': return [/血糖\s*(\d+\.?\d*)/, /(\d+\.?\d*)\s*mmol/i, /(\d+\.?\d*)\s*mg\/dL/i];
+    case '心率': return [/心率\s*(\d{2,3})/, /脉搏\s*(\d{2,3})/, /HR\s*(\d{2,3})/i, /(\d{2,3})\s*bpm/i];
+    case '体重': return [/体重\s*(\d+\.?\d*)/, /(\d+\.?\d*)\s*kg/i, /(\d+\.?\d*)\s*斤/];
+    case '血氧': return [/血氧\s*(\d{2,3})/, /SP[O2]\s*(\d{2,3})/i, /(\d{2,3})\s*%/];
+    case '身高': return [/身高\s*(\d{2,3})/, /(\d{2,3})\s*cm/i];
+  }
+  return [];
+}
+
+function extractValues(name, match) {
+  switch (name) {
+    case '血压': return [{ label: '高压', value: parseInt(match[1]), unit: 'mmHg' }, { label: '低压', value: parseInt(match[2]), unit: 'mmHg' }];
+    case '体温': case '体温(口)': case '体温(肛)': case '体温(额)':
+      return [{ label: '体温', value: parseFloat(match[1]), unit: '°C' }];
+    case '血糖': { let v = parseFloat(match[1]); if (/mg/i.test(match[0])) v = +(v / 18).toFixed(1); return [{ label: '血糖', value: v, unit: 'mmol/L' }]; }
+    case '心率': return [{ label: '心率', value: parseInt(match[1]), unit: 'bpm' }];
+    case '体重': { let w = parseFloat(match[1]); if (/斤/.test(match[0])) w = +(w / 2).toFixed(1); return [{ label: '体重', value: w, unit: 'kg' }]; }
+    case '血氧': return [{ label: '血氧', value: parseInt(match[1]), unit: '%' }];
+    case '身高': return [{ label: '身高', value: parseInt(match[1]), unit: 'cm' }];
+  }
+  return [];
+}
+
+function classifyValueWithRange(range, value) {
+  if (!range) return null;
+  const [lo, hi] = range;
+  if (value < lo) return '偏低';
+  if (value <= hi) return '正常';
+  if (value <= hi + (hi - lo) * 0.5) return '偏高';
+  return '过高';
+}
+
+function classifyValue(name, value) {
+  const info = getCategoryInfo(name);
+  return classifyValueWithRange(info.range, value);
+}
+
+function finalizeSingle(item) {
+  if (!item.category) return item;
+  if (item.values.length === 0) { item.statusLabel = '类别'; return item; }
+  // 血压特殊处理：取高压+低压按 AHA 范围
+  if (item.category === '血压' && item.values.length === 2) {
+    const [h, l] = item.values.map(v => v.value);
+    if (h >= 140 || l >= 90) item.statusLabel = '偏高';
+    else if (h < 90 || l < 60) item.statusLabel = '偏低';
+    else item.statusLabel = '正常';
+    return item;
+  }
+  const info = getCategoryInfo(item.category);
+  item.statusLabel = classifyValueWithRange(info.range, item.values[0].value);
+  return item;
+}
+
+function finalizeResult(result) {
+  if (result.multi) {
+    for (const item of result.items) finalizeSingle(item);
+    return result;
+  }
+  return finalizeSingle(result);
+}
+
+/* ============================================================
+   Supabase 集成
+   ============================================================ */
+function initSupabase() {
+  if (!isConfigured) return false;
+  try {
+    dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    return true;
+  } catch (e) {
+    console.error('Supabase 初始化失败', e);
+    return false;
+  }
+}
+
+async function loadFromCloud() {
+  if (!dbClient) return;
+  const { data, error } = await dbClient
+    .from('health_records')
+    .select('*')
+    .order('ts', { ascending: false })
+    .limit(5000);
+  if (error) throw error;
+  records = data || [];
+  records.forEach(r => {
+    if (!STANDARD_CATEGORIES[r.category.name] && !customCategories[r.category.name]) {
+      customCategories[r.category.name] = { icon: r.category.icon || '📊', unit: r.category.unit || '' };
+    }
+  });
+  saveCustomCategories();
+  saveLocalCache();
+}
+
+async function pushToCloud(record) {
+  if (!dbClient) throw new Error('未配置 Supabase');
+  const { id, ...data } = record;
+  const { data: inserted, error } = await dbClient.from('health_records').insert(data).select().single();
+  if (error) throw error;
+  return inserted;
+}
+
+async function deleteFromCloud(id) {
+  if (!dbClient || !id) return;
+  const { error } = await dbClient.from('health_records').delete().eq('id', id);
+  if (error) console.error('删除失败', error);
+}
+
+async function clearCloud() {
+  if (!dbClient) return;
+  const { error } = await dbClient.from('health_records').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  if (error) console.error('清空失败', error);
+}
+
+function setupRealtime() {
+  if (!dbClient) return;
+  // Supabase v2 subscribe() 不返回 channel 本身，必须保留引用
+  realtimeChannel = dbClient.channel('health_records_changes');
+  realtimeChannel
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'health_records' }, payload => {
+      const newRec = payload.new;
+      if (!records.find(r => r.id === newRec.id)) {
+        records.unshift(newRec);
+        saveLocalCache();
+        render();
+        showToast(`🔔 新增：${newRec.category.icon} ${newRec.member} · ${newRec.values[0]?.value}${newRec.values[0]?.unit || ''}`);
+      }
+    })
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'health_records' }, payload => {
+      records = records.filter(r => r.id !== payload.old.id);
+      saveLocalCache();
+      render();
+    })
+    .subscribe();
+}
+
+function updateSyncStatus() {
+  const el = document.getElementById('syncIndicator');
+  const txt = document.getElementById('syncText');
+  const footer = document.getElementById('footerText');
+  if (!el || !txt) return;
+  el.className = 'sync-indicator';
+
+  if (LOCAL_MODE || !isConfigured) {
+    el.classList.add('local');
+    txt.textContent = '本地模式';
+    if (footer) footer.textContent = '数据存于本浏览器（本地模式）· 配置云端后多设备同步';
+    return;
+  }
+  if (!dbClient) { el.classList.add('offline'); txt.textContent = '未连接'; return; }
+  if (!navigator.onLine) { el.classList.add('offline'); txt.textContent = '离线 · 等待同步'; return; }
+  if (!realtimeChannel) { el.classList.add('syncing'); txt.textContent = '连接中…'; return; }
+  el.classList.add('synced'); txt.textContent = '实时同步中';
+  if (footer) footer.textContent = '数据存于 Supabase（500MB 永久免费 · 实时同步）· 建议定期导出 CSV 备份';
+}
+
+window.addEventListener('online', () => { showToast('🌐 网络恢复', 'success'); updateSyncStatus(); });
+window.addEventListener('offline', () => { showToast('📴 已离线', 'warning'); updateSyncStatus(); });
+
+/* ============================================================
+   时钟
+   ============================================================ */
+function updateClock() {
+  const now = new Date();
+  document.getElementById('currentTime').textContent = now.toTimeString().slice(0, 8);
+  const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
+  document.getElementById('currentDate').textContent = `${now.getMonth()+1}月${now.getDate()}日 · ${weekdays[now.getDay()]}`;
+  document.getElementById('heroTime').textContent = '记录时间：' + formatDateTime(now.getTime());
+}
+setInterval(updateClock, 1000); updateClock();
+
+/* ============================================================
+   文字输入 + 预览
+   ============================================================ */
+const textInput = document.getElementById('textInput');
+const previewMask = document.getElementById('previewMask');
+
+// textarea 自动高度适应（最大 240px）
+function autoResize() {
+  textInput.style.height = 'auto';
+  const h = Math.min(240, Math.max(48, textInput.scrollHeight));
+  textInput.style.height = h + 'px';
+  // 内容可完全显示时隐藏滚动条
+  const isOverflowing = textInput.scrollHeight > textInput.clientHeight + 1;
+  if (isOverflowing) textInput.classList.remove('no-scroll');
+  else textInput.classList.add('no-scroll');
+}
+textInput.addEventListener('input', autoResize);
+// Enter（Shift+Enter 换行；Enter 识别）
+textInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSmart(); }
+});
+
+// 智能识别入口：默认走 AI；AI 未配置时走规则
+function doSmart() {
+  const text = textInput.value.trim();
+  if (!text) { showToast('请输入内容', 'warning'); return; }
+  // 默认走 AI
+  if (getAiConfig()) {
+    return doAI();
+  }
+  // 没配 AI：先试规则；规则失败引导配置 AI
+  const parsed = parseText(text);
+  if (!parsed) {
+    showToast('规则无法识别，配置 AI 智能识别可识别任意格式', 'warning', 4000);
+    openAiConfig();
+    return;
+  }
+  if (!parsed.multi && (!parsed.category || parsed.values.length === 0)) {
+    showToast('无法识别数值，配置 AI 智能识别可识别任意格式', 'warning', 4000);
+    openAiConfig();
+    return;
+  }
+  currentParsed = parsed;
+  if (parsed.multi) finalizeResult(parsed);
+  openPreview(parsed);
+}
+
+document.getElementById('btnParse').onclick = doSmart;
+
+document.getElementById('quickChips').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  textInput.value = chip.dataset.cat + ' ';
+  textInput.focus();
+});
+
+function openPreview(parsed) {
+  document.getElementById('previewSub').textContent = `原文：「${parsed.raw}」`;
+
+  // 家人
+  const memberSelect = document.getElementById('previewMember');
+  memberSelect.innerHTML = familyMembers.map(m =>
+    `<option value="${escapeHtml(m)}" ${m === parsed.member ? 'selected' : ''}>${escapeHtml(m)}</option>`
+  ).join('');
+
+  // 单条 vs 多条模式
+  const isMulti = parsed.multi;
+  document.getElementById('previewCategory').closest('.preview-row').style.display = isMulti ? 'none' : '';
+  document.getElementById('previewValuesRow').style.display = isMulti ? 'none' : '';
+  document.getElementById('previewItemsRow').style.display = isMulti ? '' : 'none';
+  document.getElementById('previewRangeRow').style.display = isMulti ? 'none' : '';
+
+  // 多条渲染
+  if (isMulti) {
+    const isLab = parsed.isLabReport;
+    document.getElementById('previewItems').innerHTML = parsed.items.map((it, idx) => {
+      const info = getCategoryInfo(it.category);
+      const v = it.values[0];
+      let valDisplay;
+      if (v.isQualitative) valDisplay = escapeHtml(v.value);
+      else valDisplay = `<b>${v.value}</b>${escapeHtml(v.unit || '')}`;
+
+      let refDisplay = '';
+      if (it.range && (it.range[0] != null || it.range[1] != null)) {
+        refDisplay = `参考 ${it.range[0] != null ? it.range[0] : '?'}~${it.range[1] != null ? it.range[1] : '?'}`;
+      } else if (it.rangeText) refDisplay = `参考 ${escapeHtml(it.rangeText)}`;
+
+      const status = evalItemStatus(it);
+      const nextCls = status.cls === 'normal' ? 'abnormal' : 'normal';
+      const nextLabel = status.cls === 'normal' ? '⚠ 标异常' : '✓ 标正常';
+      return `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed #f1f5f9;">
+          <span style="font-size:18px;flex-shrink:0;">${info.icon}</span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:13px;">${escapeHtml(it.category)} ${it.isNewCategory ? '<span class="new-badge" style="font-size:9px;">新</span>' : ''}</div>
+            <div style="font-size:12px;color:var(--text-3);margin-top:2px;">
+              <span style="color:var(--text);">${valDisplay}</span>
+              ${refDisplay ? ` · <span>${refDisplay}</span>` : ''}
+            </div>
+          </div>
+          <button class="preview-item-toggle" data-idx="${idx}" data-next="${nextCls}" style="margin:0;padding:3px 8px;font-size:11px;flex-shrink:0;cursor:pointer;border:1px solid currentColor;background:transparent;border-radius:6px;color:${status.cls === 'normal' ? '#065f46' : '#991b1b'};" title="切换状态">${status.cls === 'normal' ? '✓' : '⚠'}</button>
+          <span class="preview-status ${status.cls}" style="margin:0;padding:3px 8px;font-size:11px;flex-shrink:0;">${status.label}</span>
+        </div>
+      `;
+    }).join('');
+    // 绑定切换按钮
+    document.querySelectorAll('#previewItems .preview-item-toggle').forEach(btn => {
+      btn.onclick = () => {
+        const i = parseInt(btn.dataset.idx);
+        const item = currentParsed.items[i];
+        item.manualStatus = btn.dataset.next;
+        // 重新渲染
+        openPreview(currentParsed);
+      };
+    });
+    // 体检报告模式下显示总结
+    if (isLab) {
+      const ok = parsed.items.filter(i => evalItemStatus(i).cls === 'normal').length;
+      const bad = parsed.items.filter(i => evalItemStatus(i).cls === 'warning').length;
+      const summary = `<div style="margin-top:12px;padding:10px 12px;border-radius:8px;font-size:13px;${bad>0?'background:#fef3c7;color:#92400e;':'background:#d1fae5;color:#065f46;'}">
+        📊 <b>共 ${parsed.items.length} 项</b> · ✅ ${ok} 项正常${bad>0?` · ⚠️ ${bad} 项需关注`:''}
+      </div>`;
+      document.getElementById('previewItems').insertAdjacentHTML('beforeend', summary);
+    }
+  } else {
+    document.getElementById('previewCategory').value = parsed.category || '';
+    document.getElementById('previewCategoryNew').style.display = parsed.isNewCategory ? 'inline-block' : 'none';
+    const info = getCategoryInfo(parsed.category);
+    const catSelect = document.getElementById('previewCategorySelect');
+    catSelect.innerHTML = `<option value="">— 切换到标准类别 —</option>` +
+      Object.keys(STANDARD_CATEGORIES).map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    document.getElementById('previewCategoryPicker').style.display = '';
+    catSelect.value = '';
+    // 参考区间
+    const range = info.range || [null, null];
+    document.getElementById('previewRangeLow').value = (range[0] != null ? range[0] : '');
+    document.getElementById('previewRangeHigh').value = (range[1] != null ? range[1] : '');
+    document.getElementById('previewRangeUnit').textContent = info.unit || '';
+
+    const valuesDiv = document.getElementById('previewValues');
+    if (parsed.values.length === 0) {
+      valuesDiv.innerHTML = '<span style="color:#94a3b8;font-size:13px;">无数值（仅创建类别）</span>';
+    } else {
+      valuesDiv.innerHTML = parsed.values.map((v, i) => `
+        <div class="preview-value-item">
+          <span class="label">${escapeHtml(v.label)}</span>
+          <input type="number" step="0.1" data-i="${i}" value="${v.value}">
+          <span class="unit">${escapeHtml(v.unit || '')}</span>
+        </div>
+      `).join('');
+    }
+    updatePreviewStatus(parsed);
+  }
+
+  document.getElementById('previewTime').value = toDatetimeLocal(parsed.time);
+  document.getElementById('previewNote').value = parsed.note || '';
+  previewMask.classList.add('show');
+}
+
+function updatePreviewStatus(parsed) {
+  const el = document.getElementById('previewStatus');
+  if (!parsed.category) { el.className = 'preview-status empty'; el.textContent = '⚠ 类别无法识别'; return; }
+  if (parsed.values.length === 0) {
+    el.className = 'preview-status info';
+    el.textContent = `📂 将创建新类别「${parsed.category}」`; return;
+  }
+  if (parsed.category === '血压' && parsed.values.length === 2) {
+    const [h, l] = parsed.values.map(v => v.value);
+    if (h >= 140 || l >= 90) { el.className = 'preview-status warning'; el.textContent = `⚠️ 血压偏高 ${h}/${l}`; }
+    else if (h < 90 || l < 60) { el.className = 'preview-status warning'; el.textContent = `⚠️ 血压偏低 ${h}/${l}`; }
+    else { el.className = 'preview-status normal'; el.textContent = `✅ 血压正常 ${h}/${l}`; }
+  } else {
+    const v = parsed.values[0].value;
+    const cls = parsed.statusLabel;
+    if (cls === '正常') { el.className = 'preview-status normal'; el.textContent = `✅ ${parsed.category} 正常（${v}${parsed.values[0].unit}）`; }
+    else if (cls === '偏低') { el.className = 'preview-status warning'; el.textContent = `⚠️ ${parsed.category} 偏低（${v}${parsed.values[0].unit}）`; }
+    else if (cls === '偏高' || cls === '过高') {
+      el.className = cls === '过高' ? 'preview-status danger' : 'preview-status warning';
+      el.textContent = `⚠️ ${parsed.category} ${cls}（${v}${parsed.values[0].unit}）`;
+    } else { el.className = 'preview-status info'; el.textContent = `📊 ${parsed.category} = ${v}${parsed.values[0].unit}`; }
+  }
+}
+
+document.getElementById('previewValues').addEventListener('input', (e) => {
+  if (e.target.tagName !== 'INPUT') return;
+  const i = parseInt(e.target.dataset.i);
+  const v = parseFloat(e.target.value);
+  if (!isNaN(v)) {
+    currentParsed.values[i].value = v;
+    const info = getCategoryInfo(currentParsed.category);
+    currentParsed.statusLabel = classifyValueWithRange(info.range, v);
+    updatePreviewStatus(currentParsed);
+  }
+});
+
+document.getElementById('previewRangeLow').addEventListener('input', () => {
+  if (!currentParsed) return;
+  const lo = parseFloat(document.getElementById('previewRangeLow').value);
+  const hi = parseFloat(document.getElementById('previewRangeHigh').value);
+  const info = getCategoryInfo(currentParsed.category);
+  info.range = (!isNaN(lo) || !isNaN(hi)) ? [isNaN(lo) ? null : lo, isNaN(hi) ? null : hi] : null;
+  if (!info.isStandard) { customCategories[currentParsed.category] = info; saveCustomCategories(); }
+  if (currentParsed.values.length) {
+    currentParsed.statusLabel = classifyValueWithRange(info.range, currentParsed.values[0].value);
+    updatePreviewStatus(currentParsed);
+  }
+});
+document.getElementById('previewRangeHigh').addEventListener('input', () => {
+  document.getElementById('previewRangeLow').dispatchEvent(new Event('input'));
+});
+document.getElementById('previewRangeClear').addEventListener('click', () => {
+  if (!currentParsed) return;
+  document.getElementById('previewRangeLow').value = '';
+  document.getElementById('previewRangeHigh').value = '';
+  const info = getCategoryInfo(currentParsed.category);
+  info.range = STANDARD_CATEGORIES[currentParsed.category]?.defaultRange || null;
+  if (!info.isStandard && !customCategories[currentParsed.category]?.range) {
+    delete customCategories[currentParsed.category]?.range;
+    saveCustomCategories();
+  } else if (!info.isStandard) {
+    customCategories[currentParsed.category].range = info.range;
+    saveCustomCategories();
+  }
+  if (currentParsed.values.length) {
+    currentParsed.statusLabel = classifyValueWithRange(info.range, currentParsed.values[0].value);
+    updatePreviewStatus(currentParsed);
+  }
+  showToast('已恢复默认参考区间');
+});
+
+document.getElementById('previewCategory').addEventListener('input', () => {
+  if (!currentParsed) return;
+  const newName = document.getElementById('previewCategory').value.trim();
+  currentParsed.category = newName;
+  currentParsed.isNewCategory = !STANDARD_CATEGORIES[newName] && !customCategories[newName];
+  document.getElementById('previewCategoryNew').style.display = currentParsed.isNewCategory ? 'inline-block' : 'none';
+  // 更新参考区间显示
+  const info = getCategoryInfo(newName);
+  const range = info.range || [null, null];
+  document.getElementById('previewRangeLow').value = (range[0] != null ? range[0] : '');
+  document.getElementById('previewRangeHigh').value = (range[1] != null ? range[1] : '');
+  document.getElementById('previewRangeUnit').textContent = info.unit || '';
+  updatePreviewStatus(currentParsed);
+});
+
+document.getElementById('previewCategorySelect').addEventListener('change', (e) => {
+  if (!currentParsed || !e.target.value) return;
+  currentParsed.category = e.target.value;
+  document.getElementById('previewCategory').value = e.target.value;
+  currentParsed.isNewCategory = false;
+  document.getElementById('previewCategoryNew').style.display = 'none';
+  const info = getCategoryInfo(e.target.value);
+  const range = info.range || [null, null];
+  document.getElementById('previewRangeLow').value = (range[0] != null ? range[0] : '');
+  document.getElementById('previewRangeHigh').value = (range[1] != null ? range[1] : '');
+  document.getElementById('previewRangeUnit').textContent = info.unit || '';
+  // 如果还没读 value 的单位，更新
+  if (currentParsed.values[0]) currentParsed.values[0].unit = info.unit || currentParsed.values[0].unit;
+  openPreview(currentParsed); // 重新渲染以更新单位显示
+});
+
+document.getElementById('previewCancel').onclick = () => previewMask.classList.remove('show');
+
+// "+新成员" 按钮：弹输入框让用户添新家人
+document.getElementById('previewAddMember').addEventListener('click', () => {
+  const name = prompt('输入新家人名字（如：妈妈、爸爸、孩子、爷爷）', '');
+  if (!name) return;
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  if (familyMembers.includes(trimmed)) {
+    showToast(`「${trimmed}」已存在`);
+  } else {
+    familyMembers.push(trimmed);
+    saveMembers();
+    showToast(`✓ 已添加「${trimmed}」`);
+  }
+  // 重新填充下拉并选中
+  const select = document.getElementById('previewMember');
+  select.innerHTML = familyMembers.map(m =>
+    `<option value="${escapeHtml(m)}" ${m === trimmed ? 'selected' : ''}>${escapeHtml(m)}</option>`
+  ).join('');
+  select.value = trimmed;
+});
+
+function buildCategoryData(catName, currentItem) {
+  const std = STANDARD_CATEGORIES[catName];
+  const cust = customCategories[catName];
+  const info = std || cust || {};
+  let range = info.range || std?.defaultRange || null;
+  let rangeText = info.rangeText || '';
+  // 多组模式下用 item 的 range
+  if (currentItem && currentItem.range) range = currentItem.range;
+  if (currentItem && currentItem.rangeText) rangeText = currentItem.rangeText;
+  return {
+    name: catName,
+    icon: info.icon || '📋',
+    unit: currentItem?.values[0]?.unit || info.unit || '',
+    isStandard: !!std,
+    range,
+    rangeText
+  };
+}
+
+async function saveOneRecord(ts, member, catName, currentItem, note) {
+  const catData = buildCategoryData(catName, currentItem);
+  // 用户在弹窗中改的参考区间
+  if (!currentItem.multi) {
+    const lowInput = document.getElementById('previewRangeLow').value;
+    const highInput = document.getElementById('previewRangeHigh').value;
+    const lo = parseFloat(lowInput);
+    const hi = parseFloat(highInput);
+    if (lowInput !== '' && !isNaN(lo) || highInput !== '' && !isNaN(hi)) {
+      catData.range = [isNaN(lo) ? null : lo, isNaN(hi) ? null : hi];
+    }
+  }
+  // 保存到 custom categories
+  if (!STANDARD_CATEGORIES[catName]) {
+    if (!customCategories[catName]) {
+      customCategories[catName] = { icon: catData.icon, unit: catData.unit };
+    }
+    if (catData.range) customCategories[catName].range = catData.range;
+    saveCustomCategories();
+  }
+
+  const record = {
+    ts, member,
+    category: catData,
+    values: currentItem.values,
+    note,
+    statusLabel: currentItem.manualStatus === 'abnormal' ? '异常' : (currentItem.manualStatus === 'normal' ? '正常' : undefined),
+    statusManual: !!currentItem.manualStatus
+  };
+  // 过滤 undefined 的字段
+  Object.keys(record).forEach(k => record[k] === undefined && delete record[k]);
+
+  if (LOCAL_MODE || !isConfigured) {
+    record.id = 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+    records.unshift(record);
+    saveLocalCache();
+    return record;
+  }
+  try {
+    const inserted = await pushToCloud(record);
+    records.unshift(inserted);
+    saveLocalCache();
+    return inserted;
+  } catch (e) {
+    record.id = 'pending-' + Date.now();
+    records.unshift(record);
+    saveLocalCache();
+    throw e;
+  }
+}
+
+document.getElementById('previewConfirm').onclick = async () => {
+  if (!currentParsed) { showToast('暂无数据', 'warning'); return; }
+  const member = document.getElementById('previewMember').value;
+  const note = document.getElementById('previewNote').value.trim();
+  const ts = fromDatetimeLocal(document.getElementById('previewTime').value);
+
+  if (!familyMembers.includes(member)) { familyMembers.push(member); saveMembers(); }
+
+  previewMask.classList.remove('show');
+  textInput.value = '';
+
+  try {
+    if (currentParsed.multi) {
+      // 多条保存
+      let saved = 0;
+      for (const item of currentParsed.items) {
+        // checkbox 勾选 → 创建新类别
+        if (item.isNewCategory && !STANDARD_CATEGORIES[item.category] && !customCategories[item.category]) {
+          customCategories[item.category] = { icon: suggestIcon(item.category), unit: item.values[0]?.unit || '' };
+        }
+        await saveOneRecord(ts, member, item.category, item, note);
+        saved++;
+      }
+      saveCustomCategories();
+      render();
+      showToast(`✓ 已批量保存 ${saved} 条记录`);
+    } else {
+      const catName = document.getElementById('previewCategory').value.trim();
+      if (!catName) { showToast('请填写类别', 'warning'); return; }
+      await saveOneRecord(ts, member, catName, currentParsed, note);
+      render();
+      showToast(`✓ 已记录 ${catName}`);
+    }
+  } catch (e) {
+    render();
+    showToast('保存失败：' + (e.message || e), 'error');
+    console.error(e);
+  }
+};
+
+// 配置按钮 - 用 addEventListener 更安全，并加 e.stopPropagation() 防止冒泡
+function bindClick(id, handler, label) {
+  const el = document.getElementById(id);
+  if (!el) { console.warn('找不到按钮：', id); return; }
+  el.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('点击了', label || id);
+    handler(e);
+  });
+}
+
+bindClick('settingsBtn', openConfig, '⚙ 设置按钮');
+bindClick('bannerConfigBtn', openConfig, '横幅配置按钮');
+
+function openConfig() {
+  document.getElementById('cfgUrl').value = SUPABASE_URL || '';
+  document.getElementById('cfgKey').value = SUPABASE_ANON_KEY || '';
+  document.getElementById('configMask').classList.add('show');
+  console.log('✓ 配置弹窗已打开');
+}
+
+bindClick('cfgCancel', () => {
+  document.getElementById('configMask').classList.remove('show');
+  console.log('关闭配置弹窗');
+});
+
+bindClick('cfgLocalMode', () => {
+  localStorage.setItem(CFG_LOCAL_KEY, '1');
+  showToast('已切到本地模式');
+  setTimeout(() => location.reload(), 600);
+});
+
+bindClick('cfgSave', () => {
+  const url = document.getElementById('cfgUrl').value.trim();
+  const key = document.getElementById('cfgKey').value.trim();
+  if (!url || !key) { showToast('请填写完整', 'warning'); return; }
+  if (!url.startsWith('http')) { showToast('URL 格式不对', 'warning'); return; }
+  localStorage.setItem(CFG_URL_KEY, url);
+  localStorage.setItem(CFG_KEY_KEY, key);
+  localStorage.removeItem(CFG_LOCAL_KEY);
+  showToast('✓ 已保存，正在刷新…');
+  setTimeout(() => location.reload(), 800);
+});
+
+function deleteRecord(id) {
+  const rec = records.find(r => r.id === id);
+  if (!rec) return;
+  const label = `${formatDateTime(rec.ts)} · ${rec.member} · ${rec.category.name}`;
+  if (!confirm(`确认删除这条记录？\n\n${label}`)) return;
+  records = records.filter(r => r.id !== id);
+  saveLocalCache(); render();
+  if (!id.startsWith('pending-') && !id.startsWith('local-')) {
+    deleteFromCloud(id).catch(e => console.error('云端删除失败', e));
+  }
+  showToast('✓ 已删除');
+}
+
+async function clearAll() {
+  if (!confirm(`清空全部 ${records.length} 条记录？\n\n建议先导出 CSV 备份`)) return;
+  if (!confirm(`再确认一次：真的要清空全部吗？\n此操作不可恢复！`)) return;
+  records = []; saveLocalCache(); render();
+  if (!LOCAL_MODE && isConfigured) {
+    try { await clearCloud(); } catch (e) { console.error(e); }
+  }
+  showToast('已清空全部');
+}
+
+/* ----- 删除筛选弹窗 ----- */
+let delMatchedIds = [];
+
+function openDeleteDialog() {
+  if (records.length === 0) { alert('暂无记录'); return; }
+  // 家人选项
+  const memberOpts = ['<option value="all">全部家人</option>'].concat(
+    familyMembers.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`)
+  ).join('');
+  document.getElementById('delMember').innerHTML = memberOpts;
+  // 类别选项
+  const allCats = new Set();
+  records.forEach(r => allCats.add(r.category.name));
+  const catOpts = ['<option value="all">全部类别</option>'].concat(
+    [...allCats].sort().map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)
+  ).join('');
+  document.getElementById('delCategory').innerHTML = catOpts;
+  document.getElementById('delTimeRange').value = 'all';
+  document.getElementById('delCustomRange').style.display = 'none';
+  document.getElementById('delConfirmWrap').style.display = 'none';
+  document.getElementById('delConfirmInput').value = '';
+  updateDeleteMatch();
+  document.getElementById('deleteMask').classList.add('show');
+}
+
+function updateDeleteMatch() {
+  const member = document.getElementById('delMember').value;
+  const category = document.getElementById('delCategory').value;
+  const timeRange = document.getElementById('delTimeRange').value;
+  const now = Date.now();
+
+  let filtered = records.slice();
+  if (member !== 'all') filtered = filtered.filter(r => r.member === member);
+  if (category !== 'all') filtered = filtered.filter(r => r.category.name === category);
+
+  if (timeRange === '24h') filtered = filtered.filter(r => r.ts >= now - 86400000);
+  else if (timeRange === '7d') filtered = filtered.filter(r => r.ts >= now - 7 * 86400000);
+  else if (timeRange === '30d') filtered = filtered.filter(r => r.ts >= now - 30 * 86400000);
+  else if (timeRange === 'custom') {
+    const start = document.getElementById('delStart').value;
+    const end = document.getElementById('delEnd').value;
+    if (start) filtered = filtered.filter(r => r.ts >= new Date(start).getTime());
+    if (end) filtered = filtered.filter(r => r.ts <= new Date(end).getTime() + 86400000 - 1);
+  }
+
+  delMatchedIds = filtered.map(r => r.id);
+  document.getElementById('delMatchCount').textContent = filtered.length;
+  document.getElementById('delConfirmWrap').style.display = filtered.length > 0 ? '' : 'none';
+
+  // 预览前几条
+  const preview = filtered.slice(0, 5).map(r => {
+    const valuesText = r.values.map(v => `<b>${v.value}</b>${escapeHtml(v.unit || '')}`).join('/');
+    return `<div style="padding:4px 0;color:#92400e;">${formatDate(r.ts)} ${escapeHtml(r.member)} ${escapeHtml(r.category.name)} ${valuesText}</div>`;
+  }).join('');
+  if (filtered.length > 5) preview + `<div style="color:#92400e;">... 还有 ${filtered.length - 5} 条</div>`;
+}
+
+document.getElementById('btnDelete').addEventListener('click', openDeleteDialog);
+document.getElementById('delCancel').addEventListener('click', () => document.getElementById('deleteMask').classList.remove('show'));
+['delMember', 'delCategory', 'delTimeRange'].forEach(id => {
+  document.getElementById(id).addEventListener('change', updateDeleteMatch);
+});
+document.getElementById('delTimeRange').addEventListener('change', (e) => {
+  document.getElementById('delCustomRange').style.display = e.target.value === 'custom' ? '' : 'none';
+  updateDeleteMatch();
+});
+document.getElementById('delStart').addEventListener('change', updateDeleteMatch);
+document.getElementById('delEnd').addEventListener('change', updateDeleteMatch);
+
+// 全局：所有 .modal-close 按钮 + 点击遮罩 + ESC 键 关闭弹窗
+document.addEventListener('click', (e) => {
+  const closeBtn = e.target.closest('.modal-close');
+  if (closeBtn) {
+    const id = closeBtn.dataset.close;
+    const mask = id ? document.getElementById(id) : null;
+    if (mask) mask.classList.remove('show');
+    return;
+  }
+  // 点击遮罩空白处（不是 modal 内部）
+  if (e.target.classList && e.target.classList.contains('modal-mask') && e.target.classList.contains('show')) {
+    e.target.classList.remove('show');
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-mask.show').forEach(m => m.classList.remove('show'));
+  }
+});
+
+document.getElementById('delConfirmBtn').addEventListener('click', async () => {
+  if (delMatchedIds.length === 0) { showToast('没有匹配的记录', 'warning'); return; }
+  const confirmation = document.getElementById('delConfirmInput').value.trim();
+  if (confirmation !== '删除') {
+    showToast('请输入"删除"两字确认', 'warning');
+    document.getElementById('delConfirmInput').focus();
+    return;
+  }
+  const idsToDelete = new Set(delMatchedIds);
+  records = records.filter(r => !idsToDelete.has(r.id));
+  saveLocalCache(); render();
+  document.getElementById('deleteMask').classList.remove('show');
+  showToast(`✓ 已删除 ${idsToDelete.size} 条`);
+  // 云端删除
+  if (!LOCAL_MODE && isConfigured) {
+    for (const id of idsToDelete) {
+      if (!id.startsWith('pending-') && !id.startsWith('local-')) {
+        deleteFromCloud(id).catch(e => console.error(e));
+      }
+    }
+  }
+});
+
+/* ============================================================
+   渲染
+   ============================================================ */
+function renderStats() {
+  const today = records.filter(r => isSameDay(r.ts, Date.now()));
+  const weekAgo = Date.now() - 7 * 86400000;
+  const week = records.filter(r => r.ts >= weekAgo);
+  const cats = new Set(records.map(r => r.category.name));
+
+  document.getElementById('statTodayCount').textContent = today.length;
+  document.getElementById('statTodaySub').textContent = today.length > 0 ? `涉及 ${new Set(today.map(r => r.category.name)).size} 个类别` : '尚无记录';
+  document.getElementById('statWeekCount').textContent = week.length;
+  document.getElementById('statWeekSub').textContent = `覆盖 ${new Set(week.map(r => r.category.name)).size} 个类别`;
+  document.getElementById('statCatsCount').textContent = cats.size;
+  document.getElementById('statCatsSub').textContent = cats.size > 0 ? `点击管理类别` : '还没有类别';
+  document.getElementById('statMembersCount').textContent = familyMembers.length;
+  document.getElementById('statMembersSub').textContent = familyMembers.length > 0 ? `点击管理成员` : '点击添加成员';
+}
+
+function renderMemberFilter() {
+  const members = ['all', ...familyMembers];
+  document.getElementById('memberFilter').innerHTML = members.map(m =>
+    `<span class="member-chip ${currentMemberFilter === m ? 'active' : ''}" data-m="${escapeHtml(m)}">${m === 'all' ? '全部' : escapeHtml(m)}</span>`
+  ).join('');
+  document.querySelectorAll('#memberFilter .member-chip').forEach(c => {
+    c.onclick = () => { currentMemberFilter = c.dataset.m; renderHistory(); renderMemberFilter(); };
+  });
+}
+
+function openMemberManager() {
+  const mask = document.createElement('div');
+  mask.className = 'modal-mask show';
+  mask.id = 'memberMgrMask';
+  mask.innerHTML = `
+    <div class="modal" style="max-width:480px;">
+      <button class="modal-close" data-close="memberMgrMask" title="关闭">×</button>
+      <h3>👨‍👩‍👧 家庭成员管理</h3>
+      <div class="modal-sub">修改成员名字、添加新成员、删除成员</div>
+      <div id="memberList" style="display:flex;flex-direction:column;gap:8px;margin:12px 0;max-height:50vh;overflow-y:auto;"></div>
+      <button class="btn-secondary" id="memberAddBtn" style="width:100%;margin-top:8px;">+ 添加新成员</button>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button class="btn-primary" id="memberMgrDone" style="width:100%;">✓ 完成</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(mask);
+
+  const refreshList = () => {
+    const list = mask.querySelector('#memberList');
+    list.innerHTML = familyMembers.map((m, i) => {
+      const count = records.filter(r => r.member === m).length;
+      return `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);">
+          <span style="font-size:20px;">👤</span>
+          <input type="text" class="preview-input" data-idx="${i}" value="${escapeHtml(m)}" style="flex:1;padding:6px 10px;" maxlength="6">
+          <span style="font-size:11px;color:var(--text-3);">${count} 条</span>
+          <button class="member-del-btn" data-name="${escapeHtml(m)}" style="background:#fee2e2;color:var(--danger);border:1px solid #fecaca;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;">删除</button>
+        </div>
+      `;
+    }).join('');
+    if (familyMembers.length === 0) {
+      list.innerHTML = '<div style="text-align:center;color:var(--text-3);padding:20px;">还没有成员，点下方"添加新成员"开始</div>';
+    }
+    // 改名
+    list.querySelectorAll('input[data-idx]').forEach(inp => {
+      inp.addEventListener('change', (e) => {
+        const i = parseInt(e.target.dataset.idx);
+        const newName = e.target.value.trim();
+        if (!newName) { e.target.value = familyMembers[i]; return; }
+        if (newName === familyMembers[i]) return;
+        if (familyMembers.includes(newName)) { showToast('名字已存在', 'warning'); e.target.value = familyMembers[i]; return; }
+        const oldName = familyMembers[i];
+        familyMembers[i] = newName;
+        // 同步更新历史记录
+        records.forEach(r => { if (r.member === oldName) r.member = newName; });
+        saveMembers(); saveLocalCache();
+        if (currentMemberFilter === oldName) currentMemberFilter = newName;
+        refreshList();
+      });
+    });
+    // 删除
+    list.querySelectorAll('.member-del-btn').forEach(btn => {
+      btn.onclick = () => {
+        const name = btn.dataset.name;
+        const count = records.filter(r => r.member === name).length;
+        let msg = `确认删除成员「${name}」？`;
+        if (count > 0) msg += `\n\n该成员下还有 ${count} 条记录。\n删除后这些记录的成员会被标记为"未分类"。`;
+        if (!confirm(msg)) return;
+        familyMembers = familyMembers.filter(m => m !== name);
+        records.forEach(r => { if (r.member === name) r.member = '未分类'; });
+        saveMembers(); saveLocalCache();
+        if (currentMemberFilter === name) currentMemberFilter = 'all';
+        refreshList();
+      };
+    });
+  };
+  refreshList();
+
+  mask.querySelector('#memberAddBtn').onclick = () => {
+    const newName = prompt('输入新成员名字（1-6 个汉字）', '');
+    if (!newName) return;
+    const n = newName.trim();
+    if (!n) return;
+    if (familyMembers.includes(n)) { showToast('名字已存在', 'warning'); return; }
+    familyMembers.push(n);
+    saveMembers();
+    refreshList();
+  };
+
+  mask.querySelector('#memberMgrDone').onclick = async () => {
+    // 同步所有修改的记录到云端
+    showToast('正在同步到云端…');
+    mask.remove();
+    saveLocalCache();
+    render();
+    // 后台异步推送修改的记录
+    for (const r of records) {
+      if (r.id && !r.id.startsWith('local-') && !r.id.startsWith('pending-')) {
+        try { await dbClient.from('health_records').update({ member: r.member }).eq('id', r.id); } catch(e) {}
+      }
+    }
+    showToast('✓ 成员信息已更新');
+  };
+}
+
+
+// 用户手动选择要显示的类别（默认：按数据量取前 4）
+let chartVisibleCats = JSON.parse(localStorage.getItem('chartVisibleCats') || 'null');
+
+function getCategoryColor(name, idx) {
+  const colors = ['#0891b2', '#f59e0b', '#8b5cf6', '#ec4899', '#10b981', '#3b82f6', '#ef4444', '#06b6d4'];
+  return colors[idx % colors.length];
+}
+
+function getCategoryStats() {
+  // 每个类别中**可画图**（数值类）的数据量 + 最近值
+  // 定性类（阴性/阳性等）不计入，避免出现在图表选择器里
+  const stats = {};
+  records.forEach(r => {
+    const n = r.category.name;
+    const v = r.values[0]?.value;
+    // 只统计数值类（图表能画）
+    if (typeof v !== 'number') return;
+    if (!stats[n]) stats[n] = { count: 0, icon: r.category.icon || '📋', lastTs: 0, lastVal: '', lastUnit: '', unit: r.category.unit || '' };
+    stats[n].count++;
+    if (r.ts >= stats[n].lastTs) {
+      stats[n].lastTs = r.ts;
+      stats[n].lastVal = v;
+      stats[n].lastUnit = r.values[0]?.unit || '';
+    }
+  });
+  return Object.entries(stats).sort((a, b) => b[1].count - a[1].count);
+}
+
+function renderChartCats() {
+  const allStats = getCategoryStats();
+  if (allStats.length === 0) {
+    document.getElementById('chartCatsWrap').style.display = 'none';
+    return;
+  }
+  document.getElementById('chartCatsWrap').style.display = '';
+
+  // 默认显示全部有数据的类别（仅首次；用户手动隐藏后保持隐藏）
+  if (chartVisibleCats === null || chartVisibleCats === undefined) {
+    chartVisibleCats = allStats.map(([n]) => n);
+  } else {
+    // 过滤掉已经不存在的类别，但保留用户主动清空的选择
+    const existing = new Set(allStats.map(([n]) => n));
+    chartVisibleCats = chartVisibleCats.filter(n => existing.has(n));
+  }
+
+  // 显示中的
+  document.getElementById('chartCatsShown').innerHTML = chartVisibleCats.map(name => {
+    const s = allStats.find(([n]) => n === name)?.[1];
+    return `<span class="chip chip-selected" data-cat="${escapeHtml(name)}" title="点击隐藏">${s?.icon || '📋'} ${escapeHtml(name)} ✕</span>`;
+  }).join('');
+
+  // 更多类别按钮：只在还有未显示类别时显示
+  const moreCats = allStats.filter(([n]) => !chartVisibleCats.includes(n));
+  const moreBtn = document.getElementById('chartMoreCatsBtn');
+  if (moreCats.length > 0) {
+    moreBtn.style.display = '';
+    moreBtn.textContent = `还有 ${moreCats.length} 个类别，点开选择 / 一键全显`;
+  } else {
+    moreBtn.style.display = 'none';
+  }
+
+  // 渲染可选类别（已折叠，未显示在面板中）
+  document.getElementById('chartAllCats').innerHTML = `
+    <button class="btn-secondary" id="showAllCatsBtn" style="font-size:12px;padding:5px 11px;margin-bottom:6px;">✓ 全部显示 (${allStats.length})</button>
+    <button class="btn-secondary" id="hideAllCatsBtn" style="font-size:12px;padding:5px 11px;margin-bottom:6px;">✕ 全部隐藏</button>
+  ` + allStats.map(([name, s]) => {
+    const shown = chartVisibleCats.includes(name);
+    return `<span class="cat-toggle-chip ${shown ? 'on' : ''}" data-cat="${escapeHtml(name)}" title="${s.count} 条记录">${s.icon} ${escapeHtml(name)} <small>(${s.count})</small></span>`;
+  }).join('');
+
+  document.getElementById('showAllCatsBtn').onclick = () => {
+    chartVisibleCats = allStats.map(([n]) => n);
+    localStorage.setItem('chartVisibleCats', JSON.stringify(chartVisibleCats));
+    renderChart();
+  };
+  document.getElementById('hideAllCatsBtn').onclick = () => {
+    chartVisibleCats = [];
+    localStorage.setItem('chartVisibleCats', JSON.stringify(chartVisibleCats));
+    renderChart();
+  };
+
+  // 绑定事件
+  document.querySelectorAll('#chartCatsShown .chip-selected').forEach(el => {
+    el.onclick = () => {
+      chartVisibleCats = chartVisibleCats.filter(n => n !== el.dataset.cat);
+      localStorage.setItem('chartVisibleCats', JSON.stringify(chartVisibleCats));
+      renderChart();
+    };
+  });
+  document.querySelectorAll('#chartAllCats .cat-toggle-chip').forEach(el => {
+    el.onclick = () => {
+      const name = el.dataset.cat;
+      if (chartVisibleCats.includes(name)) {
+        chartVisibleCats = chartVisibleCats.filter(n => n !== name);
+      } else {
+        chartVisibleCats = [...chartVisibleCats, name];
+      }
+      localStorage.setItem('chartVisibleCats', JSON.stringify(chartVisibleCats));
+      renderChart();
+    };
+  });
+}
+
+document.getElementById('chartMoreCatsBtn').addEventListener('click', () => {
+  const panel = document.getElementById('chartMoreCatsPanel');
+  panel.style.display = panel.style.display === 'none' ? '' : 'none';
+});
+
+function renderChart() {
+  // 销毁所有旧图
+  Object.values(miniCharts).forEach(c => { try { c.destroy(); } catch(e){} });
+  miniCharts = {};
+
+  if (records.length === 0) {
+    document.getElementById('miniChartsGrid').innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="icon">📈</div><div class="text">还没有数据，录入后这里会显示每个类别的趋势</div></div>';
+    renderChartCats();
+    return;
+  }
+
+  // 过滤范围
+  let data = records.slice();
+  if (currentChartRange === '7') data = data.filter(r => r.ts >= Date.now() - 7 * 86400000);
+  else if (currentChartRange === '30') data = data.slice(0, 100);
+
+  // 收集所有有数值数据的类别
+  const byCat = {};
+  data.slice().sort((a, b) => a.ts - b.ts).forEach(r => {
+    const n = r.category.name;
+    const v = r.values[0]?.value;
+    if (typeof v !== 'number') return;
+    if (!byCat[n]) byCat[n] = { name: n, icon: r.category.icon, unit: r.category.unit, points: [] };
+    byCat[n].points.push({ x: r.ts, y: v, member: r.member, values: r.values, note: r.note });
+  });
+
+  const allCats = Object.values(byCat).sort((a, b) => b.points.length - a.points.length);
+
+  // 默认显示全部有数据的类别（仅首次；用户手动隐藏后保持隐藏）
+  if (chartVisibleCats === null || chartVisibleCats === undefined) {
+    chartVisibleCats = allCats.map(c => c.name);
+  } else {
+    const existing = new Set(allCats.map(c => c.name));
+    chartVisibleCats = chartVisibleCats.filter(n => existing.has(n));
+  }
+
+  const toShow = allCats.filter(c => chartVisibleCats.includes(c.name));
+  const grid = document.getElementById('miniChartsGrid');
+
+  if (toShow.length === 0) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="icon">📉</div><div class="text">当前范围内没有数据</div></div>';
+    renderChartCats();
+    return;
+  }
+
+  grid.innerHTML = toShow.map((c, idx) => {
+    const info = getCategoryInfo(c.name);
+    const colors = ['#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#10b981', '#3b82f6', '#ef4444', '#a855f7'];
+    const color = colors[idx % colors.length];
+    const latest = c.points[c.points.length - 1];
+    const earliest = c.points[0];
+    const trend = latest.y - earliest.y;
+    const trendArrow = trend > 0.1 ? '↗' : (trend < -0.1 ? '↘' : '→');
+    const trendColor = Math.abs(trend) < 0.1 ? 'var(--text-3)' : (trend > 0 ? 'var(--danger)' : 'var(--success, #10b981)');
+    return `
+      <div class="mini-chart-card" data-cat="${escapeHtml(c.name)}">
+        <div class="mini-chart-head">
+          <div class="mini-chart-title">
+            <span class="mini-icon" style="background:${color}22;color:${color};">${c.icon}</span>
+            <span class="mini-name">${escapeHtml(c.name)}</span>
+          </div>
+          <div class="mini-chart-trend" style="color:${trendColor};">${trendArrow}</div>
+        </div>
+        <div class="mini-chart-canvas-wrap">
+          <canvas id="miniChart_${idx}"></canvas>
+        </div>
+        <div class="mini-chart-foot">
+          <span class="mini-stat"><b>${c.points.length}</b> 条</span>
+          <span class="mini-stat">最新 <b>${latest.y}${c.unit || ''}</b></span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // 渲染每个 canvas
+  toShow.forEach((c, idx) => {
+    const colors = ['#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#10b981', '#3b82f6', '#ef4444', '#a855f7'];
+    const color = colors[idx % colors.length];
+    const info = getCategoryInfo(c.name);
+    const rangeInfo = info.range;
+
+    const labels = c.points.map((p, idx) => {
+      const d = new Date(p.x);
+      const yShort = String(d.getFullYear()).slice(2);
+      const prev = idx > 0 ? new Date(c.points[idx - 1].x) : null;
+      const isFirst = idx === 0;
+      const isYearBoundary = prev && prev.getFullYear() !== d.getFullYear();
+      const isJanuary = d.getMonth() === 0;
+      if (isFirst || isYearBoundary || isJanuary) {
+        return `${yShort}/${d.getMonth()+1}/${d.getDate()}`;
+      }
+      return `${d.getMonth()+1}/${d.getDate()}`;
+    });
+    const values = c.points.map(p => p.y);
+
+    const datasets = [{
+      data: values,
+      borderColor: color,
+      backgroundColor: ctx => {
+        const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, 160);
+        g.addColorStop(0, color + '40');
+        g.addColorStop(1, color + '05');
+        return g;
+      },
+      tension: 0.4, borderWidth: 2,
+      pointBackgroundColor: color, pointBorderColor: '#fff', pointBorderWidth: 1.5,
+      pointRadius: values.length > 20 ? 2 : 4,
+      pointHoverRadius: 6, fill: true, spanGaps: true
+    }];
+
+    // 正常值范围背景
+    const rangePlugin = {
+      id: 'rangeBg_' + idx,
+      beforeDatasetsDraw(ch) {
+        if (!rangeInfo || !Array.isArray(rangeInfo)) return;
+        const { ctx, chartArea, scales } = ch;
+        const [lo, hi] = rangeInfo;
+        if (lo == null && hi == null) return;
+        const yLo = lo != null ? scales.y.getPixelForValue(lo) : chartArea.bottom;
+        const yHi = hi != null ? scales.y.getPixelForValue(hi) : chartArea.top;
+        ctx.fillStyle = '#10b98118';
+        ctx.fillRect(chartArea.left, Math.min(yLo, yHi), chartArea.right - chartArea.left, Math.abs(yLo - yHi));
+        ctx.strokeStyle = '#10b98188';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        if (lo != null) { const y = scales.y.getPixelForValue(lo); ctx.beginPath(); ctx.moveTo(chartArea.left, y); ctx.lineTo(chartArea.right, y); ctx.stroke(); }
+        if (hi != null) { const y = scales.y.getPixelForValue(hi); ctx.beginPath(); ctx.moveTo(chartArea.left, y); ctx.lineTo(chartArea.right, y); ctx.stroke(); }
+        ctx.setLineDash([]);
+      }
+    };
+
+    const canvas = document.getElementById('miniChart_' + idx);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      plugins: [rangePlugin],
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.92)', padding: 8, cornerRadius: 6, titleFont: { size: 11 }, bodyFont: { size: 11 },
+            callbacks: {
+              title: items => { const p = c.points[items[0].dataIndex]; return formatDateTime(p.x); },
+              label: ctx => { const p = c.points[ctx.dataIndex]; return `${p.member} · ${ctx.parsed.y}${c.unit || ''}`; }
+            }
+          }
+        },
+        scales: {
+          y: { grid: { color: 'rgba(148, 163, 184, 0.12)', drawBorder: false }, ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 4 } },
+          x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 6, maxRotation: 0 } }
+        }
+      }
+    });
+    miniCharts[c.name] = chart;
+  });
+
+  document.getElementById('chartBadge').textContent = { '30': '最近 100 条', '7': '近 7 天', 'all': '全部' }[currentChartRange];
+  renderChartCats();
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  const q = historySearch.trim().toLowerCase();
+  let filtered = currentMemberFilter === 'all' ? records.slice() : records.filter(r => r.member === currentMemberFilter);
+  // 时间筛选
+  if (currentTimeFilter !== 'all') {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    if (currentTimeFilter === 'today') {
+      filtered = filtered.filter(r => r.ts >= startOfToday);
+    } else if (currentTimeFilter === 'week') {
+      // 本周（周一开始）
+      const dow = (now.getDay() + 6) % 7; // 周一=0
+      const startOfWeek = startOfToday - dow * 86400000;
+      filtered = filtered.filter(r => r.ts >= startOfWeek);
+    }
+  }
+  if (q) {
+    filtered = filtered.filter(r => {
+      if (r.category.name.toLowerCase().includes(q)) return true;
+      if (r.member.toLowerCase().includes(q)) return true;
+      if ((r.note || '').toLowerCase().includes(q)) return true;
+      const valStr = r.values.map(v => `${v.value}${v.unit || ''}`).join(' ');
+      if (valStr.toLowerCase().includes(q)) return true;
+      return false;
+    });
+  }
+  // 顶栏时间筛选 chip
+  const chip = document.getElementById('timeFilterChip');
+  const chipLabel = document.getElementById('timeFilterLabel');
+  if (currentTimeFilter === 'today') { chip.style.display = ''; chipLabel.textContent = '今天'; }
+  else if (currentTimeFilter === 'week') { chip.style.display = ''; chipLabel.textContent = '本周'; }
+  else { chip.style.display = 'none'; }
+  document.getElementById('historyCount').textContent = filtered.length + ' 条' + (q || currentTimeFilter !== 'all' ? '（已筛选）' : '');
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">${q ? '🔍' : '🌡'}</div><div class="text">${q ? '没有匹配的记录' : '还没有记录，输入第一条试试'}</div></div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(r => {
+    const valuesText = r.values.map(v => `<b>${v.value}</b>${escapeHtml(v.unit || '')}`).join(' / ');
+    // 自动评估状态
+    const st = computeRecordStatus(r);
+    const pendingBadge = (r.id && (r.id.startsWith('pending-') || r.id.startsWith('local-'))) ? '<span class="h-pending">本地</span>' : '';
+    const manualTag = st.isManual ? '<span style="font-size:10px;color:#7c3aed;margin-left:2px;" title="手动标注">✋</span>' : '';
+    // 统一显示正常参考范围（不管判定为正常还是异常，都展示，方便自行比对）
+    const rangeInfo = st.rangeText
+      ? `<span class="h-range-info" title="正常参考范围">${escapeHtml(st.rangeText)}</span>`
+      : '';
+    // 状态按钮文字：去掉 ✓/⚠ emoji（按钮已经带颜色），更紧凑
+    const btnLabel = st.cls === 'normal' ? '正常' : '异常';
+    return `
+      <div class="history-item">
+        <div class="h-icon" style="background:${getCategoryColor(r.category.name)}">${r.category.icon}</div>
+        <div class="h-info">
+          <div class="h-line1">
+            <span class="member">${escapeHtml(r.member)}</span>
+            <span>${escapeHtml(r.category.name)}</span>
+            <span class="values">${valuesText}</span>
+          </div>
+          <div class="h-line2">
+            ${rangeInfo}
+            <span>${formatDateTime(r.ts)}</span>
+            <span>· ${relativeTime(r.ts)}</span>
+            ${r.note ? `<span class="h-note">📝 ${escapeHtml(r.note)}</span>` : ''}
+            ${pendingBadge}
+          </div>
+        </div>
+        <button class="h-status-btn ${st.cls}" data-id="${r.id}" title="点击手动修正">${btnLabel}${manualTag}</button>
+        <button class="h-delete" data-id="${r.id}" title="删除这条记录">删除</button>
+      </div>
+    `;
+  }).join('');
+  list.querySelectorAll('.h-delete').forEach(btn => {
+    btn.onclick = () => {
+      const rec = records.find(r => r.id === btn.dataset.id);
+      if (rec && confirm(`删除 ${rec.member} 的 ${rec.category.name} 记录？`)) deleteRecord(btn.dataset.id);
+    };
+  });
+  // 状态按钮点击 → 弹窗确认是否修正
+  list.querySelectorAll('.h-status-btn').forEach(btn => {
+    btn.onclick = () => confirmAndToggleStatus(btn.dataset.id);
+  });
+}
+
+// 计算一条记录的最终状态（用于全部记录列表）
+// 优先级：手动标注 > 自动评估
+function computeRecordStatus(r) {
+  // 1) 手动标注优先
+  if (r.statusManual) {
+    return {
+      cls: r.statusLabel === '正常' ? 'normal' : 'abnormal',
+      label: r.statusLabel === '正常' ? '✓ 正常' : '⚠ 异常',
+      rangeText: r.rangeText || getRangeTextFromCategory(r.category),
+      isManual: true
+    };
+  }
+  // 2) 自动评估（数值类 + 定性类）
+  const item = {
+    range: r.category.range,
+    rangeText: r.rangeText,
+    values: r.values
+  };
+  const v = r.values[0];
+  if (r.category.name === '血压' && r.values.length === 2) {
+    const [h, l] = r.values.map(x => x.value);
+    const cls = (h >= 140 || l >= 90) ? 'abnormal' : ((h < 90 || l < 60) ? 'abnormal' : 'normal');
+    return {
+      cls,
+      label: cls === 'normal' ? '✓ 正常' : '⚠ 异常',
+      rangeText: r.category.range ? `正常 ${r.category.range[0]}/${r.category.range[1]} mmHg` : (r.rangeText || ''),
+      isManual: false
+    };
+  }
+  // 用 evalLabResult 复用
+  const r2 = evalLabResult(item);
+  return {
+    cls: r2.cls,
+    label: r2.label,
+    rangeText: r.rangeText || getRangeTextFromCategory(r.category),
+    isManual: false
+  };
+}
+
+function getRangeTextFromCategory(cat) {
+  if (!cat) return '';
+  if (cat.range && Array.isArray(cat.range) && (cat.range[0] != null || cat.range[1] != null)) {
+    return `正常 ${cat.range[0] ?? '?'} - ${cat.range[1] ?? '?'}${cat.unit || ''}`;
+  }
+  return '';
+}
+
+// 手动修正记录状态（弹窗确认 → 切换 → 同步云端）
+async function confirmAndToggleStatus(id) {
+  const rec = records.find(r => r.id === id);
+  if (!rec) return;
+  const cur = computeRecordStatus(rec);
+  const next = cur.cls === 'normal' ? 'abnormal' : 'normal';
+  const nextText = next === 'normal' ? '正常' : '异常';
+  const curText = cur.cls === 'normal' ? '正常' : '异常';
+  const msg = `确认将这条数据手动改为「${nextText}」吗？\n\n当前判定：${curText}\n将改为：${nextText}\n${cur.rangeText ? '参考范围：' + cur.rangeText : ''}`.trim();
+  if (!confirm(msg)) return;
+  rec.statusLabel = nextText;
+  rec.statusManual = true;
+  saveLocalCache(); render();
+  showToast(`✓ 已手动标为${nextText}`);
+  if (!rec.id.startsWith('pending-') && !rec.id.startsWith('local-') && isConfigured && !LOCAL_MODE && dbClient) {
+    try { await dbClient.from('health_records').update({ statusLabel: rec.statusLabel, statusManual: true }).eq('id', id); } catch (e) { console.error(e); }
+  }
+}
+
+// 搜索框输入
+document.getElementById('historySearch').addEventListener('input', (e) => {
+  historySearch = e.target.value;
+  renderHistory();
+});
+
+// 清除时间筛选
+document.getElementById('timeFilterClear').addEventListener('click', () => {
+  currentTimeFilter = 'all';
+  document.querySelectorAll('.stat-card[data-action]').forEach(c => c.classList.remove('active'));
+  renderHistory();
+});
+
+// 4 个小框点击行为：今日/本周弹窗 + 类别/成员管理
+document.querySelectorAll('.stat-card[data-action]').forEach(card => {
+  card.addEventListener('click', () => {
+    const action = card.dataset.action;
+    if (action === 'today' || action === 'week') {
+      // 直接弹窗显示
+      openTimeRecordsModal(action);
+    } else if (action === 'cats') {
+      openCategoryManager();
+    } else if (action === 'members') {
+      openMemberManager();
+    }
+  });
+});
+
+function openTimeRecordsModal(range) {
+  // range: 'today' | 'week'
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  let startTs, label, rangeText;
+  if (range === 'today') {
+    startTs = startOfToday;
+    label = '今日';
+    rangeText = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  } else {
+    // 近 7 天（含今天）
+    startTs = startOfToday - 6 * 86400000;
+    const endDate = new Date(startTs);
+    rangeText = `${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}-${String(endDate.getDate()).padStart(2,'0')} 至 ${rangeText = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`}`;
+    label = '近 7 天';
+  }
+  const filtered = records.filter(r => r.ts >= startTs).sort((a, b) => b.ts - a.ts);
+  const totalCount = filtered.length;
+  const members = new Set(filtered.map(r => r.member));
+  const cats = new Set(filtered.map(r => r.category.name));
+
+  const mask = document.createElement('div');
+  mask.className = 'modal-mask show';
+  mask.id = 'timeRecordsMask';
+  mask.innerHTML = `
+    <div class="modal" style="max-width:640px;">
+      <button class="modal-close" data-close="timeRecordsMask" title="关闭">×</button>
+      <h3>${range === 'today' ? '📝' : '📅'} ${label}记录</h3>
+      <div class="modal-sub">${rangeText} · 共 ${totalCount} 条 · ${members.size} 位成员 · ${cats.size} 个类别</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+        <button class="btn-secondary time-mem-filter" data-mem="all" style="padding:5px 11px;font-size:12px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;border-color:#fbbf24;">全部</button>
+        ${[...members].map(m => `<button class="btn-secondary time-mem-filter" data-mem="${escapeHtml(m)}" style="padding:5px 11px;font-size:12px;">${escapeHtml(m)}</button>`).join('')}
+      </div>
+      <div id="timeRecordsList" style="max-height:55vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:4px;"></div>
+    </div>
+  `;
+  document.body.appendChild(mask);
+
+  const renderList = (mem) => {
+    const list = filtered.filter(r => mem === 'all' || r.member === mem);
+    const wrap = mask.querySelector('#timeRecordsList');
+    if (list.length === 0) {
+      wrap.innerHTML = '<div class="empty-state"><div class="icon">📭</div><div class="text">该成员下没有记录</div></div>';
+      return;
+    }
+    wrap.innerHTML = list.map(r => {
+      const valuesText = r.values.map(v => `<b>${v.value}</b>${escapeHtml(v.unit || '')}`).join(' / ');
+      const status = r.statusLabel === '正常' ? '<span class="h-status normal">✓ 正常</span>' :
+                     r.statusLabel === '异常' ? '<span class="h-status abnormal">⚠ 异常</span>' : '';
+      const pending = (r.id && (r.id.startsWith('pending-') || r.id.startsWith('local-'))) ? '<span class="h-pending">本地</span>' : '';
+      return `
+        <div class="history-item" style="padding:8px 12px;">
+          <div class="h-icon" style="background:${getCategoryColor(r.category.name)};width:32px;height:32px;font-size:16px;">${r.category.icon}</div>
+          <div class="h-info">
+            <div class="h-line1">
+              <span class="member">${escapeHtml(r.member)}</span>
+              <span>${escapeHtml(r.category.name)}</span>
+              <span class="values">${valuesText}</span>
+            </div>
+            <div class="h-line2">
+              <span>${formatDateTime(r.ts)}</span>
+              <span>· ${relativeTime(r.ts)}</span>
+              ${status}
+              ${r.note ? `<span class="h-note">📝 ${escapeHtml(r.note)}</span>` : ''}
+              ${pending}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  };
+  renderList('all');
+  // 高亮第一个
+  mask.querySelectorAll('.time-mem-filter').forEach(btn => {
+    btn.onclick = () => {
+      mask.querySelectorAll('.time-mem-filter').forEach(b => {
+        b.style.background = ''; b.style.color = ''; b.style.borderColor = '';
+      });
+      btn.style.background = 'linear-gradient(135deg,#fef3c7,#fde68a)';
+      btn.style.color = '#92400e';
+      btn.style.borderColor = '#fbbf24';
+      renderList(btn.dataset.mem);
+    };
+  });
+}
+
+function openCategoryManager() {
+  const mask = document.createElement('div');
+  mask.className = 'modal-mask show';
+  mask.id = 'catMgrMask';
+  mask.innerHTML = `
+    <div class="modal" style="max-width:520px;">
+      <button class="modal-close" data-close="catMgrMask" title="关闭">×</button>
+      <h3>🏷 类别管理</h3>
+      <div class="modal-sub">编辑类别名称、图标、单位、参考区间；删除自定义类别</div>
+      <div id="catList" style="display:flex;flex-direction:column;gap:8px;margin:12px 0;max-height:50vh;overflow-y:auto;"></div>
+      <button class="btn-secondary" id="catAddBtn" style="width:100%;margin-top:8px;">+ 添加新类别</button>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button class="btn-primary" id="catMgrDone" style="width:100%;">✓ 完成</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(mask);
+
+  const pendingIcons = {};  // 暂存图标修改：name -> icon
+
+  const allCats = () => {
+    const std = Object.keys(STANDARD_CATEGORIES);
+    const custom = Object.keys(customCategories);
+    return [...new Set([...std, ...custom])];
+  };
+
+  const refreshList = () => {
+    const list = mask.querySelector('#catList');
+    const names = allCats();
+    if (names.length === 0) {
+      list.innerHTML = '<div style="text-align:center;color:var(--text-3);padding:20px;">还没有类别，输入记录时自动创建</div>';
+      return;
+    }
+    list.innerHTML = names.map(name => {
+      const info = getCategoryInfo(name);
+      const isStandard = !!STANDARD_CATEGORIES[name];
+      const count = records.filter(r => r.category.name === name).length;
+      const [lo, hi] = info.range || [null, null];
+      const currentIcon = pendingIcons[name] || info.icon;
+      return `
+        <div style="padding:10px;background:#fff7ed;border-radius:10px;border:1px solid #fde6c8;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <button class="cat-icon-btn" data-name="${escapeHtml(name)}" style="width:32px;height:32px;border-radius:8px;border:1.5px solid #fdba74;background:white;font-size:18px;cursor:pointer;flex-shrink:0;line-height:1;" title="点击更换图标">${currentIcon}</button>
+            <input type="text" class="preview-input cat-name" data-orig="${escapeHtml(name)}" value="${escapeHtml(name)}" style="flex:1;padding:5px 10px;font-weight:600;">
+            <span style="font-size:10px;background:${isStandard ? '#dbeafe' : '#fef3c7'};color:${isStandard ? '#1e40af' : '#92400e'};padding:1px 6px;border-radius:4px;">${isStandard ? '标准' : '自定义'}</span>
+            <span style="font-size:11px;color:var(--text-3);">${count} 条</span>
+            <button class="cat-del-btn" data-name="${escapeHtml(name)}" data-std="${isStandard}" style="background:#fee2e2;color:var(--danger);border:1px solid #fecaca;padding:3px 8px;border-radius:6px;cursor:pointer;font-size:11px;">删除</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-3);">
+            <span>单位</span>
+            <input type="text" class="preview-input cat-unit" data-orig="${escapeHtml(name)}" value="${escapeHtml(info.unit || '')}" style="width:80px;padding:3px 8px;font-size:12px;">
+            <span>参考</span>
+            <input type="number" step="any" class="preview-input cat-lo" data-orig="${escapeHtml(name)}" value="${lo ?? ''}" placeholder="下限" style="width:60px;padding:3px 6px;font-size:12px;">
+            <span>~</span>
+            <input type="number" step="any" class="preview-input cat-hi" data-orig="${escapeHtml(name)}" value="${hi ?? ''}" placeholder="上限" style="width:60px;padding:3px 6px;font-size:12px;">
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // 图标选择器
+    list.querySelectorAll('.cat-icon-btn').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        showIconPicker(btn, btn.dataset.name, (newIcon) => {
+          pendingIcons[btn.dataset.name] = newIcon;
+          btn.textContent = newIcon;
+        });
+      };
+    });
+
+    // 删除
+    list.querySelectorAll('.cat-del-btn').forEach(btn => {
+      btn.onclick = () => {
+        const name = btn.dataset.name;
+        const isStd = btn.dataset.std === 'true';
+        const count = records.filter(r => r.category.name === name).length;
+        let msg = isStd
+          ? `标准类别「${name}」无法直接删除，但可以改名。\n是否要继续？`
+          : `确认删除自定义类别「${name}」？`;
+        if (count > 0) msg += `\n\n该类别下还有 ${count} 条记录。这些记录将保留显示，但标记为"未知类别"。`;
+        if (!confirm(msg)) return;
+        if (isStd) { showToast('标准类别已锁定，请改名后保存'); return; }
+        delete customCategories[name];
+        saveCustomCategories();
+        records.forEach(r => { if (r.category.name === name) r.category.isStandard = false; });
+        saveLocalCache();
+        refreshList();
+      };
+    });
+  };
+  refreshList();
+
+  mask.querySelector('#catAddBtn').onclick = () => {
+    const name = prompt('输入新类别名称（1-6 个汉字）', '');
+    if (!name) return;
+    const n = name.trim();
+    if (!n) return;
+    if (allCats().includes(n)) { showToast('类别已存在', 'warning'); return; }
+    customCategories[n] = { icon: suggestIcon(n), unit: '', range: null };
+    saveCustomCategories();
+    refreshList();
+  };
+
+  mask.querySelector('#catMgrDone').onclick = async () => {
+    showToast('正在保存…');
+    const list = mask.querySelector('#catList');
+    const updates = [];
+    // 应用待定图标
+    Object.keys(pendingIcons).forEach(name => {
+      const newIcon = pendingIcons[name];
+      if (STANDARD_CATEGORIES[name]) {
+        STANDARD_CATEGORIES[name].icon = newIcon;
+      } else if (customCategories[name]) {
+        customCategories[name].icon = newIcon;
+      }
+      // 同步到已有记录的 category.icon
+      records.forEach(r => { if (r.category.name === name) r.category.icon = newIcon; });
+    });
+    list.querySelectorAll('.cat-name').forEach(inp => {
+      const orig = inp.dataset.orig;
+      const newName = inp.value.trim();
+      if (newName && newName !== orig) {
+        // 改名
+        if (STANDARD_CATEGORIES[orig]) {
+          // 标准类别：只改记录里显示的名字（不修改 STANDARD_CATEGORIES 常量）
+          records.forEach(r => { if (r.category.name === orig) r.category.name = newName; });
+        } else if (customCategories[orig]) {
+          const data = customCategories[orig];
+          delete customCategories[orig];
+          customCategories[newName] = data;
+          records.forEach(r => { if (r.category.name === orig) r.category.name = newName; });
+        }
+        updates.push({ type: 'rename', from: orig, to: newName });
+      }
+    });
+    list.querySelectorAll('.cat-unit').forEach(inp => {
+      const orig = inp.dataset.orig;
+      if (STANDARD_CATEGORIES[orig]) {
+        // 暂不支持修改标准类别单位
+      } else if (customCategories[orig]) {
+        customCategories[orig].unit = inp.value.trim();
+      }
+    });
+    list.querySelectorAll('.cat-lo').forEach(inp => {
+      const orig = inp.dataset.orig;
+      const v = inp.value.trim() ? parseFloat(inp.value) : null;
+      if (STANDARD_CATEGORIES[orig]) STANDARD_CATEGORIES[orig].range[0] = v;
+      else if (customCategories[orig]) {
+        if (!customCategories[orig].range) customCategories[orig].range = [null, null];
+        customCategories[orig].range[0] = v;
+      }
+    });
+    list.querySelectorAll('.cat-hi').forEach(inp => {
+      const orig = inp.dataset.orig;
+      const v = inp.value.trim() ? parseFloat(inp.value) : null;
+      if (STANDARD_CATEGORIES[orig]) STANDARD_CATEGORIES[orig].range[1] = v;
+      else if (customCategories[orig]) {
+        if (!customCategories[orig].range) customCategories[orig].range = [null, null];
+        customCategories[orig].range[1] = v;
+      }
+    });
+    saveCustomCategories();
+    saveLocalCache();
+    mask.remove();
+    render();
+    showToast('✓ 类别信息已更新');
+  };
+}
+
+// 图标选择器：弹出小面板选择温馨图标
+function showIconPicker(anchorBtn, catName, onSelect) {
+  // 移除已有面板
+  document.getElementById('iconPickerPanel')?.remove();
+  const panel = document.createElement('div');
+  panel.id = 'iconPickerPanel';
+  panel.style.cssText = 'position:absolute;background:white;border:1px solid #fdba74;border-radius:12px;padding:10px;box-shadow:0 8px 24px rgba(245,158,11,0.25);z-index:10001;max-width:280px;';
+  panel.innerHTML = `
+    <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;">为「${escapeHtml(catName)}」选个温馨图标：</div>
+    <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:4px;max-height:180px;overflow-y:auto;">
+      ${WARM_ICON_OPTIONS.map(ic => `<button class="icon-pick-btn" data-ic="${ic}" style="width:30px;height:30px;border-radius:6px;border:1px solid #fde6c8;background:#fff7ed;font-size:16px;cursor:pointer;padding:0;line-height:1;">${ic}</button>`).join('')}
+    </div>
+  `;
+  document.body.appendChild(panel);
+  // 定位到按钮下方
+  const r = anchorBtn.getBoundingClientRect();
+  panel.style.left = Math.min(window.innerWidth - 290, r.left) + 'px';
+  panel.style.top = (r.bottom + 6) + 'px';
+  // 选图标
+  panel.querySelectorAll('.icon-pick-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      onSelect(btn.dataset.ic);
+      panel.remove();
+    };
+  });
+  // 点击外部关闭
+  setTimeout(() => {
+    const onClickOutside = (ev) => {
+      if (!panel.contains(ev.target) && ev.target !== anchorBtn) {
+        panel.remove();
+        document.removeEventListener('click', onClickOutside);
+      }
+    };
+    document.addEventListener('click', onClickOutside);
+  }, 50);
+}
+
+function getCategoryColor(name) {
+  const colors = { '体温': '#ef4444', '血压': '#f59e0b', '血糖': '#8b5cf6', '心率': '#ec4899', '体重': '#10b981', '血氧': '#06b6d4', '身高': '#3b82f6' };
+  return colors[name] || '#64748b';
+}
+
+function render() {
+  renderStats();
+  renderMemberFilter();
+  renderChart();
+  renderHistory();
+  updateSyncStatus();
+  renderQuickChips();
+}
+
+function renderQuickChips() {
+  const existing = new Set(['体温','血压','血糖','心率','体重','血氧','身高']);
+  const customs = Object.keys(customCategories).filter(c => !existing.has(c)).slice(0, 3);
+  document.querySelectorAll('.chip-custom').forEach(el => el.remove());
+  const chipsEl = document.getElementById('quickChips');
+  customs.forEach(c => {
+    const chip = document.createElement('span');
+    chip.className = 'chip chip-custom';
+    chip.dataset.cat = c;
+    chip.innerHTML = `${customCategories[c].icon} ${escapeHtml(c)}`;
+    chipsEl.appendChild(chip);
+  });
+}
+
+function downloadFile(filename, content, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('btnExport').onclick = () => {
+  if (!records.length) { showToast('暂无数据', 'warning'); return; }
+  downloadFile(`家庭健康记录_${formatDate(Date.now())}.json`, JSON.stringify({
+    exportTime: new Date().toISOString(), count: records.length,
+    records: records.map(r => ({ timestamp: new Date(r.ts).toISOString(), member: r.member, category: r.category.name, values: r.values, note: r.note }))
+  }, null, 2), 'application/json');
+  showToast('✓ 已导出 JSON');
+};
+
+document.getElementById('btnExportCSV').onclick = () => {
+  if (!records.length) { showToast('暂无数据', 'warning'); return; }
+  const rows = [['记录时间', '家人', '类别', '数值', '单位', '状态', '备注']];
+  records.slice().reverse().forEach(r => {
+    r.values.forEach(v => rows.push([formatDateTime(r.ts), r.member, r.category.name, v.value, v.unit || '', r.statusLabel || '', r.note || '']));
+  });
+  downloadFile(`家庭健康记录_${formatDate(Date.now())}.csv`, '\ufeff' + rows.map(row => row.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n'), 'text/csv;charset=utf-8');
+  showToast('✓ 已导出 CSV');
+};
+
+bindClick('btnDelete', openDeleteDialog, '🗑 删除按钮');
+// 类别总览折叠切换
+/* 已移除：点击 stat-card 触发 openCategoryManager，旧的 catToggle/btnManageCats 不再需要 */
+
+document.getElementById('chartTabs').addEventListener('click', (e) => {
+  if (!e.target.classList.contains('tab')) return;
+  document.querySelectorAll('#chartTabs .tab').forEach(t => t.classList.remove('active'));
+  e.target.classList.add('active');
+  currentChartRange = e.target.dataset.range;
+  renderChart();
+});
+
+/* ============================================================
+   AI 智能识别（OpenAI 兼容 API）
+   ============================================================ */
+const AI_PRESETS = {
+  dashscope: { baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-turbo', kvLabel: 'API Key (sk-xxx)' },
+  deepseek:   { baseUrl: 'https://api.deepseek.com/v1',                  model: 'deepseek-chat', kvLabel: 'API Key (sk-xxx)' },
+  openai:     { baseUrl: 'https://api.openai.com/v1',                   model: 'gpt-4o-mini', kvLabel: 'API Key (sk-xxx)' },
+  zhipu:      { baseUrl: 'https://open.bigmodel.cn/api/paas/v4',        model: 'glm-4-flash', kvLabel: 'API Key' },
+  custom:     { baseUrl: '',                                            model: '', kvLabel: 'API Key' }
+};
+
+let aiConfig = JSON.parse(localStorage.getItem('ai_config') || 'null') || {};
+
+function getAiConfig() {
+  const cfg = aiConfig && aiConfig.baseUrl && aiConfig.apiKey ? aiConfig : null;
+  return cfg;
+}
+
+function openAiConfig() {
+  document.getElementById('aiProvider').value = aiConfig.provider || 'dashscope';
+  document.getElementById('aiBaseUrl').value = aiConfig.baseUrl || AI_PRESETS.dashscope.baseUrl;
+  document.getElementById('aiApiKey').value = aiConfig.apiKey || '';
+  document.getElementById('aiModel').value = aiConfig.model || AI_PRESETS.dashscope.model;
+  document.getElementById('aiConfigMask').classList.add('show');
+}
+
+document.getElementById('aiProvider').addEventListener('change', (e) => {
+  const preset = AI_PRESETS[e.target.value];
+  if (preset) {
+    if (!document.getElementById('aiBaseUrl').dataset.userEdited) document.getElementById('aiBaseUrl').value = preset.baseUrl;
+    if (!document.getElementById('aiModel').dataset.userEdited) document.getElementById('aiModel').value = preset.model;
+  }
+});
+['aiBaseUrl', 'aiModel'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => document.getElementById(id).dataset.userEdited = '1');
+});
+
+document.getElementById('aiCfgCancel').addEventListener('click', () => {
+  document.getElementById('aiConfigMask').classList.remove('show');
+});
+document.getElementById('aiCfgSave').addEventListener('click', () => {
+  aiConfig = {
+    provider: document.getElementById('aiProvider').value,
+    baseUrl: document.getElementById('aiBaseUrl').value.trim(),
+    apiKey: document.getElementById('aiApiKey').value.trim(),
+    model: document.getElementById('aiModel').value.trim()
+  };
+  if (!aiConfig.baseUrl || !aiConfig.apiKey) {
+    showToast('请填写 API 地址和 Key', 'warning'); return;
+  }
+  localStorage.setItem('ai_config', JSON.stringify(aiConfig));
+  document.getElementById('aiConfigMask').classList.remove('show');
+  showToast('✓ AI 配置已保存');
+});
+
+async function callLLM(text, imageBase64) {
+  const cfg = getAiConfig();
+  if (!cfg) {
+    openAiConfig();
+    throw new Error('未配置 AI');
+  }
+  const systemPrompt = `你是健康数据录入助手。用户的输入可能是：
+1) 整段体检报告（如：酸碱浓度(PH)：5.0，参考区间4.5-8.0）
+2) 一句话多条数据（如：血糖 5.6 血压 120/80）
+3) 单条数据（如：体温 36.5）
+4) 任意自然语言描述
+
+你的任务：把输入解析成 JSON 数组。每个元素结构：
+{
+  "name": "指标中文名（去掉冒号后的值和参考区间）",
+  "value": "结果（数字或文字，如 5.0 或 阴性(-)）",
+  "unit": "单位（如 mmol/L、个/HPF，无则空字符串）",
+  "range": "参考区间原始描述（如 4.5-8.0、阴性(-)、0-5个/HPF）",
+  "rangeLow": "参考区间下限（数字类型时填，文字描述时填空字符串）",
+  "rangeHigh": "参考区间上限（同上）"
+}
+
+严格要求：
+- 只返回 JSON 数组，不要任何解释或 markdown
+- 忽略「姓名」「性别」「年龄」「送检日期」「送检医生」这类元数据
+- 如果某行无法解析为「指标+值」，跳过
+- 对于「正常」「阴性」「阴性(-)」这类值，rangeLow/rangeHigh 填空字符串
+- 数字结果（如 5.0、1.027）尽量转为 JSON number 类型，但如果是「1-3」「0-5」这种范围，原样保留为字符串`;
+
+  let userContent;
+  if (imageBase64) {
+    userContent = [
+      { type: 'image_url', image_url: { url: imageBase64 } },
+      { type: 'text', text: '请识别图中体检报告内容并按系统要求返回 JSON 数组。' }
+    ];
+  } else {
+    userContent = text;
+  }
+
+  const body = {
+    model: cfg.model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userContent }
+    ],
+    temperature: 0.1
+  };
+
+  const resp = await fetch(cfg.baseUrl.replace(/\/$/, '') + '/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + cfg.apiKey
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!resp.ok) {
+    const err = await resp.text().catch(() => '');
+    throw new Error(`HTTP ${resp.status}: ${err.slice(0, 200)}`);
+  }
+
+  const data = await resp.json();
+  let content = data.choices?.[0]?.message?.content || '';
+  // 去除 markdown 代码块包裹
+  content = content.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+  // 解析 JSON
+  let items;
+  try {
+    items = JSON.parse(content);
+  } catch (e) {
+    // 兜底：尝试抓取第一个 JSON 数组
+    const m = content.match(/\[\s*[\s\S]*?\]\s*/);
+    if (m) items = JSON.parse(m[0]);
+    else throw new Error('AI 返回非 JSON：' + content.slice(0, 200));
+  }
+  if (!Array.isArray(items)) throw new Error('AI 返回格式错误');
+  return items;
+}
+
+function aiItemsToParsed(items) {
+  const out = [];
+  for (const it of items) {
+    if (!it.name) continue;
+    const value = it.value;
+    let numericValue = typeof value === 'number' ? value : (parseFloat(String(value)) || null);
+    let isQualitative = numericValue === null || /[^\d.\-eE]/.test(String(value));
+    let unit = it.unit || '';
+    let lo = (it.rangeLow !== '' && it.rangeLow != null) ? parseFloat(it.rangeLow) : null;
+    let hi = (it.rangeHigh !== '' && it.rangeHigh != null) ? parseFloat(it.rangeHigh) : null;
+    out.push({
+      category: String(it.name).trim(),
+      values: [{
+        label: '结果',
+        value: isQualitative ? String(value) : numericValue,
+        unit,
+        isQualitative,
+        displayValue: String(value)
+      }],
+      range: (lo != null || hi != null) ? [lo, hi] : null,
+      rangeText: it.range || '',
+      isNewCategory: !STANDARD_CATEGORIES[it.name] && !customCategories[it.name]
+    });
+  }
+  return out;
+}
+
+// 评估单条记录状态（仅正常/异常两类），手动优先
+function evalItemStatus(item) {
+  if (item.manualStatus) return { label: item.manualStatus === 'normal' ? '✓ 正常' : '⚠ 异常', cls: item.manualStatus };
+  return evalLabResult(item);
+}
+
+// AI 按钮和文件上传的处理
+async function doAI() {
+  console.log('🤖 AI 按钮被点击');  // 调试日志
+  // ⚡ 临时调试：100% 让你看到按钮确实被点了
+  if (location.search.includes('debug=1')) {
+    const textPreview = textInput.value.trim().slice(0, 30);
+    const cfg = getAiConfig();
+    alert(`🤖 AI 按钮被点击了！\n\n输入框内容：「${textPreview || '(空)'}」\nAI 配置状态：${cfg ? '已配置 ✓' : '未配置 ⚠️'}\n\n${cfg ? '下一步：会调 API' : '下一步：应该弹配置窗口'}`);
+  }
+  const text = textInput.value.trim();
+  if (!text) { showToast('请先在输入框粘贴内容', 'warning'); return; }
+  if (!getAiConfig()) {
+    openAiConfig();
+    return;
+  }
+  const btn = document.getElementById('btnAI');
+  const oldLabel = btn ? btn.textContent : '';
+  const restoreBtn = (label) => { if (btn) { btn.disabled = false; btn.textContent = label; } };
+  if (btn) { btn.disabled = true; btn.textContent = '🌀 识别中…'; }
+  try {
+    const items = await callLLM(text);
+    const parsed = aiItemsToParsed(items);
+    if (parsed.length === 0) throw new Error('AI 未能提取任何指标，请检查输入');
+    currentParsed = {
+      raw: text.slice(0, 80) + (text.length > 80 ? '…' : ''),
+      multi: true,
+      isLabReport: true,
+      member: '我',
+      time: Date.now(),
+      note: '',
+      items: parsed
+    };
+    openPreview(currentParsed);
+    textInput.value = '';
+    showToast(`✓ AI 识别出 ${parsed.length} 条指标`);
+  } catch (e) {
+    showToast('AI 识别失败：' + (e.message || e), 'error');
+    console.error(e);
+  } finally {
+    restoreBtn(oldLabel);
+  }
+}
+
+async function doAIImage(file) {
+  if (!getAiConfig()) { openAiConfig(); return; }
+  const btn = document.getElementById('btnAI');
+  const oldHtml = btn ? btn.innerHTML : '';
+  const restoreBtn = (html) => { if (btn) { btn.disabled = false; btn.innerHTML = html; } };
+  if (btn) { btn.disabled = true; btn.innerHTML = '🌀 识别图片…'; }
+  try {
+    const dataUrl = await readFileAsDataURL(file);
+    const items = await callLLM('', dataUrl);
+    const parsed = aiItemsToParsed(items);
+    if (parsed.length === 0) throw new Error('图中未识别出指标');
+    currentParsed = {
+      raw: `[图片] ${file.name}`,
+      multi: true,
+      isLabReport: true,
+      member: '我',
+      time: Date.now(),
+      note: '',
+      items: parsed
+    };
+    openPreview(currentParsed);
+    document.getElementById('fileName').textContent = '';
+    showToast(`✓ 已识别 ${parsed.length} 条`);
+  } catch (e) {
+    showToast('图片识别失败：' + (e.message || e), 'error');
+    console.error(e);
+  } finally {
+    restoreBtn(oldHtml);
+  }
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = e => resolve(e.target.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+// 上传图片走 AI
+document.getElementById('fileInput').addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  document.getElementById('fileName').textContent = `已选：${f.name}（${(f.size/1024).toFixed(1)} KB）`;
+  doAIImage(f);
+});
+
+/* ============================================================
+   启动
+   ============================================================ */
+async function bootstrap() {
+  loadLocalCache();
+  render();
+  autoResize();
+
+  // 本地模式：直接显示，不用连云端
+  if (LOCAL_MODE || !isConfigured) {
+    document.getElementById('configBanner').style.display = 'flex';
+    updateSyncStatus();
+    console.log('💡 本地模式启动，共', records.length, '条记录（仅本浏览器）');
+    return;
+  }
+
+  if (!initSupabase()) {
+    document.getElementById('configBanner').style.display = 'flex';
+    showToast('Supabase 初始化失败，已切本地模式', 'error');
+    updateSyncStatus();
+    return;
+  }
+
+  try {
+    await loadFromCloud();
+    setupRealtime();
+    render();
+    updateSyncStatus();
+    console.log('✓ 已连接 Supabase，共加载', records.length, '条记录');
+  } catch (e) {
+    console.error('启动失败', e);
+    showToast('连接失败，已切本地模式：' + (e.message || e), 'error');
+    document.getElementById('configBanner').style.display = 'flex';
+    updateSyncStatus();
+  }
+}
+
+bootstrap();
+
+// 全局错误捕获 - 显示在页面右下角（方便不打开 F12 也能看到）
+window.addEventListener('error', (e) => {
+  console.error('[全局错误]', e.error || e.message);
+  showErrorBar(e.message || '未知错误', e.filename, e.lineno);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('[Promise错误]', e.reason);
+  showErrorBar((e.reason && e.reason.message) || String(e.reason), 'Promise', 0);
+});
+
+function showErrorBar(msg, file, line) {
+  let bar = document.getElementById('errorBar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'errorBar';
+    bar.style.cssText = 'position:fixed;bottom:20px;right:20px;left:20px;max-width:600px;margin:auto;background:#fee2e2;color:#991b1b;border:2px solid #ef4444;border-radius:10px;padding:14px 18px;font-size:13px;font-family:monospace;z-index:10000;box-shadow:0 10px 30px rgba(0,0,0,0.2);white-space:pre-wrap;word-break:break-all;';
+    bar.innerHTML = '<div style="font-weight:700;font-size:14px;margin-bottom:6px;">⚠️ 页面 JS 错误（点击关闭）</div><div id="errorBarMsg"></div>';
+    bar.addEventListener('click', () => bar.remove());
+    document.body.appendChild(bar);
+  }
+  document.getElementById('errorBarMsg').textContent = `${msg}${file ? '\n📍 ' + file + ':' + line : ''}`;
+}
+
+// PWA 服务注册（部署到 GitHub Pages 后会用到）
+// 使用 ?debug=1 时跳过 SW 避免缓存导致看不到新版
+if ('serviceWorker' in navigator && !location.search.includes('debug=1')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      // 检查更新
+      reg.update();
+    }).catch(err => console.log('SW 注册失败：', err));
+  });
+}
+</script>
+</body>
+</html>
