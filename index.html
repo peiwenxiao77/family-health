@@ -81,19 +81,6 @@
   .clock .time .pulse { display: inline-block; width: 6px; height: 6px; background: var(--primary); border-radius: 50%; margin-right: 6px; animation: pulse 1.6s ease-in-out infinite; vertical-align: middle; }
   .clock .date { font-size: 11px; color: var(--text-3); margin-top: 0; }
 
-  /* 配置横幅（只显示在本地模式时） */
-  .config-banner {
-    background: linear-gradient(135deg, #fff7ed, #ffedd5);
-    border: 1px solid #fdba74; border-radius: var(--radius);
-    padding: 14px 18px;
-    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  }
-  .config-banner .icon { font-size: 22px; }
-  .config-banner .text { flex: 1; min-width: 220px; font-size: 13px; color: #9a3412; line-height: 1.6; }
-  .config-banner .btn { background: linear-gradient(135deg, #f59e0b, #fb923c); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3); }
-  .config-banner .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4); }
-  .config-banner .btn-sec { background: white; color: #9a3412; border: 1px solid #fdba74; }
-
   /* Hero (输入区) */
   .hero { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #fb923c 100%); border-radius: var(--radius); padding: 22px 22px; color: white; box-shadow: 0 20px 40px -8px rgba(245, 158, 11, 0.35), inset 0 1px 0 rgba(255,255,255,0.2); position: relative; overflow: hidden; margin-bottom: 16px; }
   .hero::before { content: ''; position: absolute; top: -50%; right: -20%; width: 60%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 60%); pointer-events: none; }
@@ -314,13 +301,49 @@
     .preview-row label { width: 60px; }
   }
 
-  /* 顶部视图切换 tabs（小巧紧凑） */
-  .view-tabs { display: inline-flex; background: linear-gradient(135deg, #fff7ed, #ffedd5); border-radius: 10px; padding: 3px; margin: 4px 16px 8px; gap: 3px; box-shadow: 0 1px 4px rgba(245, 158, 11, 0.08); justify-self: start; align-self: start; }
-  .view-tab { padding: 7px 16px; border-radius: 8px; border: none; background: transparent; color: #78350f; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 5px; line-height: 1.2; min-height: 32px; }
-  .view-tab.active { background: white; color: #9a3412; box-shadow: 0 1px 3px rgba(245, 158, 11, 0.18); }
-  .view-tab:hover:not(.active) { background: rgba(255, 255, 255, 0.5); }
+  /* 顶部视图切换 tabs（居中 + 加大） */
+  .view-tabs {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, #fff7ed, #ffedd5);
+    border-radius: 14px;
+    padding: 6px;
+    margin: 8px 16px 12px;
+    gap: 14px;
+    box-shadow: 0 1px 4px rgba(245, 158, 11, 0.08);
+  }
+  .view-tab {
+    flex: 0 0 auto;
+    min-width: 120px;
+    padding: 10px 22px;
+    border-radius: 10px;
+    border: none;
+    background: transparent;
+    color: #78350f;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    line-height: 1.2;
+    min-height: 40px;
+  }
+  .view-tab.active {
+    background: white;
+    color: #9a3412;
+    box-shadow: 0 2px 6px rgba(245, 158, 11, 0.22);
+    transform: translateY(-1px);
+  }
+  .view-tab:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.55);
+  }
   @media (max-width: 500px) {
-    .view-tab { padding: 6px 12px; font-size: 12px; min-height: 30px; }
+    .view-tabs { gap: 10px; margin: 6px 12px 10px; padding: 5px; }
+    .view-tab { padding: 9px 18px; font-size: 14px; min-height: 36px; min-width: 100px; }
   }
 
   /* 顶部栏 sticky：龙龙＆文文の小家 + tab 一起吸顶 */
@@ -413,17 +436,22 @@
   .menstrual-cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
   .menstrual-cal-weekday { text-align: center; font-size: 10px; color: var(--text-3); font-weight: 600; padding: 3px 0; }
   .menstrual-cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-  .menstrual-day { aspect-ratio: 1; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; position: relative; min-height: 30px; background: transparent; border: 1px solid transparent; }
+  .menstrual-day { aspect-ratio: 1; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 2px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; position: relative; min-height: 36px; background: transparent; border: 1px solid transparent; overflow: hidden; }
+  .menstrual-day .day-num { line-height: 1; font-size: 11px; font-weight: 600; }
+  .menstrual-day .phase-tag { font-size: 7px; line-height: 1; margin-top: 1px; opacity: 0.92; font-weight: 500; letter-spacing: 0; }
   .menstrual-day.empty { cursor: default; background: transparent; }
+  .menstrual-day.empty .phase-tag { display: none; }
   .menstrual-day.today { box-shadow: inset 0 0 0 2px var(--primary, #f97316); font-weight: 800; }
   .menstrual-day.in-period { background: linear-gradient(135deg, #ec4899, #be185d); color: white; cursor: pointer; }
-  .menstrual-day.in-period .marker { color: white; }
-  .menstrual-day.in-period-predicted { background: #fce7f3; color: #be185d; box-shadow: inset 0 0 0 1px #f9a8d4; }
+  .menstrual-day.in-period .marker, .menstrual-day.in-period .phase-tag { color: white; }
+  /* 修复 bug：CSS 名要和 JS 一致 —— 预测月经期粉色格 */
+  .menstrual-day.menstrual-predicted { background: linear-gradient(135deg, #fbcfe8, #f9a8d4); color: #831843; box-shadow: inset 0 0 0 1.5px #ec4899; }
   .menstrual-day.follicular { background: #d1fae5; color: #065f46; }
   .menstrual-day.ovulation-window { background: #fed7aa; color: #9a3412; }
   .menstrual-day.ovulation-day { background: linear-gradient(135deg, #fb923c, #ea580c); color: white; font-weight: 800; box-shadow: 0 0 0 2px #f59e0b; }
   .menstrual-day.luteal { background: #dbeafe; color: #1e40af; }
-  .menstrual-day:hover:not(.empty):not(.in-period) { background: #fef3c7; transform: scale(1.08); }
+  .menstrual-day.dysmenorrhea-day { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #991b1b; box-shadow: inset 0 0 0 1.5px #ef4444; }
+  .menstrual-day:hover:not(.empty):not(.in-period) { transform: scale(1.05); z-index: 2; }
   .menstrual-day.selecting { background: linear-gradient(135deg, #fce7f3, #fbcfe8) !important; color: #9d174d !important; box-shadow: inset 0 0 0 2px #ec4899, 0 0 0 1px #ec4899; font-weight: 800; animation: mcPulse 1.2s ease-in-out infinite; }
   .menstrual-day.in-range { background: #fbcfe8 !important; color: #9d174d !important; }
   @keyframes mcPulse { 0%, 100% { box-shadow: inset 0 0 0 2px #ec4899, 0 0 0 0 rgba(236, 72, 153, 0.5); } 50% { box-shadow: inset 0 0 0 2px #ec4899, 0 0 0 4px rgba(236, 72, 153, 0); } }
@@ -442,6 +470,32 @@
   .menstrual-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; font-size: 10px; color: var(--text-2); padding: 8px; background: #fefce8; border-radius: 8px; }
   .menstrual-legend-item { display: inline-flex; align-items: center; gap: 4px; }
   .menstrual-legend-color { width: 12px; height: 12px; border-radius: 3px; }
+
+  /* 身体情况类型选择器 */
+  .body-type-selector { margin-top: 14px; padding: 12px; background: linear-gradient(135deg, #fff7ed, #fefce8); border-radius: 12px; border: 1px solid #fed7aa; }
+  .body-type-selector .bts-label { display: block; font-size: 12px; color: var(--text-2); font-weight: 600; margin-bottom: 8px; }
+  .body-type-selector .bts-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .body-type-selector .bts-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; border-radius: 10px; border: 2px solid transparent; background: white; cursor: pointer; transition: all 0.15s; font-size: 12px; color: var(--text-2); font-weight: 600; }
+  .body-type-selector .bts-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.06); }
+  .body-type-selector .bts-btn.active { background: white; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(245,158,11,0.18); }
+  .body-type-selector .bts-btn[data-type="menstrual"].active { border-color: #ec4899; color: #be185d; }
+  .body-type-selector .bts-btn[data-type="gout"].active { border-color: #7c3aed; color: #5b21b6; }
+  .body-type-selector .bts-btn[data-type="anomaly"].active { border-color: #f59e0b; color: #92400e; }
+  .body-type-selector .bts-btn[data-type="custom"].active { border-color: #64748b; color: #334155; }
+  .body-type-selector .bts-icon { font-size: 20px; line-height: 1; }
+  .body-type-selector .bts-text { font-size: 11px; }
+  .body-type-selector .bts-hint { margin-top: 8px; font-size: 11px; color: var(--text-3); text-align: center; }
+  @media (max-width: 500px) {
+    .body-type-selector .bts-grid { grid-template-columns: repeat(2, 1fr); }
+    .body-type-selector .bts-icon { font-size: 18px; }
+  }
+
+  /* 痛经日期勾选（在弹窗里） */
+  .dysmenorrhea-day-list { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+  .dysmenorrhea-day-list .dys-day { padding: 6px 12px; border-radius: 8px; border: 1.5px solid #fecaca; background: white; color: var(--text-2); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .dysmenorrhea-day-list .dys-day:hover { border-color: #ef4444; }
+  .dysmenorrhea-day-list .dys-day.active { background: linear-gradient(135deg, #fee2e2, #fecaca); border-color: #ef4444; color: #991b1b; box-shadow: 0 2px 6px rgba(239,68,68,0.15); }
+  .dysmenorrhea-day-list .dys-empty { color: var(--text-3); font-size: 12px; padding: 8px 0; }
 
   .menstrual-predict-card { background: linear-gradient(135deg, #fce7f3, #fbcfe8); border-radius: 10px; padding: 12px; margin-top: 10px; }
   .menstrual-predict-card h4 { margin: 0 0 8px; font-size: 13px; color: #9d174d; display: flex; align-items: center; gap: 6px; }
@@ -484,7 +538,7 @@
           <div class="time"><span class="pulse"></span><span id="currentTime">--:--:--</span></div>
           <div class="date" id="currentDate">--</div>
         </div>
-        <button class="settings-btn" id="settingsBtn" title="设置">⚙</button>
+        <button class="settings-btn" id="settingsBtn" title="配置云端">⚙</button>
       </div>
     </header>
 
@@ -501,15 +555,6 @@
 
   <!-- 左侧：输入 + 统计 -->
   <div class="area-left">
-
-    <div class="config-banner" id="configBanner" style="display:none;">
-      <div class="icon">💡</div>
-      <div class="text">
-        <b>本地模式</b> · 数据存在本浏览器（不跨设备）<br>
-        配置云端后所有设备实时共享：
-      </div>
-      <button class="btn" id="bannerConfigBtn">⚙ 配置云端</button>
-    </div>
 
     <section class="hero">
       <div class="hero-label">🌿 健健康康平平安安！</div>
@@ -631,9 +676,32 @@
       <div class="card-header">
         <div class="card-title">🌸 身体情况 <span class="badge" id="eventsCount">0 条</span></div>
         <div class="actions">
-          <button class="btn-secondary" id="btnPredictMenstrual" title="下次月经预测">🔮 预测下次月经</button>
           <button class="btn-primary" id="btnAddEvent">➕ 添加</button>
         </div>
+      </div>
+
+      <!-- 身体情况分类选择器（决定月历点击保存为哪种类型） -->
+      <div class="body-type-selector" id="bodyTypeSelector">
+        <span class="bts-label">📝 点击月历保存为：</span>
+        <div class="bts-grid">
+          <button class="bts-btn active" data-type="menstrual" data-color="#ec4899">
+            <span class="bts-icon">🩸</span>
+            <span class="bts-text">月经</span>
+          </button>
+          <button class="bts-btn" data-type="gout" data-color="#7c3aed">
+            <span class="bts-icon">🦶</span>
+            <span class="bts-text">痛风</span>
+          </button>
+          <button class="bts-btn" data-type="anomaly" data-color="#f59e0b">
+            <span class="bts-icon">⚠️</span>
+            <span class="bts-text">异常</span>
+          </button>
+          <button class="bts-btn" data-type="custom" data-color="#64748b">
+            <span class="bts-icon">✏️</span>
+            <span class="bts-text">自定义</span>
+          </button>
+        </div>
+        <div class="bts-hint" id="btsHint">点击月历上的日期，自动保存为「月经」</div>
       </div>
 
       <!-- 月经月历（核心记录视图） -->
@@ -657,7 +725,6 @@
         </div>
         <div class="menstrual-cal-grid" id="menstrualCalendars"></div>
         <div class="menstrual-legend" id="menstrualLegend"></div>
-        <div id="menstrualPredictSummary"></div>
       </div>
 
       <!-- 关键数字 -->
@@ -720,22 +787,10 @@
       <input type="datetime-local" id="eventEndTs" class="preview-input">
     </div>
 
-    <!-- 月经专属字段 -->
+    <!-- 月经专属字段：痛经日期勾选（在所选月经期内逐日勾选） -->
     <div class="event-fields" data-for="menstrual">
-      <div class="preview-row"><label>流量</label>
-        <select id="eventMenstrualFlow" class="preview-input">
-          <option value="light">🩸 少</option>
-          <option value="medium" selected>🩸🩸 中等</option>
-          <option value="heavy">🩸🩸🩸 多</option>
-        </select>
-      </div>
-      <div class="preview-row"><label>痛经</label>
-        <div class="severity-grid" id="eventDysmenorrhea" data-max="5"></div>
-      </div>
-      <div class="preview-row"><label>症状标签</label>
-        <div class="tag-input-wrap" id="eventMenstrualSymptoms">
-          <input type="text" placeholder="输入后回车">
-        </div>
+      <div class="preview-row"><label>痛经日期 <span style="font-weight:400;color:var(--text-3);font-size:11px;">(在记录期内勾选)</span></label>
+        <div class="dysmenorrhea-day-list" id="eventDysmenorrheaDays"></div>
       </div>
     </div>
 
@@ -1154,7 +1209,20 @@ Object.keys(customCategories).forEach(name => {
     customCategories[name].icon = suggestIcon(name);
   }
 });
-let familyMembers = JSON.parse(localStorage.getItem(STORAGE_KEYS.MEMBERS) || '["我"]');
+let familyMembers = JSON.parse(localStorage.getItem(STORAGE_KEYS.MEMBERS) || '["文文"]');
+// 一次性迁移：老用户的"我"统一改为"文文"
+(function migrateMemberName() {
+  const saved = localStorage.getItem(STORAGE_KEYS.MEMBERS);
+  if (saved) {
+    try {
+      const arr = JSON.parse(saved);
+      if (Array.isArray(arr) && arr.length === 1 && arr[0] === '我') {
+        familyMembers = ['文文'];
+        localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(familyMembers));
+      }
+    } catch (e) {}
+  }
+})();
 let chart = null;
 let miniCharts = {};
 let currentMemberFilter = 'all';
@@ -1169,6 +1237,7 @@ let historySearch = '';
 let menstrualCalCursor = (() => { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d; })();
 let menstrualSelectStart = null;  // 正在选择范围时的起始日（毫秒）
 let menstrualSelectEnd = null;    // 结束日（毫秒）
+let currentBodyType = 'menstrual'; // 类型选择器当前选中（menstrual/gout/anomaly/custom）
 let realtimeChannel = null;
 let realtimeEventsChannel = null;
 let currentParsed = null;
@@ -1176,9 +1245,7 @@ let currentView = 'health';  // 'health' | 'events'
 let currentEventType = 'menstrual';
 let currentEditingEventId = null;
 let eventSeverity = 3;       // 0-4 (代表 1-5 分)
-let eventDysmenorrhea = 1;   // 0-4
 let eventPainLevel = 5;      // 0-9 (代表 1-10)
-let eventMenstrualSymptoms = [];
 let eventGoutTriggers = [];
 let eventGoutMedications = [];
 let eventCharts = {};
@@ -1294,7 +1361,7 @@ function parseText(text) {
   text = (text || '').trim();
   if (!text) return null;
 
-  const ctx = { member: '我', time: Date.now(), note: '' };
+  const ctx = { member: '文文', time: Date.now(), note: '' };
 
   // 优先级 1：检测是否为体检报告格式（含「参考区间」关键字）
   if (/参考区间|参考值|正常参考/.test(text)) {
@@ -3689,7 +3756,7 @@ async function doAI() {
       raw: text.slice(0, 80) + (text.length > 80 ? '…' : ''),
       multi: true,
       isLabReport: true,
-      member: '我',
+      member: '文文',
       time: Date.now(),
       note: '',
       items: parsed
@@ -3720,7 +3787,7 @@ async function doAIImage(file) {
       raw: `[图片] ${file.name}`,
       multi: true,
       isLabReport: true,
-      member: '我',
+      member: '文文',
       time: Date.now(),
       note: '',
       items: parsed
@@ -3877,8 +3944,22 @@ function initEventsView() {
   // 添加按钮
   document.getElementById('btnAddEvent').addEventListener('click', () => openEventModal());
 
-  // 预测按钮
-  document.getElementById('btnPredictMenstrual').addEventListener('click', openPredictModal);
+  // 身体类型选择器（月经/痛风/异常/自定义）
+  document.getElementById('bodyTypeSelector').addEventListener('click', e => {
+    const btn = e.target.closest('.bts-btn');
+    if (!btn) return;
+    document.querySelectorAll('#bodyTypeSelector .bts-btn').forEach(b => b.classList.toggle('active', b === btn));
+    currentBodyType = btn.dataset.type;
+    // 同步更新月历提示和"添加"按钮打开的默认类型
+    const hint = document.getElementById('btsHint');
+    const meta = {
+      menstrual: '点击月历上的日期，进入范围选择 → 保存为「月经」',
+      gout: '点击月历上的日期，自动保存为「痛风」单日记录',
+      anomaly: '点击月历上的日期，自动保存为「异常」单日记录',
+      custom: '点击月历上的日期，自动保存为「自定义」单日记录',
+    };
+    hint.textContent = meta[currentBodyType] || '';
+  });
 
   // 月历导航
   document.getElementById('mcPrev').addEventListener('click', () => { menstrualCalCursor = shiftMonth(menstrualCalCursor, -1); renderMenstrualCalendar(); });
@@ -3908,7 +3989,6 @@ function initEventsView() {
   document.getElementById('btnCopyLastGout').addEventListener('click', copyLastGout);
 
   // 标签输入
-  setupTagInput('eventMenstrualSymptoms', eventMenstrualSymptoms);
   setupTagInput('eventGoutTriggers', eventGoutTriggers);
   setupTagInput('eventGoutMedications', eventGoutMedications);
 
@@ -4047,7 +4127,6 @@ function renderMenstrualCalendar() {
   const wrap = document.getElementById('menstrualCalendars');
   const labelEl = document.getElementById('mcMonthLabel');
   const legendEl = document.getElementById('menstrualLegend');
-  const summaryEl = document.getElementById('menstrualPredictSummary');
   if (!wrap || !labelEl) return;
 
   const m1 = menstrualCalCursor;
@@ -4076,14 +4155,19 @@ function renderMenstrualCalendar() {
     });
   }
 
-  // 已记录月经日期
+  // 已记录月经日期 + 痛经日期
   const recordedKeys = new Set();
+  const dysmenorrheaKeys = new Set();
   bodyEvents.filter(e => {
     if (e.category !== 'menstrual') return false;
     if (member !== 'all' && e.member !== member) return false;
     return true;
   }).forEach(e => {
     expandEventToDateKeys(e).forEach(k => recordedKeys.add(k));
+    // 从 payload.dysmenorrhea_dates 读取痛经日期
+    if (e.payload && Array.isArray(e.payload.dysmenorrhea_dates)) {
+      e.payload.dysmenorrhea_dates.forEach(k => dysmenorrheaKeys.add(k));
+    }
   });
 
   const todayKey = dateKey(new Date());
@@ -4097,7 +4181,7 @@ function renderMenstrualCalendar() {
     for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) rangeKeys.add(dateKey(d));
   }
 
-  wrap.innerHTML = [m1, m2].map(m => renderSingleMonth(m, recordedKeys, predictedKeys, todayKey, selectedStartKey, selectedEndKey, rangeKeys)).join('');
+  wrap.innerHTML = [m1, m2].map(m => renderSingleMonth(m, recordedKeys, predictedKeys, todayKey, selectedStartKey, selectedEndKey, rangeKeys, dysmenorrheaKeys)).join('');
 
   // 绑定每个日期的点击
   wrap.querySelectorAll('.menstrual-day[data-ts]').forEach(el => {
@@ -4121,43 +4205,19 @@ function renderMenstrualCalendar() {
     bar.classList.remove('active');
   }
 
-  // 图例
+  // 图例（简化：颜色 + 文字标签）
   legendEl.innerHTML = `
     <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#ec4899,#be185d);"></span>已记录月经期</div>
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#fce7f3;box-shadow:inset 0 0 0 1px #f9a8d4;"></span>预测月经期</div>
+    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#fbcfe8,#f9a8d4);box-shadow:inset 0 0 0 1px #ec4899;"></span>预测月经期</div>
     <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#d1fae5;"></span>卵泡期</div>
     <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#fed7aa;"></span>排卵期</div>
     <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#fb923c,#ea580c);box-shadow:0 0 0 2px #f59e0b;"></span>排卵日</div>
     <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#dbeafe;"></span>黄体期</div>
+    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#fee2e2,#fecaca);box-shadow:inset 0 0 0 1px #ef4444;"></span>痛经日</div>
   `;
-
-  // 预测摘要
-  if (!prediction) {
-    summaryEl.innerHTML = `<div class="menstrual-predict-card"><h4>🔮 周期预测</h4><div class="no-data">📝 至少需要 <b>2 次</b> 月经开始记录才能预测<br>（点击下方月历上的日期开始记录）</div></div>`;
-  } else {
-    const fmt = d => `${d.getMonth()+1}月${d.getDate()}日`;
-    const today = new Date();
-    const daysUntil = Math.ceil((prediction.nextStart - today) / 86400000);
-    let status = '';
-    if (daysUntil > 0) status = `<span style="color:#9d174d;font-weight:600;">（还有 ${daysUntil} 天）</span>`;
-    else if (daysUntil === 0) status = `<span style="color:#ef4444;font-weight:700;">（就是今天！）</span>`;
-    else status = `<span style="color:#94a3b8;">（已过 ${-daysUntil} 天）</span>`;
-
-    summaryEl.innerHTML = `
-      <div class="menstrual-predict-card">
-        <h4>🔮 下次周期预测 <span style="font-size:10px;font-weight:400;color:var(--text-3);">基于 ${prediction.cycleCount} 个周期 · 平均 ${prediction.avgCycle} 天（${prediction.minCycle}-${prediction.maxCycle}）</span></h4>
-        <div class="phases">
-          <div class="phase"><div class="phase-label">🩸 下次月经</div><div class="phase-date">${fmt(prediction.nextStart)} ${status}</div><div class="phase-extra">约 ${prediction.lastPeriodDays} 天</div></div>
-          <div class="phase"><div class="phase-label">🌱 卵泡期</div><div class="phase-date">${fmt(prediction.follicularStart)} 起</div><div class="phase-extra">到排卵前</div></div>
-          <div class="phase"><div class="phase-label">🥚 排卵日</div><div class="phase-date">${fmt(prediction.ovulationDay)}</div><div class="phase-extra">±1 天受孕窗口</div></div>
-          <div class="phase"><div class="phase-label">🌙 黄体期</div><div class="phase-date">${fmt(prediction.lutealStart)} 起</div><div class="phase-extra">到下次月经前</div></div>
-        </div>
-      </div>
-    `;
-  }
 }
 
-function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, selectedStartKey, selectedEndKey, rangeKeys) {
+function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, selectedStartKey, selectedEndKey, rangeKeys, dysmenorrheaKeys) {
   const y = monthDate.getFullYear();
   const m = monthDate.getMonth();
   const firstDay = new Date(y, m, 1);
@@ -4179,6 +4239,15 @@ function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, sel
     </div>
     <div class="menstrual-cal-days">`;
 
+  // 阶段中文标签
+  const phaseLabel = {
+    'menstrual-predicted': '月经',
+    'follicular': '卵泡',
+    'ovulation-window': '排卵',
+    'ovulation-day': '排卵日',
+    'luteal': '黄体',
+  };
+
   // 前置空白
   for (let i = 0; i < startOffset; i++) html += `<div class="menstrual-day empty"></div>`;
 
@@ -4192,21 +4261,29 @@ function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, sel
     const isSelectedStart = k === selectedStartKey;
     const isSelectedEnd = k === selectedEndKey;
     const isInRange = rangeKeys && rangeKeys.has(k);
+    const isDysmenorrhea = dysmenorrheaKeys && dysmenorrheaKeys.has(k);
 
     let classes = ['menstrual-day'];
     let marker = '';
+    let tagText = '';
     if (isToday) classes.push('today');
     if (isRecorded) {
       classes.push('in-period');
+      tagText = '月经';
     } else if (phase) {
       classes.push(phase);
-      if (phase === 'ovulation-day') marker = '<span class="marker">🥚</span>';
+      tagText = phaseLabel[phase] || '';
+    }
+    if (isDysmenorrhea && isRecorded) {
+      // 痛经 + 月经：保留 in-period 显示，叠加重边框
+      classes.push('dysmenorrhea-day');
+      tagText = '月经·痛';
     }
     if (isSelectedStart) { classes.push('selecting'); marker = '<span class="marker">🅰️</span>'; }
     else if (isSelectedEnd) { classes.push('selecting'); marker = '<span class="marker">🅱️</span>'; }
     else if (isInRange) classes.push('in-range');
 
-    html += `<div class="${classes.join(' ')}" data-ts="${ts}" title="${k}${isRecorded ? '（已记录）' : ''}">${day}${marker}</div>`;
+    html += `<div class="${classes.join(' ')}" data-ts="${ts}" title="${k}${isRecorded ? '（已记录）' : ''}${isDysmenorrhea ? '（痛经）' : ''}"><span class="day-num">${day}</span>${tagText ? `<span class="phase-tag">${tagText}</span>` : ''}${marker}</div>`;
   }
   html += `</div></div>`;
   return html;
@@ -4215,40 +4292,71 @@ function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, sel
 async function onMenstrualDayClick(ts, el) {
   const day = startOfDay(ts);
   const k = dateKey(day);
+  const currentType = currentBodyType;  // 当前选中的身体类型
 
-  // 已记录的日期：点击 → 删除那条 menstrual 事件
+  // === 月经类型：保持 range 选择 + 弹 modal ===
+  if (currentType === 'menstrual') {
+    const memberFilter = currentEventsMemberFilter;
+    const recordedEvents = bodyEvents.filter(e => {
+      if (e.category !== 'menstrual') return false;
+      if (memberFilter !== 'all' && e.member !== memberFilter) return false;
+      return expandEventToDateKeys(e).has(k);
+    });
+    if (recordedEvents.length > 0) {
+      const ev = recordedEvents[0];
+      if (confirm(`删除 ${ev.member} 的这次月经记录（${k}）？`)) {
+        await removeBodyEvent(ev.id);
+        showToast('✓ 已删除');
+      }
+      return;
+    }
+
+    if (!menstrualSelectStart) {
+      menstrualSelectStart = ts;
+      menstrualSelectEnd = null;
+    } else if (!menstrualSelectEnd) {
+      menstrualSelectEnd = ts;
+      if (menstrualSelectEnd < menstrualSelectStart) {
+        const t = menstrualSelectStart; menstrualSelectStart = menstrualSelectEnd; menstrualSelectEnd = t;
+      }
+    } else {
+      menstrualSelectStart = ts;
+      menstrualSelectEnd = null;
+    }
+    renderMenstrualCalendar();
+    return;
+  }
+
+  // === 非月经类型（痛风/异常/自定义）：单击日期 → 直接保存一条单日事件 ===
+  // 已经存在该日期+类型的记录 → 删除
   const memberFilter = currentEventsMemberFilter;
-  const recordedEvents = bodyEvents.filter(e => {
-    if (e.category !== 'menstrual') return false;
-    if (memberFilter !== 'all' && e.member !== memberFilter) return false;
-    return expandEventToDateKeys(e).has(k);
-  });
-  if (recordedEvents.length > 0) {
-    const ev = recordedEvents[0];
-    if (confirm(`删除 ${ev.member} 的这次月经记录（${k}）？`)) {
-      await removeBodyEvent(ev.id);
+  const memberName = memberFilter === 'all' ? (familyMembers[0] || '文文') : memberFilter;
+  const existing = bodyEvents.find(e =>
+    e.category === currentType &&
+    e.member === memberName &&
+    startOfDay(e.ts).getTime() === day.getTime()
+  );
+  if (existing) {
+    if (confirm(`删除 ${memberName} 在 ${k} 的${getEventCategoryMeta(currentType).label}？`)) {
+      await removeBodyEvent(existing.id);
       showToast('✓ 已删除');
     }
     return;
   }
-
-  // 空白日期 → range 选择
-  if (!menstrualSelectStart) {
-    // 第一次点击：选起始日
-    menstrualSelectStart = ts;
-    menstrualSelectEnd = null;
-  } else if (!menstrualSelectEnd) {
-    // 第二次点击：选结束日
-    menstrualSelectEnd = ts;
-    if (menstrualSelectEnd < menstrualSelectStart) {
-      const t = menstrualSelectStart; menstrualSelectStart = menstrualSelectEnd; menstrualSelectEnd = t;
-    }
-  } else {
-    // 已有范围 → 重置起点
-    menstrualSelectStart = ts;
-    menstrualSelectEnd = null;
-  }
-  renderMenstrualCalendar();
+  // 不存在 → 直接保存
+  await saveBodyEvent({
+    id: null,
+    ts: day.getTime(),
+    end_ts: null,
+    member: memberName,
+    category: currentType,
+    severity: 3,
+    title: getEventCategoryMeta(currentType).label,
+    payload: {},
+    tags: [],
+    note: '',
+  });
+  showToast(`✓ 已记录 ${k} · ${getEventCategoryMeta(currentType).label}`);
 }
 
 function confirmMenstrualSelection() {
@@ -4291,7 +4399,7 @@ function formatMd(d) {
 }
 
 function buildSeverityGrids() {
-  ['eventSeverity', 'eventDysmenorrhea'].forEach(id => {
+  ['eventSeverity'].forEach(id => {
     const el = document.getElementById(id);
     const max = parseInt(el.dataset.max || '5', 10);
     el.innerHTML = Array.from({length: max}, (_, i) => {
@@ -4304,7 +4412,6 @@ function buildSeverityGrids() {
       el.querySelectorAll('.severity-btn').forEach(s => s.classList.remove('active'));
       b.classList.add('active');
       if (id === 'eventSeverity') eventSeverity = parseInt(b.dataset.val, 10);
-      else eventDysmenorrhea = parseInt(b.dataset.val, 10);
     });
   });
   // 痛风疼痛等级 1-10
@@ -4356,12 +4463,11 @@ function setupTagInput(wrapId, tagArr) {
 }
 
 function renderTags() {
-  ['eventMenstrualSymptoms', 'eventGoutTriggers', 'eventGoutMedications'].forEach(id => {
+  ['eventGoutTriggers', 'eventGoutMedications'].forEach(id => {
     const wrap = document.getElementById(id);
     wrap.querySelectorAll('.tag-pill').forEach(p => p.remove());
   });
   // 重渲染（触发 setupTagInput 的 closure）
-  setupTagInput('eventMenstrualSymptoms', eventMenstrualSymptoms);
   setupTagInput('eventGoutTriggers', eventGoutTriggers);
   setupTagInput('eventGoutMedications', eventGoutMedications);
 }
@@ -4401,10 +4507,8 @@ function openEventModal(ev) {
     document.querySelectorAll('#eventSeverity .severity-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.val) === sev));
     // 类型特定字段
     if (ev.category === 'menstrual') {
-      eventDysmenorrhea = Math.max(0, Math.min(4, (ev.payload.dysmenorrhea || 0) - 1));
-      document.querySelectorAll('#eventDysmenorrhea .severity-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.val) === eventDysmenorrhea));
-      eventMenstrualSymptoms = (ev.payload.symptoms || []).slice();
-      document.getElementById('eventMenstrualFlow').value = ev.payload.flow || 'medium';
+      const dysDates = (ev.payload.dysmenorrhea_dates || []).slice();
+      renderDysmenorrheaDayList(ts, end_ts, dysDates);
     }
     if (ev.category === 'gout') {
       const loc = ev.payload.location || '右脚大拇趾';
@@ -4427,7 +4531,7 @@ function openEventModal(ev) {
     currentEditingEventId = ev.id;
     renderTags();
   } else {
-    ms.value = familyMembers[0] || '我';
+    ms.value = familyMembers[0] || '文文';
     setEventType('menstrual');
     document.getElementById('eventTitle').value = '';
     document.getElementById('eventNote').value = '';
@@ -4435,21 +4539,55 @@ function openEventModal(ev) {
     // 重置
     eventSeverity = 2; // 3
     document.querySelectorAll('#eventSeverity .severity-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.val) === 2));
-    eventDysmenorrhea = 1;
-    document.querySelectorAll('#eventDysmenorrhea .severity-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.val) === 1));
     eventPainLevel = 5;
     document.querySelectorAll('#eventPainLevel .severity-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.val) === 5));
-    eventMenstrualSymptoms = []; eventGoutTriggers = []; eventGoutMedications = [];
+    eventGoutTriggers = []; eventGoutMedications = [];
     document.getElementById('eventGoutLocation').value = '右脚大拇趾';
     document.getElementById('eventGoutLocationOtherWrap').style.display = 'none';
     document.getElementById('eventAnomalyType').value = '';
     document.getElementById('eventAnomalyTreatment').value = '';
     document.getElementById('eventCustomName').value = '';
-    document.getElementById('eventMenstrualFlow').value = 'medium';
+    // 月经痛经勾选：根据当前 start/end 渲染日期按钮
+    renderDysmenorrheaDayList(ts, end_ts, []);
     renderTags();
   }
   autoFillEventTitle();
   showModal('eventModalMask');
+}
+
+// 根据月经的开始/结束时间，在弹窗里渲染一排"勾选痛经日期"的小按钮
+function renderDysmenorrheaDayList(ts, end_ts, selectedDates) {
+  const wrap = document.getElementById('eventDysmenorrheaDays');
+  if (!wrap) return;
+  if (!ts) {
+    wrap.innerHTML = '<div class="dys-empty">先在上方选择开始日期</div>';
+    return;
+  }
+  const s = startOfDay(ts);
+  const e = end_ts ? startOfDay(end_ts) : s;
+  if (e < s) {
+    wrap.innerHTML = '<div class="dys-empty">结束日期早于开始日期</div>';
+    return;
+  }
+  const days = [];
+  for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+    days.push(new Date(d));
+  }
+  if (days.length === 0) {
+    wrap.innerHTML = '<div class="dys-empty">请先选择开始/结束日期</div>';
+    return;
+  }
+  const set = new Set(selectedDates || []);
+  wrap.innerHTML = days.map(d => {
+    const k = dateKey(d);
+    const md = `${d.getMonth()+1}/${d.getDate()}`;
+    const dayNames = ['日','一','二','三','四','五','六'];
+    const dayName = dayNames[d.getDay()];
+    return `<button type="button" class="dys-day${set.has(k) ? ' active' : ''}" data-datekey="${k}" title="${k}（周${dayName}）">${md}（周${dayName}）</button>`;
+  }).join('');
+  wrap.querySelectorAll('.dys-day').forEach(btn => {
+    btn.addEventListener('click', () => btn.classList.toggle('active'));
+  });
 }
 
 function autoFillEventTitle() {
@@ -4497,10 +4635,10 @@ function saveEventFromForm() {
 
   let payload = {};
   if (currentEventType === 'menstrual') {
+    // 从弹窗里收集勾选的痛经日期
+    const dysDates = Array.from(document.querySelectorAll('#eventDysmenorrheaDays .dys-day.active')).map(el => el.dataset.datekey);
     payload = {
-      flow: document.getElementById('eventMenstrualFlow').value,
-      dysmenorrhea: eventDysmenorrhea + 1,
-      symptoms: eventMenstrualSymptoms.slice(),
+      dysmenorrhea_dates: dysDates,
       duration_days: end_ts ? Math.ceil((end_ts - ts) / 86400000) : null,
       is_period_start: true,
     };
@@ -4568,25 +4706,12 @@ function renderEventsStats() {
   const daysSinceGout = lastGout ? Math.floor((now - lastGout.ts) / 86400000) : null;
   const goutDaysTotal = goutEvents.reduce((s, e) => s + (e.end_ts ? (e.end_ts - e.ts) / 86400000 : 0), 0);
 
-  // 月经平均周期
-  const menstrualEvents = bodyEvents.filter(e => e.category === 'menstrual' && e.payload?.is_period_start !== false);
-  let avgCycle = null;
-  if (menstrualEvents.length >= 2) {
-    const sorted = menstrualEvents.sort((a,b) => a.ts - b.ts);
-    const cycles = [];
-    for (let i = 1; i < sorted.length; i++) cycles.push((sorted[i].ts - sorted[i-1].ts) / 86400000);
-    avgCycle = Math.round(cycles.reduce((s, v) => s + v, 0) / cycles.length);
-  }
-
   const items = [];
   if (anomalyThisMonth > 0 || bodyEvents.some(e => e.category === 'anomaly')) {
     items.push({ title: '本月异常', value: anomalyThisMonth, unit: '次', sub: bodyEvents.filter(e => e.category === 'anomaly').length + ' 次累计', color: '#f59e0b' });
   }
   if (goutEvents.length > 0) {
     items.push({ title: '距上次痛风', value: daysSinceGout, unit: '天', sub: '累计 ' + Math.round(goutDaysTotal) + ' 天', color: '#ef4444' });
-  }
-  if (avgCycle) {
-    items.push({ title: '月经平均周期', value: avgCycle, unit: '天', sub: '基于 ' + (menstrualEvents.length - 1) + ' 个周期', color: '#ec4899' });
   }
   if (items.length === 0) {
     items.push({ title: '身体事件', value: bodyEvents.length, unit: '条', sub: '暂无数据，点击 ➕ 添加', color: '#94a3b8' });
@@ -4649,10 +4774,8 @@ function renderEventCard(ev) {
   if (dur) chips.push(`<span class="event-meta-chip">⏱ ${dur}</span>`);
   if (ongoing) chips.push(`<span class="event-meta-chip" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1e40af;">🟢 仍在持续</span>`);
   if (ev.category === 'menstrual') {
-    if (ev.payload.flow) chips.push(`<span class="event-meta-chip">流量 ${({light:'少',medium:'中',heavy:'多'})[ev.payload.flow] || ev.payload.flow}</span>`);
-    if (ev.payload.dysmenorrhea) chips.push(`<span class="event-meta-chip">痛经 ${ev.payload.dysmenorrhea}/5</span>`);
-    if (ev.payload.symptoms && ev.payload.symptoms.length) {
-      chips.push(`<span class="event-meta-chip tag">${ev.payload.symptoms.map(escapeHtml).join(' · ')}</span>`);
+    if (ev.payload.dysmenorrhea_dates && ev.payload.dysmenorrhea_dates.length) {
+      chips.push(`<span class="event-meta-chip" style="background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b;">🔥 痛经 ${ev.payload.dysmenorrhea_dates.length} 天</span>`);
     }
   }
   if (ev.category === 'gout') {
@@ -4704,22 +4827,31 @@ function renderEventsCharts() {
   }
 
   const charts = [];
-  // 1. 月经周期长度趋势
+  // 1. 月经周期趋势（折线）：同时显示周期长度 + 来潮天数；副标题显示平均周期
   const menstrual = bodyEvents.filter(e => e.category === 'menstrual' && e.payload?.is_period_start !== false).sort((a,b) => a.ts - b.ts);
   if (menstrual.length >= 2) {
     const cycles = [];
+    const durations = [];
     for (let i = 1; i < menstrual.length; i++) {
-      cycles.push({
-        x: new Date(menstrual[i].ts).toLocaleDateString('zh-CN', {month:'2-digit', day:'2-digit'}),
-        y: Math.round((menstrual[i].ts - menstrual[i-1].ts) / 86400000)
-      });
+      cycles.push(Math.round((menstrual[i].ts - menstrual[i-1].ts) / 86400000));
+      const start = menstrual[i];
+      let dur = (start.payload && start.payload.duration_days) ? start.payload.duration_days : null;
+      if (!dur && start.end_ts) dur = Math.max(1, Math.ceil((start.end_ts - start.ts) / 86400000));
+      durations.push(dur);
     }
+    const labels = menstrual.slice(1).map(m => new Date(m.ts).toLocaleDateString('zh-CN', {month:'2-digit', day:'2-digit'}));
+    const cycleAvg = cycles.length ? Math.round(cycles.reduce((s,v) => s+v, 0) / cycles.length) : 0;
+    const cycleMin = cycles.length ? Math.min(...cycles) : 0;
+    const cycleMax = cycles.length ? Math.max(...cycles) : 0;
+    const durationData = labels.map((_, i) => durations[i] == null ? null : durations[i]);
     charts.push({
       id: 'menstrual-cycle',
-      title: '🌸 月经周期趋势',
-      subtitle: '每次开始间隔天数',
-      data: cycles,
-      type: 'line',
+      title: '🌸 月经周期 & 来潮天数',
+      subtitle: `平均周期 ${cycleAvg} 天（${cycleMin}~${cycleMax}）· 基于 ${cycles.length} 个周期`,
+      type: 'menstrual-cycle',
+      labels,
+      cycles,
+      durations: durationData,
       color: '#ec4899',
     });
   }
@@ -4800,7 +4932,52 @@ function renderEventsCharts() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     let cfg;
-    if (c.type === 'doughnut') {
+    if (c.type === 'menstrual-cycle') {
+      // 双 Y 轴折线：周期长度 + 来潮天数
+      cfg = {
+        type: 'line',
+        data: {
+          labels: c.labels,
+          datasets: [
+            {
+              label: '周期（天）',
+              data: c.cycles,
+              borderColor: '#ec4899',
+              backgroundColor: '#ec489922',
+              borderWidth: 2.5,
+              tension: 0.3,
+              yAxisID: 'y',
+              pointRadius: 4,
+              pointBackgroundColor: '#ec4899',
+            },
+            {
+              label: '来潮天数',
+              data: c.durations,
+              borderColor: '#a855f7',
+              backgroundColor: '#a855f722',
+              borderWidth: 2,
+              tension: 0.3,
+              borderDash: [5, 3],
+              yAxisID: 'y1',
+              pointRadius: 4,
+              pointBackgroundColor: '#a855f7',
+            }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 14, padding: 8 } }
+          },
+          scales: {
+            y: { position: 'left', beginAtZero: false, ticks: { font: { size: 10 } }, title: { display: true, text: '周期(天)', font: { size: 10 } } },
+            y1: { position: 'right', beginAtZero: true, ticks: { font: { size: 10 } }, grid: { drawOnChartArea: false }, title: { display: true, text: '来潮(天)', font: { size: 10 } } },
+            x: { ticks: { font: { size: 10 }, maxRotation: 45 } }
+          }
+        }
+      };
+    } else if (c.type === 'doughnut') {
       cfg = {
         type: 'doughnut',
         data: {
@@ -4843,76 +5020,8 @@ function renderEventsCharts() {
   });
 }
 
-// ===== 月经预测 =====
-function openPredictModal() {
-  const menstrual = bodyEvents.filter(e => e.category === 'menstrual' && e.payload?.is_period_start !== false).sort((a,b) => a.ts - b.ts);
-  const content = document.getElementById('predictContent');
 
-  if (menstrual.length < 2) {
-    content.innerHTML = `
-      <div style="text-align:center;padding:30px;color:var(--text-3);">
-        🌸 需要至少 <b>2 次月经开始</b> 记录才能预测<br>
-        <span style="font-size:12px;">（勾选类型时记得标记"周期开始"）</span><br><br>
-        目前：${menstrual.length} 条月经开始记录
-      </div>
-    `;
-    showModal('predictModalMask');
-    return;
-  }
-
-  const cycles = [];
-  for (let i = 1; i < menstrual.length; i++) {
-    cycles.push((menstrual[i].ts - menstrual[i-1].ts) / 86400000);
-  }
-  const avg = cycles.reduce((s, v) => s + v, 0) / cycles.length;
-  const min = Math.min(...cycles);
-  const max = Math.max(...cycles);
-  const last = menstrual[menstrual.length - 1];
-  const predictDate = new Date(last.ts + avg * 86400000);
-  const today = new Date();
-  const daysUntil = Math.ceil((predictDate - today) / 86400000);
-
-  // 按成员分别预测
-  const byMember = {};
-  menstrual.forEach(e => {
-    if (!byMember[e.member]) byMember[e.member] = [];
-    byMember[e.member].push(e);
-  });
-
-  let perMemberHtml = '';
-  Object.entries(byMember).forEach(([m, list]) => {
-    if (list.length < 2) return;
-    list.sort((a, b) => a.ts - b.ts);
-    const cs = [];
-    for (let i = 1; i < list.length; i++) cs.push((list[i].ts - list[i-1].ts) / 86400000);
-    const avgM = cs.reduce((s, v) => s + v, 0) / cs.length;
-    const lastM = list[list.length - 1];
-    const pdM = new Date(lastM.ts + avgM * 86400000);
-    const dM = Math.ceil((pdM - today) / 86400000);
-    perMemberHtml += `
-      <div style="padding:10px 0;border-bottom:1px dashed var(--border);">
-        <b>👤 ${escapeHtml(m)}</b> · 平均周期 ${Math.round(avgM)} 天<br>
-        <span style="color:var(--primary);font-size:18px;font-weight:700;">📅 ${pdM.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-        ${dM > 0 ? `<span style="color:var(--text-3);font-size:12px;">（还有 ${dM} 天）</span>` : dM === 0 ? '<span style="color:#ef4444;font-size:12px;">（就是今天！）</span>' : `<span style="color:#94a3b8;font-size:12px;">（已过 ${-dM} 天）</span>`}
-      </div>
-    `;
-  });
-
-  content.innerHTML = `
-    <div style="text-align:center;padding:20px;background:linear-gradient(135deg,#fce7f3,#fbcfe8);border-radius:12px;margin-bottom:14px;">
-      <div style="font-size:12px;color:#9d174d;">全家平均周期</div>
-      <div style="font-size:36px;font-weight:800;color:#be185d;margin:6px 0;">${Math.round(avg)} <span style="font-size:14px;">天</span></div>
-      <div style="font-size:11px;color:#9d174d;">范围 ${Math.round(min)}-${Math.round(max)} 天 · 基于 ${cycles.length} 个周期</div>
-    </div>
-    <div style="font-size:13px;line-height:1.6;">
-      ${perMemberHtml || '<div style="color:var(--text-3);text-align:center;">无足够数据</div>'}
-    </div>
-    <div style="margin-top:14px;font-size:11px;color:var(--text-3);padding:10px;background:#f1f5f9;border-radius:8px;">
-      💡 预测基于历史平均，仅供参考。实际周期受压力、作息、饮食等影响。
-    </div>
-  `;
-  showModal('predictModalMask');
-}
+// openPredictModal 已废弃（按钮已删除，预测直接显示在月历文字标签 + 趋势图里）
 </script>
 </body>
 </html>
