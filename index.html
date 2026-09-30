@@ -208,6 +208,7 @@
   /* 图表 - 多张小图 */
   .chart-wrap { position: relative; height: 280px; }
   .mini-charts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .mini-charts-grid .mini-chart-card.wide { grid-column: 1 / -1; }
   .mini-chart-card { background: linear-gradient(135deg, #fffbf5 0%, #fff5e6 100%); border: 1px solid #fde6c8; border-radius: 16px; padding: 12px 14px; transition: all 0.2s; box-shadow: 0 1px 3px rgba(251, 191, 36, 0.08); }
   .mini-chart-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(251, 191, 36, 0.15); border-color: #fdba74; }
   .mini-chart-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
@@ -456,6 +457,7 @@
   .menstrual-day.in-range { background: #fbcfe8 !important; color: #9d174d !important; }
   @keyframes mcPulse { 0%, 100% { box-shadow: inset 0 0 0 2px #ec4899, 0 0 0 0 rgba(236, 72, 153, 0.5); } 50% { box-shadow: inset 0 0 0 2px #ec4899, 0 0 0 4px rgba(236, 72, 153, 0); } }
   .menstrual-day .marker { position: absolute; top: 1px; right: 2px; font-size: 8px; line-height: 1; }
+  .menstrual-day .other-marker { position: absolute; bottom: 1px; right: 2px; font-size: 9px; line-height: 1; width: 14px; height: 14px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.18); }
 
   /* 月经选择操作条（更显眼的反馈） */
   .menstrual-select-bar { margin-top: 10px; padding: 10px 14px; border-radius: 10px; background: linear-gradient(135deg, #fce7f3, #fbcfe8); border: 2px dashed #ec4899; display: none; align-items: center; flex-wrap: wrap; gap: 10px; }
@@ -481,7 +483,11 @@
   .body-type-selector .bts-btn[data-type="menstrual"].active { border-color: #ec4899; color: #be185d; }
   .body-type-selector .bts-btn[data-type="gout"].active { border-color: #7c3aed; color: #5b21b6; }
   .body-type-selector .bts-btn[data-type="anomaly"].active { border-color: #f59e0b; color: #92400e; }
-  .body-type-selector .bts-btn[data-type="custom"].active { border-color: #64748b; color: #334155; }
+  .body-type-selector .bts-btn[data-custom].active { border-color: #8b5cf6; color: #6d28d9; background: #f5f3ff; }
+  .body-type-selector .bts-btn.bts-btn-add { background: repeating-linear-gradient(45deg, #ffffff 0 8px, #f8fafc 8px 16px); color: var(--text-2); border-style: dashed; }
+  .body-type-selector .bts-btn.bts-btn-add:hover { background: linear-gradient(135deg, #ede9fe, #ddd6fe); color: #5b21b6; border-color: #8b5cf6; }
+  .body-type-selector .bts-btn.bts-del { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; border-radius: 50%; background: #ef4444; color: white; font-size: 10px; line-height: 1; cursor: pointer; border: none; opacity: 0; transition: opacity 0.15s; padding: 0; }
+  .body-type-selector .bts-btn:hover .bts-del { opacity: 1; }
   .body-type-selector .bts-icon { font-size: 20px; line-height: 1; }
   .body-type-selector .bts-text { font-size: 11px; }
   .body-type-selector .bts-hint { margin-top: 8px; font-size: 11px; color: var(--text-3); text-align: center; }
@@ -683,7 +689,7 @@
       <!-- 身体情况分类选择器（决定月历点击保存为哪种类型） -->
       <div class="body-type-selector" id="bodyTypeSelector">
         <span class="bts-label">📝 点击月历保存为：</span>
-        <div class="bts-grid">
+        <div class="bts-grid" id="btsGrid">
           <button class="bts-btn active" data-type="menstrual" data-color="#ec4899">
             <span class="bts-icon">🩸</span>
             <span class="bts-text">月经</span>
@@ -696,12 +702,12 @@
             <span class="bts-icon">⚠️</span>
             <span class="bts-text">异常</span>
           </button>
-          <button class="bts-btn" data-type="custom" data-color="#64748b">
-            <span class="bts-icon">✏️</span>
-            <span class="bts-text">自定义</span>
+          <button class="bts-btn bts-btn-add" data-action="add-custom" data-color="#64748b" title="点击添加新的自定义项目">
+            <span class="bts-icon">＋</span>
+            <span class="bts-text">添加项目</span>
           </button>
         </div>
-        <div class="bts-hint" id="btsHint">点击月历上的日期，自动保存为「月经」</div>
+        <div class="bts-hint" id="btsHint">点击月历上的日期，弹出确认弹窗 → 保存为「月经」</div>
       </div>
 
       <!-- 月经月历（核心记录视图） -->
@@ -851,7 +857,12 @@
     <!-- 自定义专属字段 -->
     <div class="event-fields event-fields-hidden" data-for="custom">
       <div class="preview-row"><label>事件名</label>
-        <input type="text" id="eventCustomName" class="preview-input" placeholder="比如：睡眠质量/情绪波动/运动">
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="eventCustomName" class="preview-input" list="customEventTypesList" placeholder="比如：睡眠质量/情绪波动/运动">
+          <button type="button" id="btnAddCustomTypeInline" class="btn-secondary" style="font-size:12px;padding:6px 10px;flex-shrink:0;">➕ 添加</button>
+        </div>
+        <datalist id="customEventTypesList"></datalist>
+        <div id="customTypesHint" style="font-size:11px;color:var(--text-3);margin-top:4px;">已添加的项目会显示在下拉里，点击 ➕ 添加按钮保存为新自定义项目</div>
       </div>
     </div>
 
@@ -1238,6 +1249,7 @@ let menstrualCalCursor = (() => { const d = new Date(); d.setDate(1); d.setHours
 let menstrualSelectStart = null;  // 正在选择范围时的起始日（毫秒）
 let menstrualSelectEnd = null;    // 结束日（毫秒）
 let currentBodyType = 'menstrual'; // 类型选择器当前选中（menstrual/gout/anomaly/custom）
+let customEventTypes = JSON.parse(localStorage.getItem('wb_custom_event_types') || '[]'); // 用户自定义项目 [{id, name, icon, color}]
 let realtimeChannel = null;
 let realtimeEventsChannel = null;
 let currentParsed = null;
@@ -1911,6 +1923,119 @@ function saveBodyEventsCache() {
   } catch (e) { console.warn('localStorage save body events failed', e); }
 }
 
+function saveCustomEventTypes() {
+  try {
+    localStorage.setItem('wb_custom_event_types', JSON.stringify(customEventTypes));
+  } catch (e) { console.warn('localStorage save custom types failed', e); }
+}
+
+const CUSTOM_PALETTE = ['#8b5cf6', '#06b6d4', '#10b981', '#f97316', '#ec4899', '#3b82f6', '#14b8a6', '#a855f7', '#eab308', '#ef4444'];
+const CUSTOM_ICONS = ['📝', '🩹', '💊', '😴', '🏃', '🍵', '🧘', '🌡', '🧠', '💪', '🦷', '👁', '🫀', '🫁', '🧴', '📊', '🎯', '🔔', '☕', '🥗'];
+
+function addCustomEventType(name) {
+  const trimmed = String(name || '').trim();
+  if (!trimmed) return null;
+  if (customEventTypes.some(c => c.name === trimmed)) {
+    showToast(`「${trimmed}」已存在`, 'warning');
+    return customEventTypes.find(c => c.name === trimmed);
+  }
+  if (customEventTypes.length >= 10) {
+    showToast('最多 10 个自定义项目', 'warning');
+    return null;
+  }
+  const item = {
+    id: 'cust_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    name: trimmed,
+    icon: CUSTOM_ICONS[customEventTypes.length % CUSTOM_ICONS.length],
+    color: CUSTOM_PALETTE[customEventTypes.length % CUSTOM_PALETTE.length],
+  };
+  customEventTypes.push(item);
+  saveCustomEventTypes();
+  renderBodyTypeSelector();
+  return item;
+}
+
+function removeCustomEventType(id) {
+  customEventTypes = customEventTypes.filter(c => c.id !== id);
+  saveCustomEventTypes();
+}
+
+function getCustomEventType(id) {
+  return customEventTypes.find(c => c.id === id);
+}
+
+function renderBodyTypeSelector() {
+  const grid = document.getElementById('btsGrid');
+  if (!grid) return;
+  // 保留前 3 个固定按钮和最后的"添加"按钮
+  const fixedStart = grid.querySelector('[data-type="menstrual"]').outerHTML;
+  const fixedGout = grid.querySelector('[data-type="gout"]').outerHTML;
+  const fixedAnomaly = grid.querySelector('[data-type="anomaly"]').outerHTML;
+  const addBtn = grid.querySelector('[data-action="add-custom"]').outerHTML;
+  const customs = customEventTypes.map(c => `
+    <button class="bts-btn" data-type="${escapeHtml(c.id)}" data-custom="${escapeHtml(c.id)}" data-color="${escapeHtml(c.color)}" title="悬停删除">
+      <button class="bts-del" data-id="${escapeHtml(c.id)}" title="删除该项目">×</button>
+      <span class="bts-icon">${escapeHtml(c.icon)}</span>
+      <span class="bts-text">${escapeHtml(c.name)}</span>
+    </button>
+  `).join('');
+  grid.innerHTML = fixedStart + fixedGout + fixedAnomaly + customs + addBtn;
+  // 重新激活当前选中的
+  const target = currentBodyType ? `[data-type="${currentBodyType}"]` : null;
+  if (target) {
+    const el = grid.querySelector(target);
+    if (el) el.classList.add('active');
+  } else {
+    grid.querySelector('[data-type="menstrual"]').classList.add('active');
+    currentBodyType = 'menstrual';
+  }
+  // 同步类别筛选 select
+  syncEventsCategoryFilter();
+}
+
+function syncEventsCategoryFilter() {
+  const sel = document.getElementById('eventsCategoryFilter');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">全部类型</option>'
+    + '<option value="menstrual">🌸 月经</option>'
+    + '<option value="gout">🦴 痛风</option>'
+    + '<option value="anomaly">💢 异常</option>'
+    + '<option value="custom">📝 自定义（未分类）</option>'
+    + customEventTypes.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.icon)} ${escapeHtml(c.name)}</option>`).join('');
+  if (current) sel.value = current;
+}
+
+function updateBtsHint() {
+  const hint = document.getElementById('btsHint');
+  if (!hint) return;
+  const meta = {
+    menstrual: '点击月历上的日期，进入范围选择 → 保存为「月经」',
+    gout: '点击月历上的日期，弹出痛风发作确认弹窗',
+    anomaly: '点击月历上的日期，弹出异常确认弹窗',
+  };
+  if (meta[currentBodyType]) {
+    hint.textContent = meta[currentBodyType];
+  } else {
+    const ct = getCustomEventType(currentBodyType);
+    hint.textContent = ct ? `点击月历上的日期，弹出「${ct.name}」确认弹窗` : '';
+  }
+}
+
+function promptAddCustomEventType() {
+  // 用 prompt 是浏览器原生。简单起见，先用 prompt，后续可换更好看的弹窗
+  const name = prompt('输入自定义项目名（例如：睡眠质量 / 运动 / 情绪）', '');
+  if (!name) return;
+  const item = addCustomEventType(name);
+  if (item) {
+    // 自动选中新添加的项目
+    currentBodyType = item.id;
+    renderBodyTypeSelector();
+    updateBtsHint();
+    showToast(`✓ 已添加「${item.name}」`);
+  }
+}
+
 function genBodyEventId() {
   return 'pending-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
 }
@@ -1980,6 +2105,11 @@ function getEventCategoryMeta(cat) {
     anomaly: { label: '异常', icon: '💢', color: '#f59e0b' },
     custom: { label: '自定义', icon: '📝', color: '#8b5cf6' },
   };
+  // 优先识别 custom 类型下的子项目
+  if (cat && cat.startsWith && cat.startsWith('cust_')) {
+    const ct = customEventTypes.find(c => c.id === cat);
+    if (ct) return { label: ct.name, icon: ct.icon, color: ct.color };
+  }
   return map[cat] || { label: cat, icon: '📌', color: '#64748b' };
 }
 
@@ -3944,21 +4074,65 @@ function initEventsView() {
   // 添加按钮
   document.getElementById('btnAddEvent').addEventListener('click', () => openEventModal());
 
-  // 身体类型选择器（月经/痛风/异常/自定义）
+  // 身体类型选择器（月经/痛风/异常/自定义项目）
   document.getElementById('bodyTypeSelector').addEventListener('click', e => {
+    // 优先处理删除按钮
+    const delBtn = e.target.closest('.bts-del');
+    if (delBtn) {
+      e.stopPropagation();
+      const id = delBtn.dataset.id;
+      const item = customEventTypes.find(c => c.id === id);
+      if (!item) return;
+      // 兼容两种保存方式：category 直接是 cust_xxx（旧/未关联）或 category='custom' 且 payload.custom_id 等
+      const used = bodyEvents.some(ev =>
+        ev.category === id ||
+        (ev.category === 'custom' && ev.payload && ev.payload.custom_id === id)
+      );
+      const refCount = bodyEvents.filter(ev =>
+        ev.category === id ||
+        (ev.category === 'custom' && ev.payload && ev.payload.custom_id === id)
+      ).length;
+      const msg = used
+        ? `「${item.name}」已被 ${refCount} 条记录引用，删除该项目将把这些记录改为「未分类自定义」`
+        : `删除自定义项目「${item.name}」？`;
+      if (confirm(msg)) {
+        if (used) {
+          // 关联的记录把 custom_name 保留，category/cust_id 置空
+          bodyEvents.forEach(ev => {
+            if (ev.category === id) {
+              ev.category = 'custom';
+              ev.payload = ev.payload || {};
+              ev.payload.custom_id = null;
+              ev.payload._orphaned_from = item.name;
+            } else if (ev.category === 'custom' && ev.payload && ev.payload.custom_id === id) {
+              ev.payload.custom_id = null;
+              ev.payload._orphaned_from = item.name;
+            }
+          });
+          saveBodyEventsCache();
+        }
+        customEventTypes = customEventTypes.filter(c => c.id !== id);
+        saveCustomEventTypes();
+        renderBodyTypeSelector();
+        if (currentBodyType === id) {
+          currentBodyType = 'menstrual';
+          document.querySelectorAll('#bodyTypeSelector .bts-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'menstrual'));
+          updateBtsHint();
+        }
+        showToast(`✓ 已删除「${item.name}」`);
+      }
+      return;
+    }
     const btn = e.target.closest('.bts-btn');
     if (!btn) return;
+    // 「＋添加项目」按钮 → 弹出添加弹窗
+    if (btn.dataset.action === 'add-custom') {
+      promptAddCustomEventType();
+      return;
+    }
     document.querySelectorAll('#bodyTypeSelector .bts-btn').forEach(b => b.classList.toggle('active', b === btn));
     currentBodyType = btn.dataset.type;
-    // 同步更新月历提示和"添加"按钮打开的默认类型
-    const hint = document.getElementById('btsHint');
-    const meta = {
-      menstrual: '点击月历上的日期，进入范围选择 → 保存为「月经」',
-      gout: '点击月历上的日期，自动保存为「痛风」单日记录',
-      anomaly: '点击月历上的日期，自动保存为「异常」单日记录',
-      custom: '点击月历上的日期，自动保存为「自定义」单日记录',
-    };
-    hint.textContent = meta[currentBodyType] || '';
+    updateBtsHint();
   });
 
   // 月历导航
@@ -3994,6 +4168,29 @@ function initEventsView() {
 
   // 保存按钮
   document.getElementById('btnSaveEvent').addEventListener('click', saveEventFromForm);
+
+  // 弹窗内：自定义项目 inline 添加
+  document.getElementById('btnAddCustomTypeInline').addEventListener('click', () => {
+    const inp = document.getElementById('eventCustomName');
+    const v = inp.value.trim();
+    if (!v) { showToast('请先输入项目名', 'warning'); inp.focus(); return; }
+    const item = addCustomEventType(v);
+    if (item) {
+      inp.value = item.name;
+      renderCustomTypesDatalist();
+      autoFillEventTitle();
+      // 同步选中这个新项目
+      currentBodyType = item.id;
+      renderBodyTypeSelector();
+      updateBtsHint();
+      showToast(`✓ 已添加「${item.name}」到自定义项目列表`);
+    }
+  });
+
+  // 初始化渲染自定义项目
+  renderBodyTypeSelector();
+  renderCustomTypesDatalist();
+  updateBtsHint();
 
   // 时间字段默认现在
   setDefaultEventTimes();
@@ -4158,15 +4355,22 @@ function renderMenstrualCalendar() {
   // 已记录月经日期 + 痛经日期
   const recordedKeys = new Set();
   const dysmenorrheaKeys = new Set();
+  // 其他类型事件（小角标）
+  const otherMarkers = {};  // k -> {icon, color, label}
   bodyEvents.filter(e => {
-    if (e.category !== 'menstrual') return false;
     if (member !== 'all' && e.member !== member) return false;
     return true;
   }).forEach(e => {
-    expandEventToDateKeys(e).forEach(k => recordedKeys.add(k));
-    // 从 payload.dysmenorrhea_dates 读取痛经日期
-    if (e.payload && Array.isArray(e.payload.dysmenorrhea_dates)) {
-      e.payload.dysmenorrhea_dates.forEach(k => dysmenorrheaKeys.add(k));
+    if (e.category === 'menstrual') {
+      expandEventToDateKeys(e).forEach(k => recordedKeys.add(k));
+      if (e.payload && Array.isArray(e.payload.dysmenorrhea_dates)) {
+        e.payload.dysmenorrhea_dates.forEach(k => dysmenorrheaKeys.add(k));
+      }
+    } else {
+      const k = dateKey(startOfDay(e.ts));
+      if (recordedKeys.has(k)) return;  // 已记录月经优先
+      const meta = getEventCategoryMeta(e.category);
+      otherMarkers[k] = { icon: meta.icon, color: meta.color, label: meta.label };
     }
   });
 
@@ -4181,7 +4385,7 @@ function renderMenstrualCalendar() {
     for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) rangeKeys.add(dateKey(d));
   }
 
-  wrap.innerHTML = [m1, m2].map(m => renderSingleMonth(m, recordedKeys, predictedKeys, todayKey, selectedStartKey, selectedEndKey, rangeKeys, dysmenorrheaKeys)).join('');
+  wrap.innerHTML = [m1, m2].map(m => renderSingleMonth(m, recordedKeys, predictedKeys, todayKey, selectedStartKey, selectedEndKey, rangeKeys, dysmenorrheaKeys, otherMarkers)).join('');
 
   // 绑定每个日期的点击
   wrap.querySelectorAll('.menstrual-day[data-ts]').forEach(el => {
@@ -4217,7 +4421,7 @@ function renderMenstrualCalendar() {
   `;
 }
 
-function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, selectedStartKey, selectedEndKey, rangeKeys, dysmenorrheaKeys) {
+function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, selectedStartKey, selectedEndKey, rangeKeys, dysmenorrheaKeys, otherMarkers) {
   const y = monthDate.getFullYear();
   const m = monthDate.getMonth();
   const firstDay = new Date(y, m, 1);
@@ -4283,7 +4487,14 @@ function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, sel
     else if (isSelectedEnd) { classes.push('selecting'); marker = '<span class="marker">🅱️</span>'; }
     else if (isInRange) classes.push('in-range');
 
-    html += `<div class="${classes.join(' ')}" data-ts="${ts}" title="${k}${isRecorded ? '（已记录）' : ''}${isDysmenorrhea ? '（痛经）' : ''}"><span class="day-num">${day}</span>${tagText ? `<span class="phase-tag">${tagText}</span>` : ''}${marker}</div>`;
+    // 痛风/异常/自定义事件的小角标
+    const other = otherMarkers && otherMarkers[k];
+    if (other && !isRecorded) {
+      classes.push('has-other-event');
+      marker += `<span class="other-marker" style="background:${other.color};" title="${escapeHtml(other.label)}">${other.icon}</span>`;
+    }
+
+    html += `<div class="${classes.join(' ')}" data-ts="${ts}" title="${k}${isRecorded ? '（已记录）' : ''}${isDysmenorrhea ? '（痛经）' : ''}${other ? '（' + escapeHtml(other.label) + '）' : ''}"><span class="day-num">${day}</span>${tagText ? `<span class="phase-tag">${tagText}</span>` : ''}${marker}</div>`;
   }
   html += `</div></div>`;
   return html;
@@ -4293,10 +4504,11 @@ async function onMenstrualDayClick(ts, el) {
   const day = startOfDay(ts);
   const k = dateKey(day);
   const currentType = currentBodyType;  // 当前选中的身体类型
+  const memberFilter = currentEventsMemberFilter;
+  const memberName = memberFilter === 'all' ? (familyMembers[0] || '文文') : memberFilter;
 
-  // === 月经类型：保持 range 选择 + 弹 modal ===
+  // === 月经类型：range 选择 + 弹 modal ===
   if (currentType === 'menstrual') {
-    const memberFilter = currentEventsMemberFilter;
     const recordedEvents = bodyEvents.filter(e => {
       if (e.category !== 'menstrual') return false;
       if (memberFilter !== 'all' && e.member !== memberFilter) return false;
@@ -4327,10 +4539,8 @@ async function onMenstrualDayClick(ts, el) {
     return;
   }
 
-  // === 非月经类型（痛风/异常/自定义）：单击日期 → 直接保存一条单日事件 ===
+  // === 痛风/异常/自定义：单击日期 → 弹 modal 确认（不再直接保存） ===
   // 已经存在该日期+类型的记录 → 删除
-  const memberFilter = currentEventsMemberFilter;
-  const memberName = memberFilter === 'all' ? (familyMembers[0] || '文文') : memberFilter;
   const existing = bodyEvents.find(e =>
     e.category === currentType &&
     e.member === memberName &&
@@ -4343,20 +4553,32 @@ async function onMenstrualDayClick(ts, el) {
     }
     return;
   }
-  // 不存在 → 直接保存
-  await saveBodyEvent({
-    id: null,
-    ts: day.getTime(),
-    end_ts: null,
-    member: memberName,
-    category: currentType,
-    severity: 3,
-    title: getEventCategoryMeta(currentType).label,
-    payload: {},
-    tags: [],
-    note: '',
-  });
-  showToast(`✓ 已记录 ${k} · ${getEventCategoryMeta(currentType).label}`);
+
+  // 弹窗：日期预填为点击日
+  openEventModal();
+  document.getElementById('eventTs').value = toLocalDatetimeInput(ts);
+  document.getElementById('eventEndTs').value = '';
+  // 切换弹窗里的类型按钮
+  // 对于固定 3 类，直接对应；对于自定义项目 cust_xxx，弹 custom 字段 + 填入项目名
+  if (currentType === 'gout' || currentType === 'anomaly') {
+    if (currentEventType !== currentType) {
+      document.querySelectorAll('.event-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === currentType));
+      setEventType(currentType);
+    }
+  } else if (currentType && currentType.startsWith('cust_')) {
+    // 自定义项目：弹 custom 字段 + 预填名称
+    if (currentEventType !== 'custom') {
+      document.querySelectorAll('.event-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'custom'));
+      setEventType('custom');
+    }
+    const ct = getCustomEventType(currentType);
+    if (ct) {
+      document.getElementById('eventCustomName').value = ct.name;
+      autoFillEventTitle();
+    }
+  }
+  const label = (currentType.startsWith('cust_') && getCustomEventType(currentType)) ? getCustomEventType(currentType).name : getEventCategoryMeta(currentType).label;
+  showToast(`已选 ${k} · ${label}，补充信息后点保存`);
 }
 
 function confirmMenstrualSelection() {
@@ -4473,9 +4695,11 @@ function renderTags() {
 }
 
 function setEventType(type) {
-  currentEventType = type;
-  document.querySelectorAll('.event-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
-  document.querySelectorAll('.event-fields').forEach(f => f.classList.toggle('event-fields-hidden', f.dataset.for !== type));
+  // 自定义项目 cust_xxx 视为 'custom' 类型，弹窗里使用 custom 字段
+  const norm = (type && type.startsWith && type.startsWith('cust_')) ? 'custom' : type;
+  currentEventType = norm;
+  document.querySelectorAll('.event-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === norm));
+  document.querySelectorAll('.event-fields').forEach(f => f.classList.toggle('event-fields-hidden', f.dataset.for !== norm));
   // 自动生成标题
   autoFillEventTitle();
 }
@@ -4508,7 +4732,7 @@ function openEventModal(ev) {
     // 类型特定字段
     if (ev.category === 'menstrual') {
       const dysDates = (ev.payload.dysmenorrhea_dates || []).slice();
-      renderDysmenorrheaDayList(ts, end_ts, dysDates);
+      renderDysmenorrheaDayList(ev.ts, ev.end_ts, dysDates);
     }
     if (ev.category === 'gout') {
       const loc = ev.payload.location || '右脚大拇趾';
@@ -4525,11 +4749,12 @@ function openEventModal(ev) {
       document.getElementById('eventAnomalyType').value = ev.payload.anomaly_type || '';
       document.getElementById('eventAnomalyTreatment').value = ev.payload.treatment || '';
     }
-    if (ev.category === 'custom') {
+    if (ev.category === 'custom' || (ev.category && ev.category.startsWith && ev.category.startsWith('cust_'))) {
       document.getElementById('eventCustomName').value = ev.payload.custom_name || '';
     }
     currentEditingEventId = ev.id;
     renderTags();
+    renderCustomTypesDatalist();
   } else {
     ms.value = familyMembers[0] || '文文';
     setEventType('menstrual');
@@ -4548,11 +4773,22 @@ function openEventModal(ev) {
     document.getElementById('eventAnomalyTreatment').value = '';
     document.getElementById('eventCustomName').value = '';
     // 月经痛经勾选：根据当前 start/end 渲染日期按钮
-    renderDysmenorrheaDayList(ts, end_ts, []);
+    const _tsVal = document.getElementById('eventTs').value;
+    const _endVal = document.getElementById('eventEndTs').value;
+    const _tsNum = _tsVal ? new Date(_tsVal).getTime() : null;
+    const _endNum = _endVal ? new Date(_endVal).getTime() : null;
+    renderDysmenorrheaDayList(_tsNum, _endNum, []);
     renderTags();
+    renderCustomTypesDatalist();
   }
   autoFillEventTitle();
   showModal('eventModalMask');
+}
+
+function renderCustomTypesDatalist() {
+  const dl = document.getElementById('customEventTypesList');
+  if (!dl) return;
+  dl.innerHTML = customEventTypes.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.icon)}</option>`).join('');
 }
 
 // 根据月经的开始/结束时间，在弹窗里渲染一排"勾选痛经日期"的小按钮
@@ -4657,9 +4893,19 @@ function saveEventFromForm() {
       duration_hours: end_ts ? Math.round((end_ts - ts) / 3600000) : null,
     };
   } else if (currentEventType === 'custom') {
+    const name = document.getElementById('eventCustomName').value.trim();
+    // 如果用户输入/选择了已添加的自定义项目，自动关联
+    const matched = customEventTypes.find(c => c.name === name);
     payload = {
-      custom_name: document.getElementById('eventCustomName').value.trim(),
+      custom_name: name,
+      custom_id: matched ? matched.id : null,
     };
+  }
+
+  // 自定义事件 category 优先用关联的 cust_xxx id，否则保留 'custom'
+  let finalCategory = currentEventType;
+  if (currentEventType === 'custom' && payload.custom_id) {
+    finalCategory = payload.custom_id;
   }
 
   const titleVal = document.getElementById('eventTitle').value.trim();
@@ -4669,7 +4915,7 @@ function saveEventFromForm() {
     id: currentEditingEventId,
     ts, end_ts,
     member,
-    category: currentEventType,
+    category: finalCategory,
     severity: eventSeverity + 1,
     title: titleVal || null,
     payload,
@@ -4792,7 +5038,7 @@ function renderEventCard(ev) {
     if (ev.payload.anomaly_type) chips.push(`<span class="event-meta-chip">${escapeHtml(ev.payload.anomaly_type)}</span>`);
     if (ev.payload.treatment) chips.push(`<span class="event-meta-chip tag">${escapeHtml(ev.payload.treatment)}</span>`);
   }
-  if (ev.category === 'custom' && ev.payload.custom_name) {
+  if ((ev.category === 'custom' || (ev.category && ev.category.startsWith && ev.category.startsWith('cust_'))) && ev.payload.custom_name) {
     chips.push(`<span class="event-meta-chip">${escapeHtml(ev.payload.custom_name)}</span>`);
   }
 
@@ -4856,23 +5102,35 @@ function renderEventsCharts() {
     });
   }
 
-  // 2. 痛风发作频率（按月）
+  // 2. 痛风发作频率（按月，近两年 = 24 个月连续柱状图，X 轴很长）
   const gout = bodyEvents.filter(e => e.category === 'gout');
   if (gout.length >= 1) {
+    const now = new Date();
+    // 起始月 = 当前月 - 23（共 24 个月柱）
+    const startMonth = new Date(now.getFullYear(), now.getMonth() - 23, 1);
     const byMonth = {};
+    // 先填 0
+    for (let i = 0; i < 24; i++) {
+      const d = new Date(startMonth.getFullYear(), startMonth.getMonth() + i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      byMonth[key] = 0;
+    }
     gout.forEach(e => {
       const d = new Date(e.ts);
+      if (d < startMonth) return;  // 超过 24 个月的不画
       const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
       byMonth[key] = (byMonth[key] || 0) + 1;
     });
     const entries = Object.entries(byMonth).sort();
+    const total2y = gout.filter(e => new Date(e.ts) >= startMonth).length;
     charts.push({
       id: 'gout-frequency',
       title: '🦴 痛风发作频率',
-      subtitle: '按月统计',
+      subtitle: `近 24 个月（共 ${total2y} 次，跨度越久数据越能反映趋势）`,
       data: entries.map(([k, v]) => ({ x: k, y: v })),
       type: 'bar',
       color: '#ef4444',
+      wide: true,  // 标记 X 轴很长
     });
   }
 
@@ -4919,10 +5177,10 @@ function renderEventsCharts() {
   }
 
   wrap.innerHTML = charts.map(c => `
-    <div class="mini-chart-card" style="background:white;border-radius:12px;padding:14px;border:1px solid var(--border);">
+    <div class="mini-chart-card${c.wide ? ' wide' : ''}" style="background:white;border-radius:12px;padding:14px;border:1px solid var(--border);">
       <div style="font-weight:700;font-size:13px;color:var(--text);">${c.title}</div>
       <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;">${c.subtitle}</div>
-      <div style="position:relative;height:160px;"><canvas id="ev-chart-${c.id}"></canvas></div>
+      <div style="position:relative;height:${c.wide ? 200 : 160}px;overflow-x:auto;"><canvas id="ev-chart-${c.id}"></canvas></div>
     </div>
   `).join('');
 
@@ -5008,10 +5266,18 @@ function renderEventsCharts() {
         },
         options: {
           responsive: true, maintainAspectRatio: false,
+          aspectRatio: c.wide ? 3.5 : 2,
           plugins: { legend: { display: false } },
           scales: {
-            y: { beginAtZero: true, ticks: { font: { size: 10 } } },
-            x: { ticks: { font: { size: 10 }, maxRotation: 45 } }
+            y: { beginAtZero: true, ticks: { font: { size: 10 }, precision: 0 } },
+            x: {
+              ticks: {
+                font: { size: c.wide ? 10 : 10 },
+                maxRotation: c.wide ? 45 : 45,
+                autoSkip: c.wide ? false : true,
+                maxTicksLimit: c.wide ? 24 : undefined,
+              }
+            }
           }
         }
       };
