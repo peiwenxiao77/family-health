@@ -4084,7 +4084,6 @@ async function bootstrap() {
 
   // 本地模式：直接显示，不用连云端
   if (LOCAL_MODE || !isConfigured) {
-    document.getElementById('configBanner').style.display = 'flex';
     updateSyncStatus();
     renderEvents();
     console.log('💡 本地模式启动，共', records.length, '条记录（仅本浏览器）');
@@ -4092,7 +4091,6 @@ async function bootstrap() {
   }
 
   if (!initSupabase()) {
-    document.getElementById('configBanner').style.display = 'flex';
     showToast('Supabase 初始化失败，已切本地模式', 'error');
     updateSyncStatus();
     renderEvents();
@@ -4115,7 +4113,6 @@ async function bootstrap() {
   } catch (e) {
     console.error('启动失败', e);
     showToast('连接失败，已切本地模式：' + (e.message || e), 'error');
-    document.getElementById('configBanner').style.display = 'flex';
     updateSyncStatus();
   }
 }
