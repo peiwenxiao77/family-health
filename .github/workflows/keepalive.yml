@@ -15,8 +15,8 @@ jobs:
         run: |
           HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" \
             "https://dlnqhosjodkgyuojbyxo.supabase.co/rest/v1/health_records?select=id&limit=1" \
-            -H "apikey: sb_publisher sb_publishable_WJ4NSoqO2LTfq6WUo728DQ_0eMnvABo" \
-            -H "Authorization: Bearer sb_publishable_WJ4NSoqO2LTfq6WUo728DQ_0eMnvABo" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
             --max-time 30)
           echo "Supabase responded with HTTP $HTTP_CODE"
           if [ "$HTTP_CODE" = "200" ]; then
