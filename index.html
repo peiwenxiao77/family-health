@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v36: 删本月异常 stat + 异常统计图 + 距上次痛风 stat；距上次痛风挪到痛风频率副标题；新增时间总览窗口（最近一次+近7天+本月+累计+类别条形+7天热力图） -->
+<!-- v37: 选择过的选项下次打开弹窗自动预选（localStorage wb_form_defaults + applyFormDefaults） -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -2014,6 +2014,46 @@ const CUSTOM_ICONS = ['📝', '🩹', '💊', '😴', '🏃', '🍵', '🧘', '�
 // 痛风常用部位（默认）+ 常用药
 const GOUT_LOCATIONS_DEFAULT = ['右脚大拇趾', '左脚大拇趾', '右脚踝', '左脚踝', '右膝', '左膝', '右脚跟', '左脚跟', '右手腕', '左手腕', '手指', '耳廓'];
 const GOUT_MED_PRESETS = ['秋水仙碱', '别嘌醇', '非布司他', '苯溴马隆', '糖皮质激素', 'NSAIDs', '碳酸氢钠', '双氯芬酸', '布洛芬', '依托考昔'];
+
+// 表单默认值记忆：上次选择过的选项，下次打开弹窗自动预选
+const FORM_DEFAULTS_KEY = 'wb_form_defaults';
+function loadFormDefaults() {
+  try { return JSON.parse(localStorage.getItem(FORM_DEFAULTS_KEY) || '{}'); }
+  catch { return {}; }
+}
+function saveFormDefaults(patch) {
+  const cur = loadFormDefaults();
+  const next = { ...cur, ...patch };
+  localStorage.setItem(FORM_DEFAULTS_KEY, JSON.stringify(next));
+}
+// 应用某类型字段的默认值到表单（仅在"新增"分支调用）
+function applyFormDefaults(type) {
+  const d = loadFormDefaults();
+  if (type === 'gout') {
+    // 部位
+    const locSel = document.getElementById('eventGoutLocation');
+    if (locSel && d.gout_location && [...locSel.options].some(o => o.value === d.gout_location)) {
+      locSel.value = d.gout_location;
+      document.getElementById('eventGoutLocationOtherWrap').style.display = 'none';
+    }
+    // 疼痛等级（默认最近一次值，未填则 5）
+    if (typeof d.gout_pain_level === 'number') {
+      eventPainLevel = Math.max(0, Math.min(9, d.gout_pain_level - 1));
+      document.querySelectorAll('#eventPainLevel .severity-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.val) === eventPainLevel));
+    }
+    // 触发食物
+    if (Array.isArray(d.gout_triggers)) eventGoutTriggers = d.gout_triggers.slice();
+    else eventGoutTriggers = [];
+    // 用药（pill 会按历史频次排序，置顶部分自动出现；再勾选默认项）
+    if (Array.isArray(d.gout_medications)) eventGoutMedications = d.gout_medications.slice();
+    else eventGoutMedications = [];
+  } else if (type === 'anomaly') {
+    if (typeof d.anomaly_type === 'string') document.getElementById('eventAnomalyType').value = d.anomaly_type;
+    if (typeof d.anomaly_treatment === 'string') document.getElementById('eventAnomalyTreatment').value = d.anomaly_treatment;
+  } else if (type === 'custom' || (typeof type === 'string' && type.startsWith && type.startsWith('cust_'))) {
+    if (typeof d.custom_name === 'string') document.getElementById('eventCustomName').value = d.custom_name;
+  }
+}
 
 // 从 bodyEvents 提取历史上用过的部位/药（按使用次数排序）
 function getHistoricalGoutLocations() {
@@ -4911,6 +4951,8 @@ function openEventModal(ev) {
     document.getElementById('eventAnomalyType').value = '';
     document.getElementById('eventAnomalyTreatment').value = '';
     document.getElementById('eventCustomName').value = '';
+    // 用上次选择过的值覆盖默认 reset（"选择过的选项下次默认"）
+    applyFormDefaults(currentEventType);
     // 月经痛经勾选：根据当前 start/end 渲染日期按钮
     const _tsVal = document.getElementById('eventTs').value;
     const _endVal = document.getElementById('eventEndTs').value;
@@ -5058,6 +5100,23 @@ function saveEventFromForm() {
     tags: [],
     note: noteVal,
   };
+
+  // 把当前表单选择保存为下次默认值（"选择过的选项下次默认"）
+  if (finalCategory === 'gout') {
+    saveFormDefaults({
+      gout_location: payload.location,
+      gout_pain_level: payload.pain_level,
+      gout_triggers: payload.trigger_foods,
+      gout_medications: payload.medications,
+    });
+  } else if (finalCategory === 'anomaly') {
+    saveFormDefaults({
+      anomaly_type: payload.anomaly_type,
+      anomaly_treatment: payload.treatment,
+    });
+  } else if (finalCategory === 'custom' || (finalCategory && finalCategory.startsWith && finalCategory.startsWith('cust_'))) {
+    saveFormDefaults({ custom_name: payload.custom_name });
+  }
 
   saveBodyEvent(ev).then(() => {
     showModal('eventModalMask', 'hide');
