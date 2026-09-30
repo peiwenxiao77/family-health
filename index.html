@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v35: 普通日期边框 #f1f5f9 → #cbd5e1（slate-100 → slate-300，加深两档） -->
+<!-- v36: 删本月异常 stat + 异常统计图 + 距上次痛风 stat；距上次痛风挪到痛风频率副标题；新增时间总览窗口（最近一次+近7天+本月+累计+类别条形+7天热力图） -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -379,6 +379,39 @@
   .event-stat-value .unit { font-size: 12px; color: var(--text-3); font-weight: 500; margin-left: 2px; }
   .event-stat-sub { font-size: 11px; color: var(--text-3); margin-top: 4px; }
 
+  /* 时间总览窗口 */
+  .events-overview { margin-bottom: 12px; }
+  .events-overview-card { background: linear-gradient(135deg, #fff7ed, #fefce8); border: 1px solid #fed7aa; border-radius: 12px; padding: 12px 14px; }
+  .events-overview-empty { background: #f8fafc; border: 1px dashed var(--border); border-radius: 12px; }
+  .eo-head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+  .eo-icon { font-size: 16px; }
+  .eo-title { font-size: 13px; font-weight: 700; color: #92400e; letter-spacing: 0.3px; }
+  .eo-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+  .eo-stat { background: rgba(255,255,255,0.6); border-radius: 8px; padding: 8px 10px; }
+  .eo-stat-label { font-size: 11px; color: var(--text-3); font-weight: 600; margin-bottom: 4px; }
+  .eo-stat-val { font-size: 15px; font-weight: 800; color: var(--text); line-height: 1.1; }
+  .eo-unit { font-size: 11px; color: var(--text-3); font-weight: 500; margin-left: 2px; }
+  .eo-catbar { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; background: rgba(255,255,255,0.5); border-radius: 8px; margin-bottom: 10px; }
+  .eo-cat-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-2); }
+  .eo-cat-row > span:first-child { min-width: 60px; font-weight: 600; }
+  .eo-cat-row > b { min-width: 22px; text-align: right; font-weight: 700; color: var(--text); }
+  .eo-cat-bar { flex: 1; height: 6px; background: rgba(0,0,0,0.04); border-radius: 3px; overflow: hidden; }
+  .eo-cat-bar > span { display: block; height: 100%; min-width: 6px; border-radius: 3px; transition: width 0.3s; }
+  .eo-heatmap { background: rgba(255,255,255,0.5); border-radius: 8px; padding: 8px 10px; }
+  .eo-heatlabel { font-size: 11px; color: var(--text-3); font-weight: 600; margin-bottom: 6px; }
+  .eo-heatgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .eo-heatcell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; border-radius: 5px; transition: transform 0.15s; }
+  .eo-heatcell:hover { transform: scale(1.08); }
+  .eo-heatcell[data-level="0"] { background: rgba(0,0,0,0.04); color: var(--text-3); }
+  .eo-heatcell[data-level="1"] { background: #fef3c7; color: #92400e; }
+  .eo-heatcell[data-level="2"] { background: #fde68a; color: #78350f; }
+  .eo-heatcell[data-level="3"] { background: #fbbf24; color: white; }
+  .eo-heatcell[data-level="4"] { background: #f59e0b; color: white; }
+  @media (max-width: 500px) {
+    .eo-grid { grid-template-columns: repeat(2, 1fr); }
+    .eo-stat-val { font-size: 13px; }
+  }
+
   /* 事件卡片 */
   .event-card { background: white; border-radius: 12px; padding: 14px; border: 1px solid var(--border); margin-bottom: 10px; transition: all 0.2s; position: relative; }
   .event-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
@@ -745,8 +778,8 @@
         <div class="menstrual-legend" id="menstrualLegend"></div>
       </div>
 
-      <!-- 关键数字 -->
-      <div class="body-events-stats" id="eventsStats"></div>
+      <!-- 时间总览窗口（放在事件列表上面） -->
+      <div class="events-overview" id="eventsOverview"></div>
 
       <!-- 趋势图 -->
       <div style="margin-top:16px;">
@@ -5038,35 +5071,94 @@ function saveEventFromForm() {
 function renderEvents() {
   document.getElementById('eventsCount').textContent = bodyEvents.length + ' 条';
   renderMenstrualCalendar();
-  renderEventsStats();
+  renderEventsOverview();
   renderEventsCharts();
   renderEventsMemberFilter();
   renderEventsList();
 }
 
-function renderEventsStats() {
-  const wrap = document.getElementById('eventsStats');
+function renderEventsOverview() {
+  // 时间总览窗口：放在趋势分析之上、事件列表之上，作为时间维度的快速总览
+  // 内容：最近一次记录 + 本周/本月次数 + 各类别计数 + 最近 7 天日历热力图
+  const wrap = document.getElementById('eventsOverview');
   if (!wrap) return;
-  // stats 区只在异常统计图上方展示"本月异常"+"距上次痛风"两个紧凑 stat
   const now = Date.now();
+  const dayMs = 86400000;
+  const weekStart = now - 7 * dayMs;
   const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
-  const anomalyThisMonth = bodyEvents.filter(e => e.category === 'anomaly' && e.ts >= monthStart.getTime()).length;
-  const goutEvents = bodyEvents.filter(e => e.category === 'gout').sort((a,b) => b.ts - a.ts);
-  const lastGout = goutEvents[0];
-  const daysSinceGout = lastGout ? Math.floor((now - lastGout.ts) / 86400000) : null;
-  const anomalyTotal = bodyEvents.filter(e => e.category === 'anomaly').length;
-  const totalEvents = bodyEvents.length;
-  const noData = totalEvents === 0;
+  const monthStartTs = monthStart.getTime();
+
+  // 按类别计数
+  const catCounts = { menstrual: 0, gout: 0, anomaly: 0, custom: 0 };
+  bodyEvents.forEach(e => {
+    if (catCounts.hasOwnProperty(e.category)) catCounts[e.category]++;
+    else if (e.category && e.category.startsWith && e.category.startsWith('cust_')) catCounts.custom++;
+  });
+
+  // 最近 7 天日历热力图
+  const last7Days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now - i * dayMs);
+    d.setHours(0, 0, 0, 0);
+    const dStart = d.getTime();
+    const dEnd = dStart + dayMs;
+    const cnt = bodyEvents.filter(e => e.ts >= dStart && e.ts < dEnd).length;
+    last7Days.push({ date: d, count: cnt });
+  }
+  const max7 = Math.max(1, ...last7Days.map(d => d.count));
+
+  // 最近一次记录
+  const lastEvent = bodyEvents.slice().sort((a, b) => b.ts - a.ts)[0];
+  const lastMeta = lastEvent ? getEventCategoryMeta(lastEvent.category) : null;
+  const lastText = lastEvent ? `${lastMeta?.icon || '📝'} ${escapeHtml(lastEvent.title || (lastMeta?.label || '记录'))}` : '—';
+
+  if (bodyEvents.length === 0) {
+    wrap.innerHTML = `
+      <div class="events-overview-empty">
+        <div style="font-size:13px;color:var(--text-3);text-align:center;padding:14px;">📝 还没有任何身体事件记录<br><span style="font-size:11px;">点右上角 ➕ 添加 第一条记录</span></div>
+      </div>`;
+    return;
+  }
+
   wrap.innerHTML = `
-    <div class="event-stat" style="--accent:#f59e0b;">
-      <div class="event-stat-title">🔥 本月异常</div>
-      <div class="event-stat-value">${anomalyThisMonth}<span class="unit">次</span></div>
-      <div class="event-stat-sub">累计 ${anomalyTotal} 次${noData ? ' · 暂无数据' : ''}</div>
-    </div>
-    <div class="event-stat" style="--accent:#ef4444;">
-      <div class="event-stat-title">🦴 距上次痛风</div>
-      <div class="event-stat-value">${daysSinceGout == null ? '—' : daysSinceGout}<span class="unit">${daysSinceGout == null ? '' : '天'}</span></div>
-      <div class="event-stat-sub">${goutEvents.length > 0 ? '累计 ' + goutEvents.length + ' 次' : '暂无记录'}</div>
+    <div class="events-overview-card">
+      <div class="eo-head">
+        <span class="eo-icon">⏰</span>
+        <span class="eo-title">时间总览</span>
+      </div>
+      <div class="eo-grid">
+        <div class="eo-stat">
+          <div class="eo-stat-label">最近一次</div>
+          <div class="eo-stat-val">${lastText}</div>
+        </div>
+        <div class="eo-stat">
+          <div class="eo-stat-label">近 7 天</div>
+          <div class="eo-stat-val">${bodyEvents.filter(e => e.ts >= weekStart).length}<span class="eo-unit">次</span></div>
+        </div>
+        <div class="eo-stat">
+          <div class="eo-stat-label">本月</div>
+          <div class="eo-stat-val">${bodyEvents.filter(e => e.ts >= monthStartTs).length}<span class="eo-unit">次</span></div>
+        </div>
+        <div class="eo-stat">
+          <div class="eo-stat-label">累计</div>
+          <div class="eo-stat-val">${bodyEvents.length}<span class="eo-unit">次</span></div>
+        </div>
+      </div>
+      <div class="eo-catbar">
+        <div class="eo-cat-row"><span>🌸 月经</span><div class="eo-cat-bar"><span style="width:${catCounts.menstrual ? Math.min(100, catCounts.menstrual * 25) : 8}%;background:#ec4899;"></span></div><b>${catCounts.menstrual}</b></div>
+        <div class="eo-cat-row"><span>🦴 痛风</span><div class="eo-cat-bar"><span style="width:${catCounts.gout ? Math.min(100, catCounts.gout * 25) : 8}%;background:#ef4444;"></span></div><b>${catCounts.gout}</b></div>
+        <div class="eo-cat-row"><span>💢 异常</span><div class="eo-cat-bar"><span style="width:${catCounts.anomaly ? Math.min(100, catCounts.anomaly * 25) : 8}%;background:#f59e0b;"></span></div><b>${catCounts.anomaly}</b></div>
+        <div class="eo-cat-row"><span>📝 自定义</span><div class="eo-cat-bar"><span style="width:${catCounts.custom ? Math.min(100, catCounts.custom * 25) : 8}%;background:#8b5cf6;"></span></div><b>${catCounts.custom}</b></div>
+      </div>
+      <div class="eo-heatmap">
+        <div class="eo-heatlabel">近 7 天事件分布</div>
+        <div class="eo-heatgrid">
+          ${last7Days.map(d => {
+            const intensity = d.count === 0 ? 0 : Math.max(1, Math.round((d.count / max7) * 4));
+            return `<div class="eo-heatcell" data-level="${intensity}" title="${d.date.toLocaleDateString('zh-CN')} · ${d.count} 次">${d.date.getDate()}</div>`;
+          }).join('')}
+        </div>
+      </div>
     </div>
   `;
 }
@@ -5217,10 +5309,15 @@ function renderEventsCharts() {
     });
     const entries = Object.entries(byMonth).sort();
     const total2y = gout.filter(e => new Date(e.ts) >= startMonth).length;
+    const sortedAllGout = gout.slice().sort((a, b) => b.ts - a.ts);
+    const lastGout = sortedAllGout[0];
+    const daysSinceGout = lastGout ? Math.floor((Date.now() - lastGout.ts) / 86400000) : null;
+    // 把"距上次痛风"放到副标题尾部，节省单独 stat 卡
+    const goutExtra = daysSinceGout == null ? '' : ` · 距上次 ${daysSinceGout} 天`;
     charts.push({
       id: 'gout-frequency',
       title: '🦴 痛风发作频率',
-      subtitle: `近 24 个月（共 ${total2y} 次，跨度越久数据越能反映趋势）`,
+      subtitle: `近 24 个月（共 ${total2y} 次，跨度越久数据越能反映趋势）${goutExtra}`,
       data: entries.map(([k, v]) => ({ x: k, y: v })),
       type: 'bar',
       color: '#ef4444',
@@ -5228,28 +5325,8 @@ function renderEventsCharts() {
     });
   }
 
-  // 3. 异常统计（按月柱状图）
-  const anomalies = bodyEvents.filter(e => e.category === 'anomaly');
-  if (anomalies.length >= 2) {
-    const byMonth = {};
-    anomalies.forEach(e => {
-      const d = new Date(e.ts);
-      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      byMonth[key] = (byMonth[key] || 0) + 1;
-    });
-    const entries = Object.entries(byMonth).sort();
-    // 副标题简化：只保留按月统计核心信息
-    // 本月异常 + 距上次痛风已经在 stats 区显示，图表副标题不重复
-    const subtitle = `近 ${entries.length} 月 · 累计 ${anomalies.length} 次`;
-    charts.push({
-      id: 'anomaly-stat',
-      title: '💢 异常统计',
-      subtitle,
-      data: entries.map(([k, v]) => ({ x: k, y: v })),
-      type: 'bar',
-      color: '#f59e0b',
-    });
-  }
+  // 3. 异常统计图表已删除（用户 v36 反馈：信息冗余）
+  // 异常按月的逻辑直接展示在时间总览窗口（eventsOverview）的"本月异常"小卡里
 
   if (charts.length === 0) {
     wrap.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-3);font-size:12px;padding:14px;">📊 记录更多事件后这里显示趋势</div>';
