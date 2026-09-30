@@ -33,10 +33,10 @@
     color: var(--text); min-height: 100vh; line-height: 1.7; -webkit-font-smoothing: antialiased;
   }
 
-  /* 桌面布局容器：单列，让 view-health/view-events 自己分左右 */
+  /* 桌面布局容器：flex column，避免 grid+sticky 的 right-bottom 陷阱 */
   .layout {
-    display: grid;
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 14px;
     max-width: 1400px;
     margin: 0 auto;
@@ -50,12 +50,11 @@
     grid-template-columns: minmax(360px, 460px) 1fr;
     grid-template-areas: "left right";
     gap: 20px;
-    grid-column: 1 / -1;
     min-width: 0;
   }
   #view-health > .area-left { grid-area: left; align-self: start; }
   #view-health > .area-right { grid-area: right; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-  #view-events { grid-column: 1 / -1; min-width: 0; }
+  #view-events { min-width: 0; }
 
   /* 顶部 */
   header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding: 16px 20px; background: linear-gradient(135deg, #fffefb 0%, #fff7ed 100%); border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--border); }
@@ -326,7 +325,6 @@
 
   /* 顶部栏 sticky：龙龙＆文文の小家 + tab 一起吸顶 */
   .topbar {
-    grid-area: header;
     display: flex;
     flex-direction: column;
     position: sticky;
@@ -343,10 +341,7 @@
   .topbar > .view-tabs { box-shadow: none; margin: 2px 12px 8px; padding: 3px; }
 
   /* 视图容器：横跨整行，内部再用 grid 分左右两栏 */
-  #view-health { display: grid; grid-template-columns: minmax(360px, 460px) 1fr; grid-template-areas: "left right"; gap: 20px; grid-column: 1 / -1; min-width: 0; }
-  #view-health > .area-left { grid-area: left; align-self: start; }
-  #view-health > .area-right { grid-area: right; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-  #view-events { grid-column: 1 / -1; min-width: 0; }
+  /* （重复定义已在上面 #view-health 块统一处理） */
 
   /* 身体情况页面 */
   .body-events-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
