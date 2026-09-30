@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v34: sw.js 缓存策略 network-first + cache 名 v3 强制清旧缓存（修复 SW 遮蔽新版） -->
+<!-- v35: 普通日期边框 #f1f5f9 → #cbd5e1（slate-100 → slate-300，加深两档） -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -452,7 +452,7 @@
   .menstrual-day.empty { cursor: default; }  /* 空白期维持原状，不加边框 */
   .menstrual-day.empty .phase-tag { display: none; }
   /* 普通日期（有数字但无阶段标记）加浅色边框，让月历结构清晰 */
-  .menstrual-day:not(.empty):not(.in-period):not(.menstrual-predicted):not(.follicular):not(.ovulation-window):not(.ovulation-day):not(.luteal):not(.dysmenorrhea-day) { border-color: #f1f5f9; }
+  .menstrual-day:not(.empty):not(.in-period):not(.menstrual-predicted):not(.follicular):not(.ovulation-window):not(.ovulation-day):not(.luteal):not(.dysmenorrhea-day) { border-color: #cbd5e1; }
   .menstrual-day.today { box-shadow: inset 0 0 0 2px var(--primary, #f97316); font-weight: 800; }
   .menstrual-day.in-period { background: linear-gradient(135deg, #ec4899, #be185d); color: white; cursor: pointer; }
   .menstrual-day.in-period .marker, .menstrual-day.in-period .phase-tag { color: white; }
