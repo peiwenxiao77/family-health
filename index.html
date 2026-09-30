@@ -409,6 +409,12 @@
 
   /* 严重程度选择 */
   .severity-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .med-pills .pill { display:inline-flex; align-items:center; gap:4px; padding:5px 11px; border-radius:999px; border:1px solid #fecaca; background:linear-gradient(135deg,#fff5f5,#fee2e2); color:#991b1b; font-size:11px; font-weight:600; cursor:pointer; transition:all 0.15s; }
+  .med-pills .pill:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(239,68,68,0.15); border-color: #ef4444; }
+  .med-pills .pill.active { background: linear-gradient(135deg,#ef4444,#dc2626); color:white; border-color: #dc2626; }
+  .med-pills .pill .x { font-size:10px; opacity:0.7; }
+  .med-pills .pill.active .x { opacity:0.9; }
+  .med-pills .divider { color: var(--text-3); font-size: 11px; align-self: center; }
   .severity-btn { background: white; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 4px; cursor: pointer; text-align: center; transition: all 0.15s; }
   .severity-btn:hover { transform: scale(1.05); }
   .severity-btn.active { border-color: var(--primary); background: linear-gradient(135deg, #fef3c7, #fde68a); }
@@ -713,7 +719,7 @@
       <!-- 月经月历（核心记录视图） -->
       <div class="menstrual-cal-wrap" id="menstrualCalendarWrap">
         <div class="menstrual-cal-head">
-          <div class="menstrual-cal-title">🌸 月经周期 · 月历记录</div>
+          <div class="menstrual-cal-title">📅 身体事件 · 日历记录</div>
           <div class="menstrual-cal-nav">
             <button id="mcPrev" title="上一月">‹</button>
             <span class="month-label" id="mcMonthLabel"></span>
@@ -721,7 +727,7 @@
             <button id="mcToday" title="回到今天">📍</button>
           </div>
         </div>
-        <div class="menstrual-cal-hint" id="mcHint">👆 在月历上点选开始日期，再点结束日期，最后点「保存这次月经」</div>
+        <div class="menstrual-cal-hint" id="mcHint">👆 点月历上的日期：月经类型选范围 → 保存；其他类型单击 → 弹窗确认</div>
         <div class="menstrual-select-bar" id="mcSelectBar">
           <div class="sel-info" id="mcSelInfo"></div>
           <div class="sel-actions">
@@ -828,6 +834,7 @@
         <div class="tag-input-wrap" id="eventGoutMedications">
           <input type="text" placeholder="秋水仙碱/别嘌醇...">
         </div>
+        <div class="med-pills" id="eventGoutMedicationsPills" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;"></div>
       </div>
       <button class="btn-secondary" id="btnCopyLastGout" style="margin:6px 0;font-size:11px;">📋 复制上次发作（部位/触发/用药）</button>
     </div>
@@ -866,13 +873,7 @@
       </div>
     </div>
 
-    <!-- 通用：严重程度 + 标题 + 备注 -->
-    <div class="preview-row"><label>严重程度</label>
-      <div class="severity-grid" id="eventSeverity" data-max="5"></div>
-    </div>
-    <div class="preview-row"><label>标题 <span style="font-weight:400;color:var(--text-3);font-size:11px;">(可选)</span></label>
-      <input type="text" id="eventTitle" class="preview-input" placeholder="自动生成或自定义">
-    </div>
+    <!-- 通用：备注 -->
     <div class="preview-row"><label>备注</label>
       <textarea id="eventNote" class="preview-input" rows="2" placeholder="详细描述"></textarea>
     </div>
@@ -880,6 +881,22 @@
     <div class="modal-actions">
       <button class="btn-secondary" data-close="eventModalMask">取消</button>
       <button class="btn-primary" id="btnSaveEvent">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 通用输入弹窗（替代浏览器原生 prompt，浏览器禁 prompt 时也能用） ===== -->
+<div class="modal-mask" id="promptModalMask">
+  <div class="modal" style="max-width:420px;">
+    <button class="modal-close" data-close="promptModalMask" title="关闭">×</button>
+    <h3 id="promptModalTitle">📝 输入</h3>
+    <div class="modal-sub" id="promptModalSub">请输入内容</div>
+    <div class="preview-row" style="margin-top:14px;"><label id="promptModalLabel">名称</label>
+      <input type="text" id="promptModalInput" class="preview-input" placeholder="">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" data-close="promptModalMask">取消</button>
+      <button class="btn-primary" id="promptModalOk">确定</button>
     </div>
   </div>
 </div>
@@ -1256,7 +1273,6 @@ let currentParsed = null;
 let currentView = 'health';  // 'health' | 'events'
 let currentEventType = 'menstrual';
 let currentEditingEventId = null;
-let eventSeverity = 3;       // 0-4 (代表 1-5 分)
 let eventPainLevel = 5;      // 0-9 (代表 1-10)
 let eventGoutTriggers = [];
 let eventGoutMedications = [];
@@ -1321,6 +1337,30 @@ function showToast(msg, type='success') {
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => el.classList.remove('show'), 2400);
 }
+
+/* ===== 通用输入弹窗（替代浏览器原生 prompt） ===== */
+let promptModalResolve = null;
+function openPromptModal(opts) {
+  const { title = '📝 输入', sub = '', label = '名称', placeholder = '', defaultValue = '', okText = '确定' } = opts || {};
+  document.getElementById('promptModalTitle').textContent = title;
+  document.getElementById('promptModalSub').textContent = sub;
+  document.getElementById('promptModalLabel').textContent = label;
+  const inp = document.getElementById('promptModalInput');
+  inp.value = defaultValue;
+  inp.placeholder = placeholder;
+  document.getElementById('promptModalOk').textContent = okText;
+  showModal('promptModalMask');
+  setTimeout(() => { inp.focus(); inp.select(); }, 80);
+  return new Promise(resolve => { promptModalResolve = resolve; });
+}
+document.getElementById('promptModalOk').addEventListener('click', () => {
+  const v = document.getElementById('promptModalInput').value.trim();
+  showModal('promptModalMask', 'hide');
+  if (promptModalResolve) { promptModalResolve(v || null); promptModalResolve = null; }
+});
+document.getElementById('promptModalInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('promptModalOk').click(); }
+});
 function formatTime(ts) { return new Date(ts).toTimeString().slice(0, 8); }
 function formatDate(ts) {
   const d = new Date(ts);
@@ -1932,6 +1972,70 @@ function saveCustomEventTypes() {
 const CUSTOM_PALETTE = ['#8b5cf6', '#06b6d4', '#10b981', '#f97316', '#ec4899', '#3b82f6', '#14b8a6', '#a855f7', '#eab308', '#ef4444'];
 const CUSTOM_ICONS = ['📝', '🩹', '💊', '😴', '🏃', '🍵', '🧘', '🌡', '🧠', '💪', '🦷', '👁', '🫀', '🫁', '🧴', '📊', '🎯', '🔔', '☕', '🥗'];
 
+// 痛风常用部位（默认）+ 常用药
+const GOUT_LOCATIONS_DEFAULT = ['右脚大拇趾', '左脚大拇趾', '右脚踝', '左脚踝', '右膝', '左膝', '右脚跟', '左脚跟', '右手腕', '左手腕', '手指', '耳廓'];
+const GOUT_MED_PRESETS = ['秋水仙碱', '别嘌醇', '非布司他', '苯溴马隆', '糖皮质激素', 'NSAIDs', '碳酸氢钠', '双氯芬酸', '布洛芬', '依托考昔'];
+
+// 从 bodyEvents 提取历史上用过的部位/药（按使用次数排序）
+function getHistoricalGoutLocations() {
+  const counts = new Map();
+  bodyEvents.filter(e => e.category === 'gout' && e.payload && e.payload.location).forEach(e => {
+    const loc = e.payload.location;
+    if (!loc) return;
+    counts.set(loc, (counts.get(loc) || 0) + 1);
+  });
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([loc]) => loc);
+}
+function getHistoricalGoutMedications() {
+  const counts = new Map();
+  bodyEvents.filter(e => e.category === 'gout' && e.payload && Array.isArray(e.payload.medications)).forEach(e => {
+    e.payload.medications.forEach(m => {
+      if (!m) return;
+      counts.set(m, (counts.get(m) || 0) + 1);
+    });
+  });
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([m]) => m);
+}
+
+// 渲染发作部位 select：历史置顶 → 默认 → 其他
+function renderGoutLocation() {
+  const sel = document.getElementById('eventGoutLocation');
+  if (!sel) return;
+  const historical = getHistoricalGoutLocations();
+  const seen = new Set();
+  const all = [];
+  historical.forEach(loc => { if (!seen.has(loc)) { seen.add(loc); all.push(loc); } });
+  GOUT_LOCATIONS_DEFAULT.forEach(loc => { if (!seen.has(loc)) { seen.add(loc); all.push(loc); } });
+  const currentVal = sel.value;
+  sel.innerHTML = all.map(loc => `<option value="${escapeHtml(loc)}">${escapeHtml(loc)}${historical.includes(loc) ? ' ★' : ''}</option>`).join('') + '<option value="其他">其他...</option>';
+  if (currentVal && [...sel.options].some(o => o.value === currentVal)) sel.value = currentVal;
+}
+
+// 渲染用药快捷 pill：已选高亮 + 历史 + 默认 preset
+function renderGoutMedications() {
+  const wrap = document.getElementById('eventGoutMedicationsPills');
+  if (!wrap) return;
+  const historical = getHistoricalGoutMedications();
+  const seen = new Set();
+  const all = [];
+  historical.forEach(m => { if (!seen.has(m)) { seen.add(m); all.push(m); } });
+  GOUT_MED_PRESETS.forEach(m => { if (!seen.has(m)) { seen.add(m); all.push(m); } });
+  wrap.innerHTML = all.map(m => {
+    const active = eventGoutMedications.includes(m);
+    return `<span class="pill${active ? ' active' : ''}" data-med="${escapeHtml(m)}" title="${active ? '点击取消' : '点击加入'}">${escapeHtml(m)}${active ? ' <span class="x">×</span>' : ''}</span>`;
+  }).join('');
+  wrap.querySelectorAll('.pill').forEach(p => {
+    p.addEventListener('click', () => {
+      const m = p.dataset.med;
+      const idx = eventGoutMedications.indexOf(m);
+      if (idx >= 0) eventGoutMedications.splice(idx, 1);
+      else eventGoutMedications.push(m);
+      renderTags();
+      renderGoutMedications();
+    });
+  });
+}
+
 function addCustomEventType(name) {
   const trimmed = String(name || '').trim();
   if (!trimmed) return null;
@@ -2022,13 +2126,16 @@ function updateBtsHint() {
   }
 }
 
-function promptAddCustomEventType() {
-  // 用 prompt 是浏览器原生。简单起见，先用 prompt，后续可换更好看的弹窗
-  const name = prompt('输入自定义项目名（例如：睡眠质量 / 运动 / 情绪）', '');
+async function promptAddCustomEventType() {
+  const name = await openPromptModal({
+    title: '➕ 添加自定义项目',
+    sub: '添加后会在选择器里出现，可点击记录事件',
+    label: '项目名',
+    placeholder: '如：睡眠质量 / 运动 / 情绪 / 喝水',
+  });
   if (!name) return;
   const item = addCustomEventType(name);
   if (item) {
-    // 自动选中新添加的项目
     currentBodyType = item.id;
     renderBodyTypeSelector();
     updateBtsHint();
@@ -2444,8 +2551,13 @@ document.getElementById('previewCategorySelect').addEventListener('change', (e) 
 document.getElementById('previewCancel').onclick = () => previewMask.classList.remove('show');
 
 // "+新成员" 按钮：弹输入框让用户添新家人
-document.getElementById('previewAddMember').addEventListener('click', () => {
-  const name = prompt('输入新家人名字（如：妈妈、爸爸、孩子、爷爷）', '');
+document.getElementById('previewAddMember').addEventListener('click', async () => {
+  const name = await openPromptModal({
+    title: '➕ 添加新家人',
+    sub: '支持中文/英文/emoji，建议 1-6 个字',
+    label: '家人名字',
+    placeholder: '如：妈妈、爸爸、孩子、爷爷',
+  });
   if (!name) return;
   const trimmed = name.trim();
   if (!trimmed) return;
@@ -2852,8 +2964,13 @@ function openMemberManager() {
   };
   refreshList();
 
-  mask.querySelector('#memberAddBtn').onclick = () => {
-    const newName = prompt('输入新成员名字（1-6 个汉字）', '');
+  mask.querySelector('#memberAddBtn').onclick = async () => {
+    const newName = await openPromptModal({
+      title: '➕ 添加新成员',
+      sub: '支持中文/英文/emoji',
+      label: '成员名字',
+      placeholder: '如：文文、龙龙、妈妈',
+    });
     if (!newName) return;
     const n = newName.trim();
     if (!n) return;
@@ -3509,8 +3626,13 @@ function openCategoryManager() {
   };
   refreshList();
 
-  mask.querySelector('#catAddBtn').onclick = () => {
-    const name = prompt('输入新类别名称（1-6 个汉字）', '');
+  mask.querySelector('#catAddBtn').onclick = async () => {
+    const name = await openPromptModal({
+      title: '➕ 添加新类别',
+      sub: '例如：血糖/血压/情绪/运动',
+      label: '类别名称',
+      placeholder: '如：血糖',
+    });
     if (!name) return;
     const n = name.trim();
     if (!n) return;
@@ -4574,7 +4696,6 @@ async function onMenstrualDayClick(ts, el) {
     const ct = getCustomEventType(currentType);
     if (ct) {
       document.getElementById('eventCustomName').value = ct.name;
-      autoFillEventTitle();
     }
   }
   const label = (currentType.startsWith('cust_') && getCustomEventType(currentType)) ? getCustomEventType(currentType).name : getEventCategoryMeta(currentType).label;
@@ -4600,7 +4721,9 @@ function confirmMenstrualSelection() {
     document.querySelectorAll('.event-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'menstrual'));
     setEventType('menstrual');
   }
-  showToast(`已选 ${dateKey(new Date(startTs))} ~ ${dateKey(new Date(endTs))}，补充信息后保存`);
+  // 重新渲染痛经日期勾选列表（用覆盖后的日期）
+  renderDysmenorrheaDayList(startTs, endTs, []);
+  showToast(`已选 ${dateKey(new Date(startTs))} ~ ${dateKey(new Date(endTs))}，勾选痛经日期后保存`);
 }
 
 function cancelMenstrualSelection() {
@@ -4621,23 +4744,9 @@ function formatMd(d) {
 }
 
 function buildSeverityGrids() {
-  ['eventSeverity'].forEach(id => {
-    const el = document.getElementById(id);
-    const max = parseInt(el.dataset.max || '5', 10);
-    el.innerHTML = Array.from({length: max}, (_, i) => {
-      const emoji = ['😊', '🙂', '😐', '😟', '😣'][i] || '😣';
-      return `<button class="severity-btn" data-val="${i}"><div class="severity-btn-emoji">${emoji}</div><div class="severity-btn-label">${i+1}</div></button>`;
-    }).join('');
-    el.addEventListener('click', e => {
-      const b = e.target.closest('.severity-btn');
-      if (!b) return;
-      el.querySelectorAll('.severity-btn').forEach(s => s.classList.remove('active'));
-      b.classList.add('active');
-      if (id === 'eventSeverity') eventSeverity = parseInt(b.dataset.val, 10);
-    });
-  });
-  // 痛风疼痛等级 1-10
+  // 痛风疼痛等级 1-10（保留）
   const painEl = document.getElementById('eventPainLevel');
+  if (!painEl) return;
   painEl.innerHTML = Array.from({length: 10}, (_, i) => {
     const e = ['😐', '😕', '😟', '😣', '😫', '😖', '😩', '😭', '🤬', '💀'][i];
     return `<button class="severity-btn" data-val="${i}" style="padding:6px 2px;"><div class="severity-btn-emoji" style="font-size:14px;">${e}</div><div class="severity-btn-label">${i+1}</div></button>`;
@@ -4692,6 +4801,8 @@ function renderTags() {
   // 重渲染（触发 setupTagInput 的 closure）
   setupTagInput('eventGoutTriggers', eventGoutTriggers);
   setupTagInput('eventGoutMedications', eventGoutMedications);
+  // 同步刷新用药 pill 高亮
+  if (typeof renderGoutMedications === 'function') renderGoutMedications();
 }
 
 function setEventType(type) {
@@ -4700,8 +4811,6 @@ function setEventType(type) {
   currentEventType = norm;
   document.querySelectorAll('.event-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === norm));
   document.querySelectorAll('.event-fields').forEach(f => f.classList.toggle('event-fields-hidden', f.dataset.for !== norm));
-  // 自动生成标题
-  autoFillEventTitle();
 }
 
 function setDefaultEventTimes() {
@@ -4723,12 +4832,7 @@ function openEventModal(ev) {
     setEventType(ev.category);
     document.getElementById('eventTs').value = new Date(ev.ts).toISOString().slice(0, 16);
     document.getElementById('eventEndTs').value = ev.end_ts ? new Date(ev.end_ts).toISOString().slice(0, 16) : '';
-    document.getElementById('eventTitle').value = ev.title || '';
     document.getElementById('eventNote').value = ev.note || '';
-    // 严重程度
-    const sev = Math.max(0, Math.min(4, (ev.severity || 3) - 1));
-    eventSeverity = sev;
-    document.querySelectorAll('#eventSeverity .severity-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.val) === sev));
     // 类型特定字段
     if (ev.category === 'menstrual') {
       const dysDates = (ev.payload.dysmenorrhea_dates || []).slice();
@@ -4744,6 +4848,7 @@ function openEventModal(ev) {
       document.querySelectorAll('#eventPainLevel .severity-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.val) === eventPainLevel));
       eventGoutTriggers = (ev.payload.trigger_foods || []).slice();
       eventGoutMedications = (ev.payload.medications || []).slice();
+      renderGoutMedications();
     }
     if (ev.category === 'anomaly') {
       document.getElementById('eventAnomalyType').value = ev.payload.anomaly_type || '';
@@ -4755,15 +4860,13 @@ function openEventModal(ev) {
     currentEditingEventId = ev.id;
     renderTags();
     renderCustomTypesDatalist();
+    renderGoutLocation();
   } else {
     ms.value = familyMembers[0] || '文文';
     setEventType('menstrual');
-    document.getElementById('eventTitle').value = '';
     document.getElementById('eventNote').value = '';
     setDefaultEventTimes();
     // 重置
-    eventSeverity = 2; // 3
-    document.querySelectorAll('#eventSeverity .severity-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.val) === 2));
     eventPainLevel = 5;
     document.querySelectorAll('#eventPainLevel .severity-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.val) === 5));
     eventGoutTriggers = []; eventGoutMedications = [];
@@ -4780,8 +4883,8 @@ function openEventModal(ev) {
     renderDysmenorrheaDayList(_tsNum, _endNum, []);
     renderTags();
     renderCustomTypesDatalist();
+    renderGoutLocation();
   }
-  autoFillEventTitle();
   showModal('eventModalMask');
 }
 
@@ -4826,24 +4929,7 @@ function renderDysmenorrheaDayList(ts, end_ts, selectedDates) {
   });
 }
 
-function autoFillEventTitle() {
-  const titleEl = document.getElementById('eventTitle');
-  if (titleEl.value) return;  // 已有自定义标题就不覆盖
-  const meta = getEventCategoryMeta(currentEventType);
-  let autoTitle = meta.label;
-  if (currentEventType === 'gout') {
-    const loc = document.getElementById('eventGoutLocation').value;
-    if (loc === '其他') autoTitle = `${meta.label} · ${document.getElementById('eventGoutLocationOther').value || '其他'}`;
-    else autoTitle = `${meta.label} · ${loc}`;
-  } else if (currentEventType === 'anomaly') {
-    const t = document.getElementById('eventAnomalyType').value;
-    if (t) autoTitle = `${meta.label} · ${t}`;
-  } else if (currentEventType === 'custom') {
-    const n = document.getElementById('eventCustomName').value;
-    if (n) autoTitle = n;
-  }
-  titleEl.value = autoTitle;
-}
+// autoFillEventTitle 已废弃（标题字段已删除，事件名根据类型自动生成）
 
 function copyLastGout() {
   const last = bodyEvents.find(e => e.category === 'gout');
@@ -4908,16 +4994,30 @@ function saveEventFromForm() {
     finalCategory = payload.custom_id;
   }
 
-  const titleVal = document.getElementById('eventTitle').value.trim();
   const noteVal = document.getElementById('eventNote').value.trim();
+
+  // 自动生成 title（按类型 + 关键字段）
+  const meta = getEventCategoryMeta(finalCategory);
+  let autoTitle = meta.label;
+  if (finalCategory === 'gout') {
+    const loc = (payload.location || '').trim();
+    autoTitle = loc ? `${meta.label} · ${loc}` : meta.label;
+  } else if (finalCategory === 'anomaly') {
+    const t = (payload.anomaly_type || '').trim();
+    autoTitle = t ? `${meta.label} · ${t}` : meta.label;
+  } else if (finalCategory === 'custom' || (finalCategory && finalCategory.startsWith && finalCategory.startsWith('cust_'))) {
+    autoTitle = (payload.custom_name || '').trim() || meta.label;
+  } else if (finalCategory === 'menstrual') {
+    autoTitle = `月经期（${payload.duration_days || Math.max(1, Math.ceil(((end_ts || ts) - ts) / 86400000) + 1)} 天）`;
+  }
 
   const ev = {
     id: currentEditingEventId,
     ts, end_ts,
     member,
     category: finalCategory,
-    severity: eventSeverity + 1,
-    title: titleVal || null,
+    severity: 3,  // 保留字段以兼容旧数据；UI 不再使用
+    title: autoTitle,
     payload,
     tags: [],
     note: noteVal,
@@ -5016,7 +5116,7 @@ function renderEventCard(ev) {
   const ongoing = !ev.end_ts;
   const chips = [];
   chips.push(`<span class="event-meta-chip">👤 ${escapeHtml(ev.member)}</span>`);
-  chips.push(`<span class="event-meta-chip severity">强度 ${ev.severity}/5</span>`);
+  // 强度字段已删除，不再在 chip 中显示
   if (dur) chips.push(`<span class="event-meta-chip">⏱ ${dur}</span>`);
   if (ongoing) chips.push(`<span class="event-meta-chip" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1e40af;">🟢 仍在持续</span>`);
   if (ev.category === 'menstrual') {
