@@ -312,7 +312,7 @@
   }
 
   /* 顶部视图切换 tabs（小巧紧凑） */
-  .view-tabs { display: inline-flex; background: linear-gradient(135deg, #fff7ed, #ffedd5); border-radius: 8px; padding: 2px; margin: 6px 16px 0; gap: 2px; box-shadow: 0 1px 4px rgba(245, 158, 11, 0.08); }
+  .view-tabs { display: inline-flex; background: linear-gradient(135deg, #fff7ed, #ffedd5); border-radius: 8px; padding: 2px; margin: 6px 16px 0; gap: 2px; box-shadow: 0 1px 4px rgba(245, 158, 11, 0.08); grid-column: 1 / -1; justify-self: start; align-self: start; }
   .view-tab { padding: 4px 10px; border-radius: 6px; border: none; background: transparent; color: #78350f; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2; }
   .view-tab.active { background: white; color: #9a3412; box-shadow: 0 1px 3px rgba(245, 158, 11, 0.18); }
   .view-tab:hover:not(.active) { background: rgba(255, 255, 255, 0.5); }
@@ -320,6 +320,9 @@
     .view-tabs { margin: 4px 12px 0; }
     .view-tab { padding: 3px 8px; font-size: 10px; }
   }
+
+  /* 视图容器：横跨所有列，保留内部左右分栏 */
+  #view-health, #view-events { grid-column: 1 / -1; min-width: 0; }
 
   /* 身体情况页面 */
   .body-events-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
@@ -402,9 +405,20 @@
   .menstrual-day.ovulation-day { background: linear-gradient(135deg, #fb923c, #ea580c); color: white; font-weight: 800; box-shadow: 0 0 0 2px #f59e0b; }
   .menstrual-day.luteal { background: #dbeafe; color: #1e40af; }
   .menstrual-day:hover:not(.empty):not(.in-period) { background: #fef3c7; transform: scale(1.08); }
-  .menstrual-day.selecting { box-shadow: inset 0 0 0 2px #ec4899; }
-  .menstrual-day.in-range { background: #fbcfe8; color: #9d174d; }
+  .menstrual-day.selecting { background: linear-gradient(135deg, #fce7f3, #fbcfe8) !important; color: #9d174d !important; box-shadow: inset 0 0 0 2px #ec4899, 0 0 0 1px #ec4899; font-weight: 800; animation: mcPulse 1.2s ease-in-out infinite; }
+  .menstrual-day.in-range { background: #fbcfe8 !important; color: #9d174d !important; }
+  @keyframes mcPulse { 0%, 100% { box-shadow: inset 0 0 0 2px #ec4899, 0 0 0 0 rgba(236, 72, 153, 0.5); } 50% { box-shadow: inset 0 0 0 2px #ec4899, 0 0 0 4px rgba(236, 72, 153, 0); } }
   .menstrual-day .marker { position: absolute; top: 1px; right: 2px; font-size: 8px; line-height: 1; }
+
+  /* 月经选择操作条（更显眼的反馈） */
+  .menstrual-select-bar { margin-top: 10px; padding: 10px 14px; border-radius: 10px; background: linear-gradient(135deg, #fce7f3, #fbcfe8); border: 2px dashed #ec4899; display: none; align-items: center; flex-wrap: wrap; gap: 10px; }
+  .menstrual-select-bar.active { display: flex; animation: slideUp 0.2s; }
+  .menstrual-select-bar .sel-info { font-size: 13px; color: #9d174d; font-weight: 700; flex: 1; min-width: 140px; }
+  .menstrual-select-bar .sel-info .arrow { margin: 0 6px; color: #ec4899; }
+  .menstrual-select-bar .sel-actions { display: flex; gap: 6px; }
+  .menstrual-select-bar button { padding: 6px 12px; border-radius: 6px; border: none; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .menstrual-select-bar .btn-confirm { background: linear-gradient(135deg, #ec4899, #be185d); color: white; }
+  .menstrual-select-bar .btn-cancel { background: white; color: #9d174d; border: 1px solid #f9a8d4; }
 
   .menstrual-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; font-size: 10px; color: var(--text-2); padding: 8px; background: #fefce8; border-radius: 8px; }
   .menstrual-legend-item { display: inline-flex; align-items: center; gap: 4px; }
@@ -610,7 +624,14 @@
             <button id="mcToday" title="回到今天">📍</button>
           </div>
         </div>
-        <div class="menstrual-cal-hint" id="mcHint">👆 在月历上点选开始日期，再点结束日期</div>
+        <div class="menstrual-cal-hint" id="mcHint">👆 在月历上点选开始日期，再点结束日期，最后点「保存这次月经」</div>
+        <div class="menstrual-select-bar" id="mcSelectBar">
+          <div class="sel-info" id="mcSelInfo"></div>
+          <div class="sel-actions">
+            <button class="btn-cancel" id="mcSelCancel">✕ 取消</button>
+            <button class="btn-confirm" id="mcSelConfirm">💾 保存这次月经</button>
+          </div>
+        </div>
         <div class="menstrual-cal-grid" id="menstrualCalendars"></div>
         <div class="menstrual-legend" id="menstrualLegend"></div>
         <div id="menstrualPredictSummary"></div>
@@ -1124,6 +1145,7 @@ let historySearch = '';
 // 月经月历状态
 let menstrualCalCursor = (() => { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d; })();
 let menstrualSelectStart = null;  // 正在选择范围时的起始日（毫秒）
+let menstrualSelectEnd = null;    // 结束日（毫秒）
 let realtimeChannel = null;
 let realtimeEventsChannel = null;
 let currentParsed = null;
@@ -3840,6 +3862,10 @@ function initEventsView() {
   document.getElementById('mcNext').addEventListener('click', () => { menstrualCalCursor = shiftMonth(menstrualCalCursor, 1); renderMenstrualCalendar(); });
   document.getElementById('mcToday').addEventListener('click', () => { menstrualCalCursor = new Date(); menstrualCalCursor.setDate(1); renderMenstrualCalendar(); });
 
+  // 月经选择操作条
+  document.getElementById('mcSelConfirm').addEventListener('click', confirmMenstrualSelection);
+  document.getElementById('mcSelCancel').addEventListener('click', cancelMenstrualSelection);
+
   // 类型选择（弹窗内）
   document.getElementById('eventTypeGrid').addEventListener('click', e => {
     const btn = e.target.closest('.event-type-btn');
@@ -3882,6 +3908,25 @@ function renderEventsMemberFilter() {
   });
   wrap.innerHTML = html.join('');
 }
+
+/* ============================================================
+   弹窗通用工具（showModal/hideModal + data-close 委托）
+   ============================================================ */
+function showModal(maskId, action) {
+  const el = document.getElementById(maskId);
+  if (!el) return;
+  if (action === 'hide') el.classList.remove('show');
+  else el.classList.add('show');
+}
+// 全局委托：data-close 按钮关闭对应弹窗
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-close]');
+  if (btn) {
+    const id = btn.dataset.close;
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('show');
+  }
+});
 
 /* ============================================================
    月经月历：双月视图 + range 选择 + 周期预测
@@ -4020,13 +4065,38 @@ function renderMenstrualCalendar() {
 
   const todayKey = dateKey(new Date());
   const selectedStartKey = menstrualSelectStart ? dateKey(new Date(menstrualSelectStart)) : null;
+  const selectedEndKey = menstrualSelectEnd ? dateKey(new Date(menstrualSelectEnd)) : null;
+  // 计算范围之间的所有日期 keys
+  const rangeKeys = new Set();
+  if (menstrualSelectStart && menstrualSelectEnd) {
+    const s = startOfDay(menstrualSelectStart);
+    const e = startOfDay(menstrualSelectEnd);
+    for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) rangeKeys.add(dateKey(d));
+  }
 
-  wrap.innerHTML = [m1, m2].map(m => renderSingleMonth(m, recordedKeys, predictedKeys, todayKey, selectedStartKey)).join('');
+  wrap.innerHTML = [m1, m2].map(m => renderSingleMonth(m, recordedKeys, predictedKeys, todayKey, selectedStartKey, selectedEndKey, rangeKeys)).join('');
 
   // 绑定每个日期的点击
   wrap.querySelectorAll('.menstrual-day[data-ts]').forEach(el => {
     el.addEventListener('click', () => onMenstrualDayClick(parseInt(el.dataset.ts, 10), el));
   });
+
+  // 操作条显示
+  const bar = document.getElementById('mcSelectBar');
+  const info = document.getElementById('mcSelInfo');
+  if (menstrualSelectStart) {
+    const sK = dateKey(new Date(menstrualSelectStart));
+    const sFmt = formatMd(new Date(menstrualSelectStart));
+    if (menstrualSelectEnd) {
+      const eFmt = formatMd(new Date(menstrualSelectEnd));
+      info.innerHTML = `✅ 已选 <b>${sFmt}</b><span class="arrow">→</span><b>${eFmt}</b>　<span style="color:#9d174d;font-weight:500;">（${Math.round((menstrualSelectEnd - menstrualSelectStart)/86400000)+1} 天）</span>`;
+    } else {
+      info.innerHTML = `📍 已选开始日 <b>${sFmt}</b>　<span style="color:#9d174d;font-weight:500;">再点结束日（点同一格 = 单日记录）</span>`;
+    }
+    bar.classList.add('active');
+  } else {
+    bar.classList.remove('active');
+  }
 
   // 图例
   legendEl.innerHTML = `
@@ -4064,7 +4134,7 @@ function renderMenstrualCalendar() {
   }
 }
 
-function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, selectedStartKey) {
+function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, selectedStartKey, selectedEndKey, rangeKeys) {
   const y = monthDate.getFullYear();
   const m = monthDate.getMonth();
   const firstDay = new Date(y, m, 1);
@@ -4097,6 +4167,8 @@ function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, sel
     const isRecorded = recordedKeys.has(k);
     const phase = predictedKeys[k];
     const isSelectedStart = k === selectedStartKey;
+    const isSelectedEnd = k === selectedEndKey;
+    const isInRange = rangeKeys && rangeKeys.has(k);
 
     let classes = ['menstrual-day'];
     let marker = '';
@@ -4107,7 +4179,9 @@ function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, sel
       classes.push(phase);
       if (phase === 'ovulation-day') marker = '<span class="marker">🥚</span>';
     }
-    if (isSelectedStart) classes.push('selecting');
+    if (isSelectedStart) { classes.push('selecting'); marker = '<span class="marker">🅰️</span>'; }
+    else if (isSelectedEnd) { classes.push('selecting'); marker = '<span class="marker">🅱️</span>'; }
+    else if (isInRange) classes.push('in-range');
 
     html += `<div class="${classes.join(' ')}" data-ts="${ts}" title="${k}${isRecorded ? '（已记录）' : ''}">${day}${marker}</div>`;
   }
@@ -4118,7 +4192,6 @@ function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, sel
 async function onMenstrualDayClick(ts, el) {
   const day = startOfDay(ts);
   const k = dateKey(day);
-  const member = currentEventsMemberFilter === 'all' ? (familyMembers[0] || '我') : currentEventsMemberFilter;
 
   // 已记录的日期：点击 → 删除那条 menstrual 事件
   const memberFilter = currentEventsMemberFilter;
@@ -4136,27 +4209,40 @@ async function onMenstrualDayClick(ts, el) {
     return;
   }
 
-  // 没记录的日期 → 进入范围选择
+  // 空白日期 → range 选择
   if (!menstrualSelectStart) {
     // 第一次点击：选起始日
     menstrualSelectStart = ts;
-    document.getElementById('mcHint').innerHTML = `✅ 已选 <span class="badge-pending">${k}</span>，再点结束日`;
-    renderMenstrualCalendar();
-    return;
+    menstrualSelectEnd = null;
+  } else if (!menstrualSelectEnd) {
+    // 第二次点击：选结束日
+    menstrualSelectEnd = ts;
+    if (menstrualSelectEnd < menstrualSelectStart) {
+      const t = menstrualSelectStart; menstrualSelectStart = menstrualSelectEnd; menstrualSelectEnd = t;
+    }
+  } else {
+    // 已有范围 → 重置起点
+    menstrualSelectStart = ts;
+    menstrualSelectEnd = null;
   }
+  renderMenstrualCalendar();
+}
 
-  // 第二次点击：选结束日，保存
+function confirmMenstrualSelection() {
+  if (!menstrualSelectStart) { showToast('请先点选日期', 'warning'); return; }
   let startTs = menstrualSelectStart;
-  let endTs = ts;
-  if (endTs < startTs) { const t = startTs; startTs = endTs; endTs = t; }
-  menstrualSelectStart = null;
-  document.getElementById('mcHint').textContent = '👆 在月历上点选开始日期，再点结束日期';
+  let endTs = menstrualSelectEnd || startTs;  // 单日 = 同一天
 
-  // 弹出月经表单，让用户补充流量、痛经、备注
+  // 清空状态
+  menstrualSelectStart = null;
+  menstrualSelectEnd = null;
+  document.getElementById('mcSelectBar').classList.remove('active');
+  renderMenstrualCalendar();
+
+  // 弹窗
   openEventModal();
   document.getElementById('eventTs').value = toLocalDatetimeInput(startTs);
   document.getElementById('eventEndTs').value = toLocalDatetimeInput(endTs);
-  // 强制类型为 menstrual（即使当前是别的）
   if (currentEventType !== 'menstrual') {
     document.querySelectorAll('.event-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'menstrual'));
     setEventType('menstrual');
@@ -4164,10 +4250,21 @@ async function onMenstrualDayClick(ts, el) {
   showToast(`已选 ${dateKey(new Date(startTs))} ~ ${dateKey(new Date(endTs))}，补充信息后保存`);
 }
 
+function cancelMenstrualSelection() {
+  menstrualSelectStart = null;
+  menstrualSelectEnd = null;
+  document.getElementById('mcSelectBar').classList.remove('active');
+  renderMenstrualCalendar();
+}
+
 function toLocalDatetimeInput(ts) {
   const d = new Date(ts);
   const pad = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function formatMd(d) {
+  return `${d.getMonth()+1}月${d.getDate()}日`;
 }
 
 function buildSeverityGrids() {
