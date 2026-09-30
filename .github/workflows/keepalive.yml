@@ -1,0 +1,27 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # 北京时间周一 8 点 = UTC 周一 0 点
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Touch health_records (keep project active)
+        run: |
+          HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" \
+            "https://dlnqhosjodkgyuojbyxo.supabase.co/rest/v1/health_records?select=id&limit=1" \
+            -H "apikey: sb_publisher sb_publishable_WJ4NSoqO2LTfq6WUo728DQ_0eMnvABo" \
+            -H "Authorization: Bearer sb_publishable_WJ4NSoqO2LTfq6WUo728DQ_0eMnvABo" \
+            --max-time 30)
+          echo "Supabase responded with HTTP $HTTP_CODE"
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "Project is healthy"
+          else
+            echo "Unexpected: $HTTP_CODE"
+            exit 1
+          fi
