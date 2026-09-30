@@ -47,10 +47,8 @@
     min-height: 100vh;
   }
   .area-header { grid-area: header; }
-  .area-left   { grid-area: left;  position: sticky; top: 20px; align-self: start; max-height: calc(100vh - 40px); overflow-y: auto; padding-right: 6px; }
+  .area-left   { grid-area: left;  align-self: start; }
   .area-right  { grid-area: right; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-  .area-left::-webkit-scrollbar { width: 6px; }
-  .area-left::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 
   /* 顶部 */
   header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding: 16px 20px; background: linear-gradient(135deg, #fffefb 0%, #fff7ed 100%); border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--border); }
@@ -312,17 +310,34 @@
   }
 
   /* 顶部视图切换 tabs（小巧紧凑） */
-  .view-tabs { display: inline-flex; background: linear-gradient(135deg, #fff7ed, #ffedd5); border-radius: 8px; padding: 2px; margin: 6px 16px 0; gap: 2px; box-shadow: 0 1px 4px rgba(245, 158, 11, 0.08); grid-column: 1 / -1; justify-self: start; align-self: start; }
-  .view-tab { padding: 4px 10px; border-radius: 6px; border: none; background: transparent; color: #78350f; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2; }
+  .view-tabs { display: inline-flex; background: linear-gradient(135deg, #fff7ed, #ffedd5); border-radius: 10px; padding: 3px; margin: 4px 16px 8px; gap: 3px; box-shadow: 0 1px 4px rgba(245, 158, 11, 0.08); justify-self: start; align-self: start; }
+  .view-tab { padding: 7px 16px; border-radius: 8px; border: none; background: transparent; color: #78350f; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 5px; line-height: 1.2; min-height: 32px; }
   .view-tab.active { background: white; color: #9a3412; box-shadow: 0 1px 3px rgba(245, 158, 11, 0.18); }
   .view-tab:hover:not(.active) { background: rgba(255, 255, 255, 0.5); }
   @media (max-width: 500px) {
-    .view-tabs { margin: 4px 12px 0; }
-    .view-tab { padding: 3px 8px; font-size: 10px; }
+    .view-tab { padding: 6px 12px; font-size: 12px; min-height: 30px; }
   }
 
-  /* 视图容器：横跨所有列，保留内部左右分栏 */
-  #view-health, #view-events { grid-column: 1 / -1; min-width: 0; }
+  /* 顶部栏 sticky：龙龙＆文文の小家 + tab 一起吸顶 */
+  .topbar {
+    grid-area: header;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: linear-gradient(180deg, #fff8f0 0%, rgba(255, 237, 213, 0.95) 100%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.08);
+    overflow: hidden;
+  }
+  .topbar > header { background: transparent; box-shadow: none; border: none; padding: 12px 18px 6px; }
+  .topbar > .view-tabs { box-shadow: none; margin: 2px 12px 8px; padding: 3px; }
+
+  /* 视图容器：保留内部左右分栏 */
+  #view-health, #view-events { min-width: 0; }
 
   /* 身体情况页面 */
   .body-events-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
@@ -447,31 +462,35 @@
 
 <div class="layout">
 
-  <header class="area-header">
-    <div class="brand">
-      <div class="logo">🏠</div>
-      <div>
-        <h1>龙龙＆文文の小家</h1>
-        <div class="subtitle">健康数据记录</div>
-      </div>
-    </div>
-    <div class="header-right">
-      <span class="sync-indicator" id="syncIndicator">
-        <span class="dot"></span><span id="syncText">连接中…</span>
-      </span>
-      <div class="clock">
-        <div class="time"><span class="pulse"></span><span id="currentTime">--:--:--</span></div>
-        <div class="date" id="currentDate">--</div>
-      </div>
-      <button class="settings-btn" id="settingsBtn" title="设置">⚙</button>
-    </div>
-  </header>
+  <div class="topbar">
 
-  <!-- 顶部视图切换 -->
-  <div class="view-tabs" id="viewTabs">
-    <button class="view-tab active" data-view="health">📊 健康</button>
-    <button class="view-tab" data-view="events">🌸 身体</button>
-  </div>
+    <header class="area-header">
+      <div class="brand">
+        <div class="logo">🏠</div>
+        <div>
+          <h1>龙龙＆文文の小家</h1>
+          <div class="subtitle">健康数据记录</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <span class="sync-indicator" id="syncIndicator">
+          <span class="dot"></span><span id="syncText">连接中…</span>
+        </span>
+        <div class="clock">
+          <div class="time"><span class="pulse"></span><span id="currentTime">--:--:--</span></div>
+          <div class="date" id="currentDate">--</div>
+        </div>
+        <button class="settings-btn" id="settingsBtn" title="设置">⚙</button>
+      </div>
+    </header>
+
+    <!-- 顶部视图切换 -->
+    <div class="view-tabs" id="viewTabs">
+      <button class="view-tab active" data-view="health">📊 健康</button>
+      <button class="view-tab" data-view="events">🌸 身体</button>
+    </div>
+
+  </div><!-- end .topbar -->
 
   <!-- ============ 视图 1：健康数据（现有内容）============ -->
   <div id="view-health">
