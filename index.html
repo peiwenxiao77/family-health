@@ -109,6 +109,8 @@
 
   /* Modal */
   .modal-mask { position: fixed; inset: 0; background: rgba(67, 20, 7, 0.45); display: none; align-items: center; justify-content: center; z-index: 9999; padding: 20px; animation: fadeIn 0.2s; backdrop-filter: blur(2px); }
+  /* promptModal 必须盖在所有其他 modal 之上（点"添加新成员"时 previewMask 还在显示） */
+  .modal-mask#promptModalMask { z-index: 10050; }
   .modal-mask.show { display: flex; }
   .modal { background: white; border-radius: 20px; padding: 24px; max-width: 460px; width: 100%; box-shadow: 0 25px 50px -12px rgba(120, 53, 15, 0.4); max-height: 90vh; overflow-y: auto; position: relative; z-index: 10000; animation: slideUp 0.25s; }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -445,7 +447,7 @@
   .menstrual-cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
   .menstrual-day { aspect-ratio: 1; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 2px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; position: relative; min-height: 36px; background: transparent; border: 1px solid transparent; overflow: hidden; }
   .menstrual-day .day-num { line-height: 1; font-size: 11px; font-weight: 600; }
-  .menstrual-day .phase-tag { font-size: 7px; line-height: 1; margin-top: 1px; opacity: 0.92; font-weight: 500; letter-spacing: 0; }
+  .menstrual-day .phase-tag { font-size: 9px; line-height: 1; margin-top: 2px; opacity: 0.92; font-weight: 600; letter-spacing: 0; padding: 1px 2px; border-radius: 3px; background: rgba(255,255,255,0.55); }
   .menstrual-day.empty { cursor: default; background: transparent; }
   .menstrual-day.empty .phase-tag { display: none; }
   .menstrual-day.today { box-shadow: inset 0 0 0 2px var(--primary, #f97316); font-weight: 800; }
@@ -4609,11 +4611,11 @@ function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, sel
     else if (isSelectedEnd) { classes.push('selecting'); marker = '<span class="marker">🅱️</span>'; }
     else if (isInRange) classes.push('in-range');
 
-    // 痛风/异常/自定义事件的小角标
+    // 痛风/异常/自定义事件的小角标（即使在月经期也显示）
     const other = otherMarkers && otherMarkers[k];
-    if (other && !isRecorded) {
+    if (other) {
       classes.push('has-other-event');
-      marker += `<span class="other-marker" style="background:${other.color};" title="${escapeHtml(other.label)}">${other.icon}</span>`;
+      marker += `<span class="other-marker" style="background:${other.color};color:white;" title="${escapeHtml(other.label)}">${other.icon}</span>`;
     }
 
     html += `<div class="${classes.join(' ')}" data-ts="${ts}" title="${k}${isRecorded ? '（已记录）' : ''}${isDysmenorrhea ? '（痛经）' : ''}${other ? '（' + escapeHtml(other.label) + '）' : ''}"><span class="day-num">${day}</span>${tagText ? `<span class="phase-tag">${tagText}</span>` : ''}${marker}</div>`;
@@ -5044,31 +5046,27 @@ function renderEvents() {
 function renderEventsStats() {
   const wrap = document.getElementById('eventsStats');
   if (!wrap) return;
-  const now = Date.now();
-  const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
-  const anomalyThisMonth = bodyEvents.filter(e => e.category === 'anomaly' && e.ts >= monthStart.getTime()).length;
-  const goutEvents = bodyEvents.filter(e => e.category === 'gout').sort((a,b) => b.ts - a.ts);
-  const lastGout = goutEvents[0];
-  const daysSinceGout = lastGout ? Math.floor((now - lastGout.ts) / 86400000) : null;
-  const goutDaysTotal = goutEvents.reduce((s, e) => s + (e.end_ts ? (e.end_ts - e.ts) / 86400000 : 0), 0);
-
-  const items = [];
-  if (anomalyThisMonth > 0 || bodyEvents.some(e => e.category === 'anomaly')) {
-    items.push({ title: '本月异常', value: anomalyThisMonth, unit: '次', sub: bodyEvents.filter(e => e.category === 'anomaly').length + ' 次累计', color: '#f59e0b' });
+  // 这两个数据现在主要在「异常按月」chart 的副标题里展示，
+  // stats 区只保留一个轻量"总览"卡片，避免信息重复
+  const totalCount = bodyEvents.length;
+  if (totalCount === 0) {
+    wrap.innerHTML = `
+      <div class="event-stat" style="--accent:#94a3b8;">
+        <div class="event-stat-title">身体事件</div>
+        <div class="event-stat-value">0<span class="unit">条</span></div>
+        <div class="event-stat-sub">暂无数据，点击 ➕ 添加</div>
+      </div>
+    `;
+    return;
   }
-  if (goutEvents.length > 0) {
-    items.push({ title: '距上次痛风', value: daysSinceGout, unit: '天', sub: '累计 ' + Math.round(goutDaysTotal) + ' 天', color: '#ef4444' });
-  }
-  if (items.length === 0) {
-    items.push({ title: '身体事件', value: bodyEvents.length, unit: '条', sub: '暂无数据，点击 ➕ 添加', color: '#94a3b8' });
-  }
-  wrap.innerHTML = items.map(it => `
-    <div class="event-stat" style="--accent:${it.color};">
-      <div class="event-stat-title">${escapeHtml(it.title)}</div>
-      <div class="event-stat-value">${it.value}<span class="unit">${escapeHtml(it.unit)}</span></div>
-      <div class="event-stat-sub">${escapeHtml(it.sub)}</div>
+  // 有数据时显示一个总览，详细按月统计看下方图表
+  wrap.innerHTML = `
+    <div class="event-stat" style="--accent:#f59e0b;">
+      <div class="event-stat-title">事件总览</div>
+      <div class="event-stat-value">${totalCount}<span class="unit">条</span></div>
+      <div class="event-stat-sub">本月 / 距上次痛风 → 见下方"异常按月"副标题</div>
     </div>
-  `).join('');
+  `;
 }
 
 function renderEventsList() {
@@ -5101,10 +5099,6 @@ function renderEventsList() {
       if (btn.dataset.evAction === 'edit') openEventModal(ev);
       else if (btn.dataset.evAction === 'delete') {
         if (confirm('删除这条记录？')) removeBodyEvent(id);
-      } else if (btn.dataset.evAction === 'toggle-end') {
-        // 标记"结束"按钮
-        ev.end_ts = Date.now();
-        saveBodyEvent(ev).then(() => showToast('✓ 已标记结束'));
       }
     };
   });
@@ -5113,12 +5107,11 @@ function renderEventsList() {
 function renderEventCard(ev) {
   const meta = getEventCategoryMeta(ev.category);
   const dur = getEventDurationStr(ev);
-  const ongoing = !ev.end_ts;
   const chips = [];
   chips.push(`<span class="event-meta-chip">👤 ${escapeHtml(ev.member)}</span>`);
   // 强度字段已删除，不再在 chip 中显示
   if (dur) chips.push(`<span class="event-meta-chip">⏱ ${dur}</span>`);
-  if (ongoing) chips.push(`<span class="event-meta-chip" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#1e40af;">🟢 仍在持续</span>`);
+  // 痛风"仍在持续"状态已移除（不再有"标记结束"按钮，end_ts 仅用于持续时长显示）
   if (ev.category === 'menstrual') {
     if (ev.payload.dysmenorrhea_dates && ev.payload.dysmenorrhea_dates.length) {
       chips.push(`<span class="event-meta-chip" style="background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b;">🔥 痛经 ${ev.payload.dysmenorrhea_dates.length} 天</span>`);
@@ -5152,7 +5145,6 @@ function renderEventCard(ev) {
       <div class="event-card-meta">${chips.join('')}</div>
       ${ev.note ? `<div style="font-size:12px;color:var(--text-3);margin-top:8px;line-height:1.5;">${escapeHtml(ev.note)}</div>` : ''}
       <div class="event-card-actions">
-        ${ongoing ? `<button class="btn-secondary" data-ev-action="toggle-end" data-ev-id="${escapeHtml(ev.id)}" style="font-size:11px;">✓ 标记结束（现在）</button>` : ''}
         <button class="btn-secondary" data-ev-action="edit" data-ev-id="${escapeHtml(ev.id)}" style="font-size:11px;margin-left:auto;">✏️ 编辑</button>
         <button class="btn-danger" data-ev-action="delete" data-ev-id="${escapeHtml(ev.id)}" style="font-size:11px;">🗑</button>
       </div>
@@ -5234,25 +5226,8 @@ function renderEventsCharts() {
     });
   }
 
-  // 3. 异常按类型饼图
+  // 3. 异常按月（旁边附带本月异常 + 距上次痛风天数）
   const anomalies = bodyEvents.filter(e => e.category === 'anomaly');
-  if (anomalies.length >= 2) {
-    const byType = {};
-    anomalies.forEach(e => {
-      const t = (e.payload && e.payload.anomaly_type) || '未分类';
-      byType[t] = (byType[t] || 0) + 1;
-    });
-    charts.push({
-      id: 'anomaly-by-type',
-      title: '💢 异常按类型',
-      subtitle: '总 ' + anomalies.length + ' 次',
-      data: Object.entries(byType).map(([k, v]) => ({ x: k, y: v })),
-      type: 'doughnut',
-      color: '#f59e0b',
-    });
-  }
-
-  // 4. 异常按月
   if (anomalies.length >= 2) {
     const byMonth = {};
     anomalies.forEach(e => {
@@ -5261,10 +5236,20 @@ function renderEventsCharts() {
       byMonth[key] = (byMonth[key] || 0) + 1;
     });
     const entries = Object.entries(byMonth).sort();
+    // 本月异常（仅当前月）+ 累计异常
+    const now = new Date();
+    const curMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const anomalyThisMonth = byMonth[curMonthKey] || 0;
+    // 距上次痛风
+    const goutEvents = bodyEvents.filter(e => e.category === 'gout').sort((a,b) => b.ts - a.ts);
+    const lastGout = goutEvents[0];
+    const daysSinceGout = lastGout ? Math.floor((Date.now() - lastGout.ts) / 86400000) : null;
+    const subtitleParts = [`近 ${entries.length} 月`, `本月 ${anomalyThisMonth} 次`, `累计 ${anomalies.length} 次`];
+    if (daysSinceGout != null) subtitleParts.push(`距上次痛风 ${daysSinceGout} 天`);
     charts.push({
       id: 'anomaly-by-month',
       title: '💢 异常按月',
-      subtitle: '近 ' + entries.length + ' 月',
+      subtitle: subtitleParts.join(' · '),
       data: entries.map(([k, v]) => ({ x: k, y: v })),
       type: 'bar',
       color: '#f59e0b',
