@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v39: ①选项记忆扩展(成员/上次类型/心情) ②痛风频率图时间范围自适应 ③月经周期图同逻辑 ④新增❤️心情类别 ⑤时间总览重做为健康速览 ⑥健康趋势图一键收起 ⑦今日/本周→本周/今年 -->
+<!-- v40: ❤️类别由"心情"改为"同房"记录（去掉心情多选，纯日期+备注），并新增同房频率月度统计图（时间范围自适应，与痛风图同逻辑） -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -452,9 +452,6 @@
   .med-pills .pill .x { font-size:10px; opacity:0.7; }
   .med-pills .pill.active .x { opacity:0.9; }
   .med-pills .divider { color: var(--text-3); font-size: 11px; align-self: center; }
-  /* 心情 pills：玫瑰红主题（❤️） */
-  .mood-pills .pill { border-color:#fecdd3; background:linear-gradient(135deg,#fff1f2,#ffe4e6); color:#9f1239; }
-  .mood-pills .pill.active { background: linear-gradient(135deg,#f43f5e,#e11d48); border-color:#e11d48; }
   .severity-btn { background: white; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 4px; cursor: pointer; text-align: center; transition: all 0.15s; }
   .severity-btn:hover { transform: scale(1.05); }
   .severity-btn.active { border-color: var(--primary); background: linear-gradient(135deg, #fef3c7, #fde68a); }
@@ -753,9 +750,9 @@
             <span class="bts-icon">⚠️</span>
             <span class="bts-text">异常</span>
           </button>
-          <button class="bts-btn" data-type="mood" data-color="#f43f5e">
+          <button class="bts-btn" data-type="intercourse" data-color="#f43f5e">
             <span class="bts-icon">❤️</span>
-            <span class="bts-text">心情</span>
+            <span class="bts-text">同房</span>
           </button>
           <button class="bts-btn bts-btn-add" data-action="add-custom" data-color="#64748b" title="点击添加新的自定义项目">
             <span class="bts-icon">＋</span>
@@ -805,7 +802,7 @@
           <option value="menstrual">🌸 月经</option>
           <option value="gout">🦴 痛风</option>
           <option value="anomaly">💢 异常</option>
-          <option value="mood">❤️ 心情</option>
+          <option value="intercourse">❤️ 同房</option>
           <option value="custom">📝 自定义</option>
         </select>
         <input type="search" id="eventsSearch" class="preview-input" placeholder="🔍 搜索标题、备注..." style="flex:1;min-width:140px;">
@@ -834,7 +831,7 @@
       <button class="event-type-btn active" data-type="menstrual"><div class="event-type-icon">🌸</div><div class="event-type-name">月经</div></button>
       <button class="event-type-btn" data-type="gout"><div class="event-type-icon">🦴</div><div class="event-type-name">痛风发作</div></button>
       <button class="event-type-btn" data-type="anomaly"><div class="event-type-icon">💢</div><div class="event-type-name">异常情况</div></button>
-      <button class="event-type-btn" data-type="mood"><div class="event-type-icon">❤️</div><div class="event-type-name">心情</div></button>
+      <button class="event-type-btn" data-type="intercourse"><div class="event-type-icon">❤️</div><div class="event-type-name">同房</div></button>
       <button class="event-type-btn" data-type="custom"><div class="event-type-icon">📝</div><div class="event-type-name">自定义</div></button>
     </div>
 
@@ -909,14 +906,6 @@
       </div>
       <div class="preview-row"><label>处理方式</label>
         <input type="text" id="eventAnomalyTreatment" class="preview-input" placeholder="休息/吃药/就医...">
-      </div>
-    </div>
-
-    <!-- 心情专属字段：多选心情标签 -->
-    <div class="event-fields event-fields-hidden" data-for="mood">
-      <div class="preview-row"><label>今天的心情 <span style="font-weight:400;color:var(--text-3);font-size:11px;">(可多选)</span></label>
-        <div class="med-pills mood-pills" id="eventMoodPills" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-        <div style="font-size:11px;color:var(--text-3);margin-top:6px;">💡 选完可以在下方备注里补充一句今天发生了什么</div>
       </div>
     </div>
 
@@ -1334,8 +1323,6 @@ let currentEventType = 'menstrual';
 let currentEditingEventId = null;
 let eventPainLevel = 5;      // 0-9 (代表 1-10)
 let eventGoutTriggers = [];
-let currentMoodTags = [];    // 心情多选（v39 新增 ❤️ 类别）
-const MOOD_PRESETS = ['😊 愉快', '😌 平静', '🤩 充实', '😰 焦虑', '😢 低落', '😠 烦躁', '😴 疲惫', '🤒 不适'];
 let eventGoutMedications = [];
 let eventCharts = {};
 
@@ -2072,13 +2059,10 @@ function applyFormDefaults(type) {
   } else if (type === 'anomaly') {
     if (typeof d.anomaly_type === 'string') document.getElementById('eventAnomalyType').value = d.anomaly_type;
     if (typeof d.anomaly_treatment === 'string') document.getElementById('eventAnomalyTreatment').value = d.anomaly_treatment;
-  } else if (type === 'mood') {
-    if (Array.isArray(d.mood_tags)) currentMoodTags = d.mood_tags.slice();
-    else currentMoodTags = [];
-    renderMoodPills();
   } else if (type === 'custom' || (typeof type === 'string' && type.startsWith && type.startsWith('cust_'))) {
     if (typeof d.custom_name === 'string') document.getElementById('eventCustomName').value = d.custom_name;
   }
+  // 同房（intercourse）无专属选项，纯日期+备注，无需默认值
 }
 
 // 从 bodyEvents 提取历史上用过的部位/药（按使用次数排序）
@@ -2141,25 +2125,6 @@ function renderGoutMedications() {
   });
 }
 
-// 渲染心情 pills（多选，v39 ❤️ 类别）
-function renderMoodPills() {
-  const wrap = document.getElementById('eventMoodPills');
-  if (!wrap) return;
-  wrap.innerHTML = MOOD_PRESETS.map(m => {
-    const active = currentMoodTags.includes(m);
-    return `<span class="pill${active ? ' active' : ''}" data-mood="${escapeHtml(m)}" title="${active ? '点击取消' : '点击选择'}">${escapeHtml(m)}</span>`;
-  }).join('');
-  wrap.querySelectorAll('.pill').forEach(p => {
-    p.addEventListener('click', () => {
-      const m = p.dataset.mood;
-      const idx = currentMoodTags.indexOf(m);
-      if (idx >= 0) currentMoodTags.splice(idx, 1);
-      else currentMoodTags.push(m);
-      renderMoodPills();
-    });
-  });
-}
-
 function addCustomEventType(name) {
   const trimmed = String(name || '').trim();
   if (!trimmed) return null;
@@ -2195,11 +2160,11 @@ function getCustomEventType(id) {
 function renderBodyTypeSelector() {
   const grid = document.getElementById('btsGrid');
   if (!grid) return;
-  // 保留固定按钮（月经/痛风/异常/心情）和最后的"添加"按钮
+  // 保留固定按钮（月经/痛风/异常/同房）和最后的"添加"按钮
   const fixedStart = grid.querySelector('[data-type="menstrual"]').outerHTML;
   const fixedGout = grid.querySelector('[data-type="gout"]').outerHTML;
   const fixedAnomaly = grid.querySelector('[data-type="anomaly"]').outerHTML;
-  const fixedMood = grid.querySelector('[data-type="mood"]') ? grid.querySelector('[data-type="mood"]').outerHTML : '';
+  const fixedMood = grid.querySelector('[data-type="intercourse"]') ? grid.querySelector('[data-type="intercourse"]').outerHTML : '';
   const addBtn = grid.querySelector('[data-action="add-custom"]').outerHTML;
   const customs = customEventTypes.map(c => `
     <button class="bts-btn" data-type="${escapeHtml(c.id)}" data-custom="${escapeHtml(c.id)}" data-color="${escapeHtml(c.color)}" title="悬停删除">
@@ -2230,7 +2195,7 @@ function syncEventsCategoryFilter() {
     + '<option value="menstrual">🌸 月经</option>'
     + '<option value="gout">🦴 痛风</option>'
     + '<option value="anomaly">💢 异常</option>'
-    + '<option value="mood">❤️ 心情</option>'
+    + '<option value="intercourse">❤️ 同房</option>'
     + '<option value="custom">📝 自定义（未分类）</option>'
     + customEventTypes.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.icon)} ${escapeHtml(c.name)}</option>`).join('');
   if (current) sel.value = current;
@@ -2243,7 +2208,7 @@ function updateBtsHint() {
     menstrual: '点击月历上的日期，进入范围选择 → 保存为「月经」',
     gout: '点击月历上的日期，弹出痛风发作确认弹窗',
     anomaly: '点击月历上的日期，弹出异常确认弹窗',
-    mood: '点击月历上的日期，弹出心情记录弹窗',
+    intercourse: '点击月历上的日期，弹出同房记录弹窗',
   };
   if (meta[currentBodyType]) {
     hint.textContent = meta[currentBodyType];
@@ -2337,7 +2302,8 @@ function getEventCategoryMeta(cat) {
     menstrual: { label: '月经', icon: '🌸', color: '#ec4899' },
     gout: { label: '痛风', icon: '🦴', color: '#ef4444' },
     anomaly: { label: '异常', icon: '💢', color: '#f59e0b' },
-    mood: { label: '心情', icon: '❤️', color: '#f43f5e' },
+    intercourse: { label: '同房', icon: '❤️', color: '#f43f5e' },
+    mood: { label: '同房', icon: '❤️', color: '#f43f5e' },  // v39 短暂存在的历史键，兼容显示
     custom: { label: '自定义', icon: '📝', color: '#8b5cf6' },
   };
   // 优先识别 custom 类型下的子项目
@@ -4425,9 +4391,6 @@ function initEventsView() {
   // 严重程度
   buildSeverityGrids();
 
-  // 心情 pills（v39 ❤️）
-  renderMoodPills();
-
   // 痛风部位切换"其他"
   document.getElementById('eventGoutLocation').addEventListener('change', e => {
     document.getElementById('eventGoutLocationOtherWrap').style.display = e.target.value === '其他' ? 'flex' : 'none';
@@ -4833,8 +4796,8 @@ async function onMenstrualDayClick(ts, el) {
   document.getElementById('eventTs').value = toLocalDatetimeInput(ts);
   document.getElementById('eventEndTs').value = '';
   // 切换弹窗里的类型按钮
-  // 对于固定 3 类 + 心情，直接对应；对于自定义项目 cust_xxx，弹 custom 字段 + 填入项目名
-  if (currentType === 'gout' || currentType === 'anomaly' || currentType === 'mood') {
+  // 对于固定 3 类 + 同房，直接对应；对于自定义项目 cust_xxx，弹 custom 字段 + 填入项目名
+  if (currentType === 'gout' || currentType === 'anomaly' || currentType === 'intercourse') {
     if (currentEventType !== currentType) {
       document.querySelectorAll('.event-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === currentType));
       setEventType(currentType);
@@ -4961,7 +4924,8 @@ function renderTags() {
 
 function setEventType(type) {
   // 自定义项目 cust_xxx 视为 'custom' 类型，弹窗里使用 custom 字段
-  const norm = (type && type.startsWith && type.startsWith('cust_')) ? 'custom' : type;
+  // v39 历史键 'mood'（曾短暂表示心情）→ 归一为 'intercourse'（同房）
+  const norm = (type && type.startsWith && type.startsWith('cust_')) ? 'custom' : (type === 'mood' ? 'intercourse' : type);
   currentEventType = norm;
   document.querySelectorAll('.event-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === norm));
   document.querySelectorAll('.event-fields').forEach(f => f.classList.toggle('event-fields-hidden', f.dataset.for !== norm));
@@ -5008,10 +4972,6 @@ function openEventModal(ev) {
       document.getElementById('eventAnomalyType').value = ev.payload.anomaly_type || '';
       document.getElementById('eventAnomalyTreatment').value = ev.payload.treatment || '';
     }
-    if (ev.category === 'mood') {
-      currentMoodTags = Array.isArray(ev.payload.moods) ? ev.payload.moods.slice() : [];
-      renderMoodPills();
-    }
     if (ev.category === 'custom' || (ev.category && ev.category.startsWith && ev.category.startsWith('cust_'))) {
       document.getElementById('eventCustomName').value = ev.payload.custom_name || '';
     }
@@ -5022,7 +4982,7 @@ function openEventModal(ev) {
   } else {
     // 记住上次选择：成员 + 事件类型（"选择过的选项下次默认"）
     const d0 = loadFormDefaults();
-    const validTypes = ['menstrual', 'gout', 'anomaly', 'mood', 'custom'];
+    const validTypes = ['menstrual', 'gout', 'anomaly', 'intercourse', 'custom', 'mood'];
     const lastType = (typeof d0.last_event_type === 'string' && (validTypes.includes(d0.last_event_type) || d0.last_event_type.startsWith('cust_'))) ? d0.last_event_type : 'menstrual';
     if (d0.event_member && familyMembers.includes(d0.event_member)) ms.value = d0.event_member;
     else ms.value = familyMembers[0] || '文文';
@@ -5033,13 +4993,11 @@ function openEventModal(ev) {
     eventPainLevel = 5;
     document.querySelectorAll('#eventPainLevel .severity-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.val) === 5));
     eventGoutTriggers = []; eventGoutMedications = [];
-    currentMoodTags = [];
     document.getElementById('eventGoutLocation').value = '右脚大拇趾';
     document.getElementById('eventGoutLocationOtherWrap').style.display = 'none';
     document.getElementById('eventAnomalyType').value = '';
     document.getElementById('eventAnomalyTreatment').value = '';
     document.getElementById('eventCustomName').value = '';
-    renderMoodPills();
     // 用上次选择过的值覆盖默认 reset（"选择过的选项下次默认"）
     applyFormDefaults(currentEventType);
     // 月经痛经勾选：根据当前 start/end 渲染日期按钮
@@ -5145,10 +5103,9 @@ function saveEventFromForm() {
       treatment: document.getElementById('eventAnomalyTreatment').value.trim(),
       duration_hours: end_ts ? Math.round((end_ts - ts) / 3600000) : null,
     };
-  } else if (currentEventType === 'mood') {
-    payload = {
-      moods: currentMoodTags.slice(),
-    };
+  } else if (currentEventType === 'intercourse') {
+    // 同房：仅日期 + 成员 + 备注，无专属字段
+    payload = {};
   } else if (currentEventType === 'custom') {
     const name = document.getElementById('eventCustomName').value.trim();
     // 如果用户输入/选择了已添加的自定义项目，自动关联
@@ -5176,9 +5133,8 @@ function saveEventFromForm() {
   } else if (finalCategory === 'anomaly') {
     const t = (payload.anomaly_type || '').trim();
     autoTitle = t ? `${meta.label} · ${t}` : meta.label;
-  } else if (finalCategory === 'mood') {
-    const moods = payload.moods || [];
-    autoTitle = moods.length ? `${meta.label} · ${moods[0]}${moods.length > 1 ? ` 等${moods.length} 种` : ''}` : meta.label;
+  } else if (finalCategory === 'intercourse') {
+    autoTitle = meta.label;
   } else if (finalCategory === 'custom' || (finalCategory && finalCategory.startsWith && finalCategory.startsWith('cust_'))) {
     autoTitle = (payload.custom_name || '').trim() || meta.label;
   } else if (finalCategory === 'menstrual') {
@@ -5210,8 +5166,6 @@ function saveEventFromForm() {
       anomaly_type: payload.anomaly_type,
       anomaly_treatment: payload.treatment,
     });
-  } else if (finalCategory === 'mood') {
-    saveFormDefaults({ mood_tags: payload.moods });
   } else if (finalCategory === 'custom' || (finalCategory && finalCategory.startsWith && finalCategory.startsWith('cust_'))) {
     saveFormDefaults({ custom_name: payload.custom_name });
   }
@@ -5238,7 +5192,7 @@ function renderEvents() {
 
 function renderEventsOverview() {
   // 健康速览（v39 重做，替代旧"时间总览"）：
-  // 只放对决策有用的信息：① 下次月经预测倒计时 ② 痛风距上次发作 ③ 本周记录+今日补录提醒 ④ 最近心情
+  // 只放对决策有用的信息：① 下次月经预测倒计时 ② 痛风距上次发作 ③ 本周记录+今日补录提醒 ④ 同房距上次
   const wrap = document.getElementById('eventsOverview');
   if (!wrap) return;
   const now = Date.now();
@@ -5294,14 +5248,17 @@ function renderEventsOverview() {
   let weekSub = todayCount > 0 ? `今天已记录 ${todayCount} 条 ✓` : '今天还没记录，点 ➕ 补一条';
   if (weekEvents.length === 0) weekSub = '本周还没有记录';
 
-  // ④ 最近心情
-  const moodEvents = bodyEvents.filter(e => e.category === 'mood').sort((a, b) => b.ts - a.ts);
-  let moodVal = '—', moodSub = '记一下今天的心情吧';
-  if (moodEvents.length) {
-    const weekMoods = moodEvents.filter(e => e.ts >= weekStart).length;
-    const lastMoods = (moodEvents[0].payload && moodEvents[0].payload.moods) || [];
-    moodVal = lastMoods.length ? lastMoods.slice(0, 3).join(' ') : '❤️';
-    moodSub = `${formatEventDateTime(moodEvents[0].ts)} · 本周 ${weekMoods} 条`;
+  // ④ 同房
+  const loveEvents = bodyEvents.filter(e => e.category === 'intercourse' || e.category === 'mood').sort((a, b) => b.ts - a.ts);
+  let loveVal = '—', loveSub = '在月历上点日期即可记录';
+  if (loveEvents.length) {
+    const daysSinceLove = Math.floor((now - loveEvents[0].ts) / dayMs);
+    const loveMonthStart = new Date(); loveMonthStart.setDate(1); loveMonthStart.setHours(0, 0, 0, 0);
+    const loveYearStart = new Date(new Date().getFullYear(), 0, 1).getTime();
+    const loveM = loveEvents.filter(e => e.ts >= loveMonthStart.getTime()).length;
+    const loveY = loveEvents.filter(e => e.ts >= loveYearStart).length;
+    loveVal = `${daysSinceLove} 天`;
+    loveSub = `距上次 · 本月 ${loveM} 次 / 今年 ${loveY} 次`;
   }
 
   wrap.innerHTML = `
@@ -5327,9 +5284,9 @@ function renderEventsOverview() {
           <div class="eo-stat-sub" style="color:${todayCount > 0 ? 'var(--text-3)' : '#be123c'};font-weight:${todayCount > 0 ? 400 : 600};">${weekSub}</div>
         </div>
         <div class="eo-stat" style="background:rgba(244,63,94,0.07);">
-          <div class="eo-stat-label">❤️ 最近心情</div>
-          <div class="eo-stat-val">${moodVal}</div>
-          <div class="eo-stat-sub">${moodSub}</div>
+          <div class="eo-stat-label">❤️ 同房</div>
+          <div class="eo-stat-val" style="color:#e11d48;">${loveVal}</div>
+          <div class="eo-stat-sub">${loveSub}</div>
         </div>
       </div>
     </div>
@@ -5398,9 +5355,6 @@ function renderEventCard(ev) {
     if (ev.payload.anomaly_type) chips.push(`<span class="event-meta-chip">${escapeHtml(ev.payload.anomaly_type)}</span>`);
     if (ev.payload.treatment) chips.push(`<span class="event-meta-chip tag">${escapeHtml(ev.payload.treatment)}</span>`);
   }
-  if (ev.category === 'mood' && Array.isArray(ev.payload.moods) && ev.payload.moods.length) {
-    chips.push(`<span class="event-meta-chip" style="background:linear-gradient(135deg,#fff1f2,#ffe4e6);color:#9f1239;">${ev.payload.moods.map(escapeHtml).join(' · ')}</span>`);
-  }
   if ((ev.category === 'custom' || (ev.category && ev.category.startsWith && ev.category.startsWith('cust_'))) && ev.payload.custom_name) {
     chips.push(`<span class="event-meta-chip">${escapeHtml(ev.payload.custom_name)}</span>`);
   }
@@ -5420,6 +5374,38 @@ function renderEventCard(ev) {
       </div>
     </div>
   `;
+}
+
+// 构建"按月频率"柱状图数据（时间范围自适应 v39/v40）：
+// 从最早一次有记录的月份开始显示；跨度超过 24 个月（两年）→ 只显示最近 24 个月
+function buildMonthlyFrequency(events) {
+  const now = new Date();
+  const nowIdx = now.getFullYear() * 12 + now.getMonth();
+  const earliest = new Date(Math.min(...events.map(e => e.ts)));
+  const earliestIdx = earliest.getFullYear() * 12 + earliest.getMonth();
+  const span = nowIdx - earliestIdx + 1;   // 从首次记录到本月的月数
+  const MONTHS_CAP = 24;
+  const months = Math.min(span, MONTHS_CAP);
+  const startMonth = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
+  const byMonth = {};
+  for (let i = 0; i < months; i++) {
+    const d = new Date(startMonth.getFullYear(), startMonth.getMonth() + i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    byMonth[key] = 0;
+  }
+  events.forEach(e => {
+    const d = new Date(e.ts);
+    if (d < startMonth) return;  // 范围外的不画
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    byMonth[key] = (byMonth[key] || 0) + 1;
+  });
+  const entries = Object.entries(byMonth).sort();
+  const totalInRange = events.filter(e => new Date(e.ts) >= startMonth).length;
+  const rangeLabel = span > months ? '近 24 个月' : `${startMonth.getFullYear()}/${startMonth.getMonth()+1} 至今`;
+  return {
+    data: entries.map(([k, v]) => ({ x: k, y: v })),
+    subtitle: `${rangeLabel}（共 ${totalInRange} 次）`,
+  };
 }
 
 function renderEventsCharts() {
@@ -5471,48 +5457,39 @@ function renderEventsCharts() {
     });
   }
 
-  // 2. 痛风发作频率（按月柱状图）：时间范围自适应
-  //    - 从最早一次有记录的月份开始显示（数据会"从第一次记录开始生长"）
-  //    - 跨度超过 24 个月（两年）→ 只显示最近 24 个月
+  // 2. 痛风发作频率（按月柱状图，时间范围自适应）
   const gout = bodyEvents.filter(e => e.category === 'gout');
   if (gout.length >= 1) {
-    const now = new Date();
-    const nowIdx = now.getFullYear() * 12 + now.getMonth();
-    const earliestTs = Math.min(...gout.map(e => e.ts));
-    const earliest = new Date(earliestTs);
-    const earliestIdx = earliest.getFullYear() * 12 + earliest.getMonth();
-    const span = nowIdx - earliestIdx + 1;   // 从首次记录到本月的月数
-    const MONTHS_CAP = 24;
-    const months = Math.min(span, MONTHS_CAP);
-    const startMonth = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
-    const byMonth = {};
-    for (let i = 0; i < months; i++) {
-      const d = new Date(startMonth.getFullYear(), startMonth.getMonth() + i, 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      byMonth[key] = 0;
-    }
-    gout.forEach(e => {
-      const d = new Date(e.ts);
-      if (d < startMonth) return;  // 范围外的不画
-      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      byMonth[key] = (byMonth[key] || 0) + 1;
-    });
-    const entries = Object.entries(byMonth).sort();
-    const totalInRange = gout.filter(e => new Date(e.ts) >= startMonth).length;
+    const freq = buildMonthlyFrequency(gout);
     const sortedAllGout = gout.slice().sort((a, b) => b.ts - a.ts);
-    const lastGout = sortedAllGout[0];
-    const daysSinceGout = lastGout ? Math.floor((Date.now() - lastGout.ts) / 86400000) : null;
+    const daysSinceGout = Math.floor((Date.now() - sortedAllGout[0].ts) / 86400000);
     // 把"距上次痛风"放到副标题尾部，节省单独 stat 卡
-    const goutExtra = daysSinceGout == null ? '' : ` · 距上次 ${daysSinceGout} 天`;
-    const rangeLabel = span > months ? '近 24 个月' : `${startMonth.getFullYear()}/${startMonth.getMonth()+1} 至今`;
+    const goutExtra = ` · 距上次 ${daysSinceGout} 天`;
     charts.push({
       id: 'gout-frequency',
       title: '🦴 痛风发作频率',
-      subtitle: `${rangeLabel}（共 ${totalInRange} 次，跨度越久数据越能反映趋势）${goutExtra}`,
-      data: entries.map(([k, v]) => ({ x: k, y: v })),
+      subtitle: `${freq.subtitle}，跨度越久数据越能反映趋势${goutExtra}`,
+      data: freq.data,
       type: 'bar',
       color: '#ef4444',
       wide: true,  // 标记 X 轴很长
+    });
+  }
+
+  // 3. 同房频率（按月柱状图，与痛风图同逻辑 v40）
+  const loveEvents = bodyEvents.filter(e => e.category === 'intercourse' || e.category === 'mood');
+  if (loveEvents.length >= 1) {
+    const freq = buildMonthlyFrequency(loveEvents);
+    const lastLove = loveEvents.slice().sort((a, b) => b.ts - a.ts)[0];
+    const daysSinceLove = Math.floor((Date.now() - lastLove.ts) / 86400000);
+    charts.push({
+      id: 'intercourse-frequency',
+      title: '❤️ 同房频率',
+      subtitle: `${freq.subtitle} · 距上次 ${daysSinceLove} 天`,
+      data: freq.data,
+      type: 'bar',
+      color: '#f43f5e',
+      wide: true,
     });
   }
 
