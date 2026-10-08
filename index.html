@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v40: ❤️类别由"心情"改为"同房"记录（去掉心情多选，纯日期+备注），并新增同房频率月度统计图（时间范围自适应，与痛风图同逻辑） -->
+<!-- v41: ❤️不显示"同房"文字（只显示图标）；月历点击❤️类型=立即记录（再点一次删除，无需弹窗） -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -752,7 +752,6 @@
           </button>
           <button class="bts-btn" data-type="intercourse" data-color="#f43f5e">
             <span class="bts-icon">❤️</span>
-            <span class="bts-text">同房</span>
           </button>
           <button class="bts-btn bts-btn-add" data-action="add-custom" data-color="#64748b" title="点击添加新的自定义项目">
             <span class="bts-icon">＋</span>
@@ -802,7 +801,7 @@
           <option value="menstrual">🌸 月经</option>
           <option value="gout">🦴 痛风</option>
           <option value="anomaly">💢 异常</option>
-          <option value="intercourse">❤️ 同房</option>
+          <option value="intercourse">❤️</option>
           <option value="custom">📝 自定义</option>
         </select>
         <input type="search" id="eventsSearch" class="preview-input" placeholder="🔍 搜索标题、备注..." style="flex:1;min-width:140px;">
@@ -831,7 +830,7 @@
       <button class="event-type-btn active" data-type="menstrual"><div class="event-type-icon">🌸</div><div class="event-type-name">月经</div></button>
       <button class="event-type-btn" data-type="gout"><div class="event-type-icon">🦴</div><div class="event-type-name">痛风发作</div></button>
       <button class="event-type-btn" data-type="anomaly"><div class="event-type-icon">💢</div><div class="event-type-name">异常情况</div></button>
-      <button class="event-type-btn" data-type="intercourse"><div class="event-type-icon">❤️</div><div class="event-type-name">同房</div></button>
+      <button class="event-type-btn" data-type="intercourse"><div class="event-type-icon">❤️</div><div class="event-type-name"></div></button>
       <button class="event-type-btn" data-type="custom"><div class="event-type-icon">📝</div><div class="event-type-name">自定义</div></button>
     </div>
 
@@ -2195,7 +2194,7 @@ function syncEventsCategoryFilter() {
     + '<option value="menstrual">🌸 月经</option>'
     + '<option value="gout">🦴 痛风</option>'
     + '<option value="anomaly">💢 异常</option>'
-    + '<option value="intercourse">❤️ 同房</option>'
+    + '<option value="intercourse">❤️</option>'
     + '<option value="custom">📝 自定义（未分类）</option>'
     + customEventTypes.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.icon)} ${escapeHtml(c.name)}</option>`).join('');
   if (current) sel.value = current;
@@ -2208,7 +2207,7 @@ function updateBtsHint() {
     menstrual: '点击月历上的日期，进入范围选择 → 保存为「月经」',
     gout: '点击月历上的日期，弹出痛风发作确认弹窗',
     anomaly: '点击月历上的日期，弹出异常确认弹窗',
-    intercourse: '点击月历上的日期，弹出同房记录弹窗',
+    intercourse: '点击月历日期，立即记录 ❤️（再点一次 = 删除）',
   };
   if (meta[currentBodyType]) {
     hint.textContent = meta[currentBodyType];
@@ -2302,8 +2301,8 @@ function getEventCategoryMeta(cat) {
     menstrual: { label: '月经', icon: '🌸', color: '#ec4899' },
     gout: { label: '痛风', icon: '🦴', color: '#ef4444' },
     anomaly: { label: '异常', icon: '💢', color: '#f59e0b' },
-    intercourse: { label: '同房', icon: '❤️', color: '#f43f5e' },
-    mood: { label: '同房', icon: '❤️', color: '#f43f5e' },  // v39 短暂存在的历史键，兼容显示
+    intercourse: { label: '❤️', icon: '❤️', color: '#f43f5e' },
+    mood: { label: '❤️', icon: '❤️', color: '#f43f5e' },  // v39 短暂存在的历史键，兼容显示
     custom: { label: '自定义', icon: '📝', color: '#8b5cf6' },
   };
   // 优先识别 custom 类型下的子项目
@@ -4776,6 +4775,33 @@ async function onMenstrualDayClick(ts, el) {
     return;
   }
 
+  // === ❤️（同房）：点击即记录，无需确认弹窗；再点一次 = 删除 ===
+  if (currentType === 'intercourse' || currentType === 'mood') {
+    const existingLove = bodyEvents.find(e =>
+      (e.category === 'intercourse' || e.category === 'mood') &&
+      e.member === memberName &&
+      startOfDay(e.ts).getTime() === day.getTime()
+    );
+    if (existingLove) {
+      if (confirm(`删除 ${memberName} 在 ${k} 的 ❤️ 记录？`)) {
+        await removeBodyEvent(existingLove.id);
+        showToast('✓ 已删除');
+      }
+      return;
+    }
+    // 时间取值：今天 = 当前时刻；历史日期 = 当天 21:00
+    const nowD = new Date();
+    const tsLove = dateKey(nowD) === k ? nowD.getTime() : new Date(`${k}T21:00:00`).getTime();
+    saveFormDefaults({ event_member: memberName, last_event_type: 'intercourse' });
+    await saveBodyEvent({
+      id: null, ts: tsLove, end_ts: null,
+      member: memberName, category: 'intercourse',
+      severity: 3, title: '❤️', payload: {}, tags: [], note: '',
+    });
+    showToast('✓ 已记录 ❤️');
+    return;
+  }
+
   // === 痛风/异常/自定义：单击日期 → 弹 modal 确认（不再直接保存） ===
   // 已经存在该日期+类型的记录 → 删除
   const existing = bodyEvents.find(e =>
@@ -5250,7 +5276,7 @@ function renderEventsOverview() {
 
   // ④ 同房
   const loveEvents = bodyEvents.filter(e => e.category === 'intercourse' || e.category === 'mood').sort((a, b) => b.ts - a.ts);
-  let loveVal = '—', loveSub = '在月历上点日期即可记录';
+  let loveVal = '—', loveSub = '点击月历日期即可记录';
   if (loveEvents.length) {
     const daysSinceLove = Math.floor((now - loveEvents[0].ts) / dayMs);
     const loveMonthStart = new Date(); loveMonthStart.setDate(1); loveMonthStart.setHours(0, 0, 0, 0);
@@ -5284,7 +5310,7 @@ function renderEventsOverview() {
           <div class="eo-stat-sub" style="color:${todayCount > 0 ? 'var(--text-3)' : '#be123c'};font-weight:${todayCount > 0 ? 400 : 600};">${weekSub}</div>
         </div>
         <div class="eo-stat" style="background:rgba(244,63,94,0.07);">
-          <div class="eo-stat-label">❤️ 同房</div>
+          <div class="eo-stat-label">❤️</div>
           <div class="eo-stat-val" style="color:#e11d48;">${loveVal}</div>
           <div class="eo-stat-sub">${loveSub}</div>
         </div>
@@ -5359,11 +5385,15 @@ function renderEventCard(ev) {
     chips.push(`<span class="event-meta-chip">${escapeHtml(ev.payload.custom_name)}</span>`);
   }
 
+  // ❤️ 记录的标题就是图标本身，卡片上不再重复显示文字标题
+  const rawTitle = ev.title || meta.label;
+  const displayTitle = rawTitle === meta.icon ? '' : escapeHtml(rawTitle);
+
   return `
     <div class="event-card event-cat-${escapeHtml(ev.category)}">
       <div class="event-card-head">
         <div class="event-card-icon">${meta.icon}</div>
-        <div class="event-card-title">${escapeHtml(ev.title || meta.label)}</div>
+        <div class="event-card-title">${displayTitle}</div>
         <div class="event-card-time">${formatEventDateTime(ev.ts)}</div>
       </div>
       <div class="event-card-meta">${chips.join('')}</div>
@@ -5484,7 +5514,7 @@ function renderEventsCharts() {
     const daysSinceLove = Math.floor((Date.now() - lastLove.ts) / 86400000);
     charts.push({
       id: 'intercourse-frequency',
-      title: '❤️ 同房频率',
+      title: '❤️ 频率',
       subtitle: `${freq.subtitle} · 距上次 ${daysSinceLove} 天`,
       data: freq.data,
       type: 'bar',
