@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v42: 全站图标萌化（用户确认清单：换2/3/5/6/7/8/9/10/12/14/15/16/18/19/20/21/23，保留1/4/11/13/17/22）+ 旧数据图标一次性迁移 -->
+<!-- v43: 「点击月历保存为」改为5个一排（桌面+手机），❤️按钮无文字时垂直居中，补❤️选中态玫瑰色描边 -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -522,13 +522,15 @@
   /* 身体情况类型选择器 */
   .body-type-selector { margin-top: 14px; padding: 12px; background: linear-gradient(135deg, #fff7ed, #fefce8); border-radius: 12px; border: 1px solid #fed7aa; }
   .body-type-selector .bts-label { display: block; font-size: 12px; color: var(--text-2); font-weight: 600; margin-bottom: 8px; }
-  .body-type-selector .bts-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .body-type-selector .bts-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
   .body-type-selector .bts-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; border-radius: 10px; border: 2px solid transparent; background: white; cursor: pointer; transition: all 0.15s; font-size: 12px; color: var(--text-2); font-weight: 600; }
   .body-type-selector .bts-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.06); }
   .body-type-selector .bts-btn.active { background: white; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(245,158,11,0.18); }
   .body-type-selector .bts-btn[data-type="menstrual"].active { border-color: #ec4899; color: #be185d; }
   .body-type-selector .bts-btn[data-type="gout"].active { border-color: #7c3aed; color: #5b21b6; }
   .body-type-selector .bts-btn[data-type="anomaly"].active { border-color: #f59e0b; color: #92400e; }
+  .body-type-selector .bts-btn[data-type="intercourse"] { justify-content: center; }
+  .body-type-selector .bts-btn[data-type="intercourse"].active { border-color: #f43f5e; color: #be123c; }
   .body-type-selector .bts-btn[data-custom].active { border-color: #8b5cf6; color: #6d28d9; background: #f5f3ff; }
   .body-type-selector .bts-btn.bts-btn-add { background: repeating-linear-gradient(45deg, #ffffff 0 8px, #f8fafc 8px 16px); color: var(--text-2); border-style: dashed; }
   .body-type-selector .bts-btn.bts-btn-add:hover { background: linear-gradient(135deg, #ede9fe, #ddd6fe); color: #5b21b6; border-color: #8b5cf6; }
@@ -538,7 +540,7 @@
   .body-type-selector .bts-text { font-size: 11px; }
   .body-type-selector .bts-hint { margin-top: 8px; font-size: 11px; color: var(--text-3); text-align: center; }
   @media (max-width: 500px) {
-    .body-type-selector .bts-grid { grid-template-columns: repeat(2, 1fr); }
+    .body-type-selector .bts-grid { grid-template-columns: repeat(5, 1fr); gap: 6px; }
     .body-type-selector .bts-icon { font-size: 18px; }
   }
 
