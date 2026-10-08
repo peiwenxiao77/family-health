@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v38: 接手验证部署（无功能改动，pipeline check） -->
+<!-- v39: ①选项记忆扩展(成员/上次类型/心情) ②痛风频率图时间范围自适应 ③月经周期图同逻辑 ④新增❤️心情类别 ⑤时间总览重做为健康速览 ⑥健康趋势图一键收起 ⑦今日/本周→本周/今年 -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -170,14 +170,14 @@
   .stat-card:active { transform: translateY(0); }
   .stat-card.active { background: linear-gradient(135deg, #fff7ed, #ffedd5); border-color: var(--primary); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2); }
   .stat-card::after { content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%; background: var(--accent, var(--primary)); }
-  .stat-card.s-today { --accent: #f59e0b; }
+  .stat-card.s-year { --accent: #f59e0b; }
   .stat-card.s-week { --accent: #fb923c; }
   .stat-card.s-cats { --accent: #f472b6; }
   .stat-card.s-members { --accent: #84cc16; }
   .stat-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
   .stat-title { font-size: 11px; color: var(--text-2); font-weight: 500; }
   .stat-icon { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 13px; }
-  .stat-card.s-today .stat-icon { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #b45309; }
+  .stat-card.s-year .stat-icon { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #b45309; }
   .stat-card.s-week .stat-icon { background: linear-gradient(135deg, #fed7aa, #fdba74); color: #c2410c; }
   .stat-card.s-cats .stat-icon { background: linear-gradient(135deg, #fce7f3, #fbcfe8); color: #be185d; }
   .stat-card.s-members .stat-icon { background: linear-gradient(135deg, #ecfccb, #d9f99d); color: #4d7c0f; }
@@ -390,6 +390,7 @@
   .eo-stat { background: rgba(255,255,255,0.6); border-radius: 8px; padding: 8px 10px; }
   .eo-stat-label { font-size: 11px; color: var(--text-3); font-weight: 600; margin-bottom: 4px; }
   .eo-stat-val { font-size: 15px; font-weight: 800; color: var(--text); line-height: 1.1; }
+  .eo-stat-sub { font-size: 10.5px; color: var(--text-3); margin-top: 4px; line-height: 1.45; font-weight: 400; }
   .eo-unit { font-size: 11px; color: var(--text-3); font-weight: 500; margin-left: 2px; }
   .eo-catbar { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; background: rgba(255,255,255,0.5); border-radius: 8px; margin-bottom: 10px; }
   .eo-cat-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-2); }
@@ -451,6 +452,9 @@
   .med-pills .pill .x { font-size:10px; opacity:0.7; }
   .med-pills .pill.active .x { opacity:0.9; }
   .med-pills .divider { color: var(--text-3); font-size: 11px; align-self: center; }
+  /* 心情 pills：玫瑰红主题（❤️） */
+  .mood-pills .pill { border-color:#fecdd3; background:linear-gradient(135deg,#fff1f2,#ffe4e6); color:#9f1239; }
+  .mood-pills .pill.active { background: linear-gradient(135deg,#f43f5e,#e11d48); border-color:#e11d48; }
   .severity-btn { background: white; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 4px; cursor: pointer; text-align: center; transition: all 0.15s; }
   .severity-btn:hover { transform: scale(1.05); }
   .severity-btn.active { border-color: var(--primary); background: linear-gradient(135deg, #fef3c7, #fde68a); }
@@ -639,14 +643,6 @@
     </section>
 
     <div class="stats-grid">
-      <div class="stat-card s-today" data-action="today" title="点击查看今日记录">
-        <div class="stat-head">
-          <div class="stat-title">今日记录</div>
-          <div class="stat-icon">📝</div>
-        </div>
-        <div class="stat-value"><span id="statTodayCount">0</span><span class="unit">条</span></div>
-        <div class="stat-sub" id="statTodaySub">尚无记录</div>
-      </div>
       <div class="stat-card s-week" data-action="week" title="点击查看本周记录">
         <div class="stat-head">
           <div class="stat-title">本周记录</div>
@@ -654,6 +650,14 @@
         </div>
         <div class="stat-value"><span id="statWeekCount">0</span><span class="unit">条</span></div>
         <div class="stat-sub" id="statWeekSub">--</div>
+      </div>
+      <div class="stat-card s-year" data-action="year" title="点击查看今年记录">
+        <div class="stat-head">
+          <div class="stat-title">今年记录</div>
+          <div class="stat-icon">🗓</div>
+        </div>
+        <div class="stat-value"><span id="statYearCount">0</span><span class="unit">条</span></div>
+        <div class="stat-sub" id="statYearSub">--</div>
       </div>
       <div class="stat-card s-cats" data-action="cats" title="点击管理类别">
         <div class="stat-head">
@@ -679,7 +683,9 @@
 
     <div class="card">
       <div class="card-header">
-        <div class="card-title">📈 各项趋势 <span class="badge" id="chartBadge">最近 100 条</span></div>
+        <div class="card-title">📈 各项趋势 <span class="badge" id="chartBadge">最近 100 条</span>
+          <button class="btn-secondary" id="btnToggleCharts" style="font-size:11px;padding:4px 10px;margin-left:8px;">⇕ 收起</button>
+        </div>
         <div class="tabs" id="chartTabs">
           <button class="tab active" data-range="30">最近 100 条</button>
           <button class="tab" data-range="7">近 7 天</button>
@@ -747,6 +753,10 @@
             <span class="bts-icon">⚠️</span>
             <span class="bts-text">异常</span>
           </button>
+          <button class="bts-btn" data-type="mood" data-color="#f43f5e">
+            <span class="bts-icon">❤️</span>
+            <span class="bts-text">心情</span>
+          </button>
           <button class="bts-btn bts-btn-add" data-action="add-custom" data-color="#64748b" title="点击添加新的自定义项目">
             <span class="bts-icon">＋</span>
             <span class="bts-text">添加项目</span>
@@ -778,7 +788,7 @@
         <div class="menstrual-legend" id="menstrualLegend"></div>
       </div>
 
-      <!-- 时间总览窗口（放在事件列表上面） -->
+      <!-- 健康速览（v39 重做，原"时间总览"） -->
       <div class="events-overview" id="eventsOverview"></div>
 
       <!-- 趋势图 -->
@@ -795,6 +805,7 @@
           <option value="menstrual">🌸 月经</option>
           <option value="gout">🦴 痛风</option>
           <option value="anomaly">💢 异常</option>
+          <option value="mood">❤️ 心情</option>
           <option value="custom">📝 自定义</option>
         </select>
         <input type="search" id="eventsSearch" class="preview-input" placeholder="🔍 搜索标题、备注..." style="flex:1;min-width:140px;">
@@ -823,6 +834,7 @@
       <button class="event-type-btn active" data-type="menstrual"><div class="event-type-icon">🌸</div><div class="event-type-name">月经</div></button>
       <button class="event-type-btn" data-type="gout"><div class="event-type-icon">🦴</div><div class="event-type-name">痛风发作</div></button>
       <button class="event-type-btn" data-type="anomaly"><div class="event-type-icon">💢</div><div class="event-type-name">异常情况</div></button>
+      <button class="event-type-btn" data-type="mood"><div class="event-type-icon">❤️</div><div class="event-type-name">心情</div></button>
       <button class="event-type-btn" data-type="custom"><div class="event-type-icon">📝</div><div class="event-type-name">自定义</div></button>
     </div>
 
@@ -897,6 +909,14 @@
       </div>
       <div class="preview-row"><label>处理方式</label>
         <input type="text" id="eventAnomalyTreatment" class="preview-input" placeholder="休息/吃药/就医...">
+      </div>
+    </div>
+
+    <!-- 心情专属字段：多选心情标签 -->
+    <div class="event-fields event-fields-hidden" data-for="mood">
+      <div class="preview-row"><label>今天的心情 <span style="font-weight:400;color:var(--text-3);font-size:11px;">(可多选)</span></label>
+        <div class="med-pills mood-pills" id="eventMoodPills" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:6px;">💡 选完可以在下方备注里补充一句今天发生了什么</div>
       </div>
     </div>
 
@@ -1314,6 +1334,8 @@ let currentEventType = 'menstrual';
 let currentEditingEventId = null;
 let eventPainLevel = 5;      // 0-9 (代表 1-10)
 let eventGoutTriggers = [];
+let currentMoodTags = [];    // 心情多选（v39 新增 ❤️ 类别）
+const MOOD_PRESETS = ['😊 愉快', '😌 平静', '🤩 充实', '😰 焦虑', '😢 低落', '😠 烦躁', '😴 疲惫', '🤒 不适'];
 let eventGoutMedications = [];
 let eventCharts = {};
 
@@ -2050,6 +2072,10 @@ function applyFormDefaults(type) {
   } else if (type === 'anomaly') {
     if (typeof d.anomaly_type === 'string') document.getElementById('eventAnomalyType').value = d.anomaly_type;
     if (typeof d.anomaly_treatment === 'string') document.getElementById('eventAnomalyTreatment').value = d.anomaly_treatment;
+  } else if (type === 'mood') {
+    if (Array.isArray(d.mood_tags)) currentMoodTags = d.mood_tags.slice();
+    else currentMoodTags = [];
+    renderMoodPills();
   } else if (type === 'custom' || (typeof type === 'string' && type.startsWith && type.startsWith('cust_'))) {
     if (typeof d.custom_name === 'string') document.getElementById('eventCustomName').value = d.custom_name;
   }
@@ -2115,6 +2141,25 @@ function renderGoutMedications() {
   });
 }
 
+// 渲染心情 pills（多选，v39 ❤️ 类别）
+function renderMoodPills() {
+  const wrap = document.getElementById('eventMoodPills');
+  if (!wrap) return;
+  wrap.innerHTML = MOOD_PRESETS.map(m => {
+    const active = currentMoodTags.includes(m);
+    return `<span class="pill${active ? ' active' : ''}" data-mood="${escapeHtml(m)}" title="${active ? '点击取消' : '点击选择'}">${escapeHtml(m)}</span>`;
+  }).join('');
+  wrap.querySelectorAll('.pill').forEach(p => {
+    p.addEventListener('click', () => {
+      const m = p.dataset.mood;
+      const idx = currentMoodTags.indexOf(m);
+      if (idx >= 0) currentMoodTags.splice(idx, 1);
+      else currentMoodTags.push(m);
+      renderMoodPills();
+    });
+  });
+}
+
 function addCustomEventType(name) {
   const trimmed = String(name || '').trim();
   if (!trimmed) return null;
@@ -2150,10 +2195,11 @@ function getCustomEventType(id) {
 function renderBodyTypeSelector() {
   const grid = document.getElementById('btsGrid');
   if (!grid) return;
-  // 保留前 3 个固定按钮和最后的"添加"按钮
+  // 保留固定按钮（月经/痛风/异常/心情）和最后的"添加"按钮
   const fixedStart = grid.querySelector('[data-type="menstrual"]').outerHTML;
   const fixedGout = grid.querySelector('[data-type="gout"]').outerHTML;
   const fixedAnomaly = grid.querySelector('[data-type="anomaly"]').outerHTML;
+  const fixedMood = grid.querySelector('[data-type="mood"]') ? grid.querySelector('[data-type="mood"]').outerHTML : '';
   const addBtn = grid.querySelector('[data-action="add-custom"]').outerHTML;
   const customs = customEventTypes.map(c => `
     <button class="bts-btn" data-type="${escapeHtml(c.id)}" data-custom="${escapeHtml(c.id)}" data-color="${escapeHtml(c.color)}" title="悬停删除">
@@ -2162,7 +2208,7 @@ function renderBodyTypeSelector() {
       <span class="bts-text">${escapeHtml(c.name)}</span>
     </button>
   `).join('');
-  grid.innerHTML = fixedStart + fixedGout + fixedAnomaly + customs + addBtn;
+  grid.innerHTML = fixedStart + fixedGout + fixedAnomaly + fixedMood + customs + addBtn;
   // 重新激活当前选中的
   const target = currentBodyType ? `[data-type="${currentBodyType}"]` : null;
   if (target) {
@@ -2184,6 +2230,7 @@ function syncEventsCategoryFilter() {
     + '<option value="menstrual">🌸 月经</option>'
     + '<option value="gout">🦴 痛风</option>'
     + '<option value="anomaly">💢 异常</option>'
+    + '<option value="mood">❤️ 心情</option>'
     + '<option value="custom">📝 自定义（未分类）</option>'
     + customEventTypes.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.icon)} ${escapeHtml(c.name)}</option>`).join('');
   if (current) sel.value = current;
@@ -2196,6 +2243,7 @@ function updateBtsHint() {
     menstrual: '点击月历上的日期，进入范围选择 → 保存为「月经」',
     gout: '点击月历上的日期，弹出痛风发作确认弹窗',
     anomaly: '点击月历上的日期，弹出异常确认弹窗',
+    mood: '点击月历上的日期，弹出心情记录弹窗',
   };
   if (meta[currentBodyType]) {
     hint.textContent = meta[currentBodyType];
@@ -2289,6 +2337,7 @@ function getEventCategoryMeta(cat) {
     menstrual: { label: '月经', icon: '🌸', color: '#ec4899' },
     gout: { label: '痛风', icon: '🦴', color: '#ef4444' },
     anomaly: { label: '异常', icon: '💢', color: '#f59e0b' },
+    mood: { label: '心情', icon: '❤️', color: '#f43f5e' },
     custom: { label: '自定义', icon: '📝', color: '#8b5cf6' },
   };
   // 优先识别 custom 类型下的子项目
@@ -2949,15 +2998,17 @@ document.getElementById('delConfirmBtn').addEventListener('click', async () => {
    渲染
    ============================================================ */
 function renderStats() {
-  const today = records.filter(r => isSameDay(r.ts, Date.now()));
   const weekAgo = Date.now() - 7 * 86400000;
   const week = records.filter(r => r.ts >= weekAgo);
+  const now = new Date();
+  const yearStart = new Date(now.getFullYear(), 0, 1).getTime();
+  const year = records.filter(r => r.ts >= yearStart);
   const cats = new Set(records.map(r => r.category.name));
 
-  document.getElementById('statTodayCount').textContent = today.length;
-  document.getElementById('statTodaySub').textContent = today.length > 0 ? `涉及 ${new Set(today.map(r => r.category.name)).size} 个类别` : '尚无记录';
   document.getElementById('statWeekCount').textContent = week.length;
-  document.getElementById('statWeekSub').textContent = `覆盖 ${new Set(week.map(r => r.category.name)).size} 个类别`;
+  document.getElementById('statWeekSub').textContent = week.length > 0 ? `覆盖 ${new Set(week.map(r => r.category.name)).size} 个类别` : '本周还没有记录';
+  document.getElementById('statYearCount').textContent = year.length;
+  document.getElementById('statYearSub').textContent = year.length > 0 ? `覆盖 ${new Set(year.map(r => r.category.name)).size} 个类别` : '今年还没有记录';
   document.getElementById('statCatsCount').textContent = cats.size;
   document.getElementById('statCatsSub').textContent = cats.size > 0 ? `点击管理类别` : '还没有类别';
   document.getElementById('statMembersCount').textContent = familyMembers.length;
@@ -3511,11 +3562,11 @@ document.getElementById('timeFilterClear').addEventListener('click', () => {
   renderHistory();
 });
 
-// 4 个小框点击行为：今日/本周弹窗 + 类别/成员管理
+// 4 个小框点击行为：本周/今年弹窗 + 类别/成员管理
 document.querySelectorAll('.stat-card[data-action]').forEach(card => {
   card.addEventListener('click', () => {
     const action = card.dataset.action;
-    if (action === 'today' || action === 'week') {
+    if (action === 'week' || action === 'year') {
       // 直接弹窗显示
       openTimeRecordsModal(action);
     } else if (action === 'cats') {
@@ -3527,19 +3578,20 @@ document.querySelectorAll('.stat-card[data-action]').forEach(card => {
 });
 
 function openTimeRecordsModal(range) {
-  // range: 'today' | 'week'
+  // range: 'week' | 'year'
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   let startTs, label, rangeText;
-  if (range === 'today') {
-    startTs = startOfToday;
-    label = '今日';
-    rangeText = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  if (range === 'year') {
+    // 今年（1月1日 0 点起）
+    startTs = new Date(now.getFullYear(), 0, 1).getTime();
+    label = '今年';
+    rangeText = `${now.getFullYear()}-01-01 至 ${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   } else {
     // 近 7 天（含今天）
     startTs = startOfToday - 6 * 86400000;
     const endDate = new Date(startTs);
-    rangeText = `${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}-${String(endDate.getDate()).padStart(2,'0')} 至 ${rangeText = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`}`;
+    rangeText = `${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}-${String(endDate.getDate()).padStart(2,'0')} 至 ${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
     label = '近 7 天';
   }
   const filtered = records.filter(r => r.ts >= startTs).sort((a, b) => b.ts - a.ts);
@@ -3890,6 +3942,27 @@ document.getElementById('chartTabs').addEventListener('click', (e) => {
   e.target.classList.add('active');
   currentChartRange = e.target.dataset.range;
   renderChart();
+});
+
+// 一键收起/展开 全部趋势图（默认展开，记忆上次状态）
+const CHARTS_COLLAPSED_KEY = 'wb_charts_collapsed';
+function applyChartsCollapsed(collapsed) {
+  const grid = document.getElementById('miniChartsGrid');
+  const cats = document.getElementById('chartCatsWrap');
+  const tabs = document.getElementById('chartTabs');
+  const btn = document.getElementById('btnToggleCharts');
+  if (!grid || !btn) return;
+  grid.style.display = collapsed ? 'none' : '';
+  if (cats) cats.style.display = collapsed ? 'none' : '';
+  if (tabs) tabs.style.display = collapsed ? 'none' : '';
+  btn.textContent = collapsed ? '⇕ 展开' : '⇕ 收起';
+}
+applyChartsCollapsed(localStorage.getItem(CHARTS_COLLAPSED_KEY) === '1');
+document.getElementById('btnToggleCharts').addEventListener('click', () => {
+  const collapsed = localStorage.getItem(CHARTS_COLLAPSED_KEY) === '1';
+  const next = !collapsed;
+  localStorage.setItem(CHARTS_COLLAPSED_KEY, next ? '1' : '0');
+  applyChartsCollapsed(next);
 });
 
 /* ============================================================
@@ -4352,6 +4425,9 @@ function initEventsView() {
   // 严重程度
   buildSeverityGrids();
 
+  // 心情 pills（v39 ❤️）
+  renderMoodPills();
+
   // 痛风部位切换"其他"
   document.getElementById('eventGoutLocation').addEventListener('change', e => {
     document.getElementById('eventGoutLocationOtherWrap').style.display = e.target.value === '其他' ? 'flex' : 'none';
@@ -4757,12 +4833,14 @@ async function onMenstrualDayClick(ts, el) {
   document.getElementById('eventTs').value = toLocalDatetimeInput(ts);
   document.getElementById('eventEndTs').value = '';
   // 切换弹窗里的类型按钮
-  // 对于固定 3 类，直接对应；对于自定义项目 cust_xxx，弹 custom 字段 + 填入项目名
-  if (currentType === 'gout' || currentType === 'anomaly') {
+  // 对于固定 3 类 + 心情，直接对应；对于自定义项目 cust_xxx，弹 custom 字段 + 填入项目名
+  if (currentType === 'gout' || currentType === 'anomaly' || currentType === 'mood') {
     if (currentEventType !== currentType) {
       document.querySelectorAll('.event-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === currentType));
       setEventType(currentType);
     }
+    // 从月历进入也要应用"上次选择"的默认值（➕ 按钮以外的入口）
+    applyFormDefaults(currentType);
   } else if (currentType && currentType.startsWith('cust_')) {
     // 自定义项目：弹 custom 字段 + 预填名称
     if (currentEventType !== 'custom') {
@@ -4930,6 +5008,10 @@ function openEventModal(ev) {
       document.getElementById('eventAnomalyType').value = ev.payload.anomaly_type || '';
       document.getElementById('eventAnomalyTreatment').value = ev.payload.treatment || '';
     }
+    if (ev.category === 'mood') {
+      currentMoodTags = Array.isArray(ev.payload.moods) ? ev.payload.moods.slice() : [];
+      renderMoodPills();
+    }
     if (ev.category === 'custom' || (ev.category && ev.category.startsWith && ev.category.startsWith('cust_'))) {
       document.getElementById('eventCustomName').value = ev.payload.custom_name || '';
     }
@@ -4938,19 +5020,26 @@ function openEventModal(ev) {
     renderCustomTypesDatalist();
     renderGoutLocation();
   } else {
-    ms.value = familyMembers[0] || '文文';
-    setEventType('menstrual');
+    // 记住上次选择：成员 + 事件类型（"选择过的选项下次默认"）
+    const d0 = loadFormDefaults();
+    const validTypes = ['menstrual', 'gout', 'anomaly', 'mood', 'custom'];
+    const lastType = (typeof d0.last_event_type === 'string' && (validTypes.includes(d0.last_event_type) || d0.last_event_type.startsWith('cust_'))) ? d0.last_event_type : 'menstrual';
+    if (d0.event_member && familyMembers.includes(d0.event_member)) ms.value = d0.event_member;
+    else ms.value = familyMembers[0] || '文文';
+    setEventType(lastType);
     document.getElementById('eventNote').value = '';
     setDefaultEventTimes();
     // 重置
     eventPainLevel = 5;
     document.querySelectorAll('#eventPainLevel .severity-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.val) === 5));
     eventGoutTriggers = []; eventGoutMedications = [];
+    currentMoodTags = [];
     document.getElementById('eventGoutLocation').value = '右脚大拇趾';
     document.getElementById('eventGoutLocationOtherWrap').style.display = 'none';
     document.getElementById('eventAnomalyType').value = '';
     document.getElementById('eventAnomalyTreatment').value = '';
     document.getElementById('eventCustomName').value = '';
+    renderMoodPills();
     // 用上次选择过的值覆盖默认 reset（"选择过的选项下次默认"）
     applyFormDefaults(currentEventType);
     // 月经痛经勾选：根据当前 start/end 渲染日期按钮
@@ -5056,6 +5145,10 @@ function saveEventFromForm() {
       treatment: document.getElementById('eventAnomalyTreatment').value.trim(),
       duration_hours: end_ts ? Math.round((end_ts - ts) / 3600000) : null,
     };
+  } else if (currentEventType === 'mood') {
+    payload = {
+      moods: currentMoodTags.slice(),
+    };
   } else if (currentEventType === 'custom') {
     const name = document.getElementById('eventCustomName').value.trim();
     // 如果用户输入/选择了已添加的自定义项目，自动关联
@@ -5083,6 +5176,9 @@ function saveEventFromForm() {
   } else if (finalCategory === 'anomaly') {
     const t = (payload.anomaly_type || '').trim();
     autoTitle = t ? `${meta.label} · ${t}` : meta.label;
+  } else if (finalCategory === 'mood') {
+    const moods = payload.moods || [];
+    autoTitle = moods.length ? `${meta.label} · ${moods[0]}${moods.length > 1 ? ` 等${moods.length} 种` : ''}` : meta.label;
   } else if (finalCategory === 'custom' || (finalCategory && finalCategory.startsWith && finalCategory.startsWith('cust_'))) {
     autoTitle = (payload.custom_name || '').trim() || meta.label;
   } else if (finalCategory === 'menstrual') {
@@ -5114,9 +5210,13 @@ function saveEventFromForm() {
       anomaly_type: payload.anomaly_type,
       anomaly_treatment: payload.treatment,
     });
+  } else if (finalCategory === 'mood') {
+    saveFormDefaults({ mood_tags: payload.moods });
   } else if (finalCategory === 'custom' || (finalCategory && finalCategory.startsWith && finalCategory.startsWith('cust_'))) {
     saveFormDefaults({ custom_name: payload.custom_name });
   }
+  // 通用的"记住上次选择"：成员 + 事件类型
+  saveFormDefaults({ event_member: member, last_event_type: finalCategory });
 
   saveBodyEvent(ev).then(() => {
     showModal('eventModalMask', 'hide');
@@ -5137,39 +5237,12 @@ function renderEvents() {
 }
 
 function renderEventsOverview() {
-  // 时间总览窗口：放在趋势分析之上、事件列表之上，作为时间维度的快速总览
-  // 内容：最近一次记录 + 本周/本月次数 + 各类别计数 + 最近 7 天日历热力图
+  // 健康速览（v39 重做，替代旧"时间总览"）：
+  // 只放对决策有用的信息：① 下次月经预测倒计时 ② 痛风距上次发作 ③ 本周记录+今日补录提醒 ④ 最近心情
   const wrap = document.getElementById('eventsOverview');
   if (!wrap) return;
   const now = Date.now();
   const dayMs = 86400000;
-  const weekStart = now - 7 * dayMs;
-  const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0);
-  const monthStartTs = monthStart.getTime();
-
-  // 按类别计数
-  const catCounts = { menstrual: 0, gout: 0, anomaly: 0, custom: 0 };
-  bodyEvents.forEach(e => {
-    if (catCounts.hasOwnProperty(e.category)) catCounts[e.category]++;
-    else if (e.category && e.category.startsWith && e.category.startsWith('cust_')) catCounts.custom++;
-  });
-
-  // 最近 7 天日历热力图
-  const last7Days = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(now - i * dayMs);
-    d.setHours(0, 0, 0, 0);
-    const dStart = d.getTime();
-    const dEnd = dStart + dayMs;
-    const cnt = bodyEvents.filter(e => e.ts >= dStart && e.ts < dEnd).length;
-    last7Days.push({ date: d, count: cnt });
-  }
-  const max7 = Math.max(1, ...last7Days.map(d => d.count));
-
-  // 最近一次记录
-  const lastEvent = bodyEvents.slice().sort((a, b) => b.ts - a.ts)[0];
-  const lastMeta = lastEvent ? getEventCategoryMeta(lastEvent.category) : null;
-  const lastText = lastEvent ? `${lastMeta?.icon || '📝'} ${escapeHtml(lastEvent.title || (lastMeta?.label || '记录'))}` : '—';
 
   if (bodyEvents.length === 0) {
     wrap.innerHTML = `
@@ -5179,43 +5252,84 @@ function renderEventsOverview() {
     return;
   }
 
+  // ① 下次月经预测
+  const starts = getMenstrualStarts('all');
+  const pred = computeCyclePrediction(starts);
+  let periodVal = '—', periodSub = '记录 2 次月经后可预测', periodColor = 'var(--text)';
+  if (pred) {
+    const daysTo = Math.ceil((pred.nextStart.getTime() - now) / dayMs);
+    const fmt = d => `${d.getMonth() + 1}/${d.getDate()}`;
+    if (daysTo > 0) {
+      periodVal = `还有 ${daysTo} 天`;
+      periodSub = `预测 ${fmt(pred.nextStart)} 来潮 · 周期约 ${pred.avgCycle} 天`;
+    } else if (daysTo === 0) {
+      periodVal = '就是今天';
+      periodSub = `预测今天来潮 · 周期约 ${pred.avgCycle} 天`;
+    } else {
+      periodVal = `推迟 ${-daysTo} 天`;
+      periodSub = `原预测 ${fmt(pred.nextStart)} · 周期约 ${pred.avgCycle} 天`;
+      periodColor = '#be123c';
+    }
+  }
+
+  // ② 痛风
+  const gouts = bodyEvents.filter(e => e.category === 'gout').sort((a, b) => b.ts - a.ts);
+  let goutVal = '—', goutSub = '暂无痛风记录，好现象 👍';
+  if (gouts.length) {
+    const daysSince = Math.floor((now - gouts[0].ts) / dayMs);
+    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+    const yearStart = new Date(new Date().getFullYear(), 0, 1).getTime();
+    const mCount = gouts.filter(e => e.ts >= monthStart.getTime()).length;
+    const yCount = gouts.filter(e => e.ts >= yearStart).length;
+    goutVal = `${daysSince} 天`;
+    goutSub = `距上次发作 · 本月 ${mCount} 次 / 今年 ${yCount} 次`;
+  }
+
+  // ③ 本周记录 + 今日补录提醒
+  const weekStart = now - 7 * dayMs;
+  const weekEvents = bodyEvents.filter(e => e.ts >= weekStart);
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayCount = bodyEvents.filter(e => e.ts >= todayStart.getTime()).length;
+  const weekVal = `${weekEvents.length} 次`;
+  let weekSub = todayCount > 0 ? `今天已记录 ${todayCount} 条 ✓` : '今天还没记录，点 ➕ 补一条';
+  if (weekEvents.length === 0) weekSub = '本周还没有记录';
+
+  // ④ 最近心情
+  const moodEvents = bodyEvents.filter(e => e.category === 'mood').sort((a, b) => b.ts - a.ts);
+  let moodVal = '—', moodSub = '记一下今天的心情吧';
+  if (moodEvents.length) {
+    const weekMoods = moodEvents.filter(e => e.ts >= weekStart).length;
+    const lastMoods = (moodEvents[0].payload && moodEvents[0].payload.moods) || [];
+    moodVal = lastMoods.length ? lastMoods.slice(0, 3).join(' ') : '❤️';
+    moodSub = `${formatEventDateTime(moodEvents[0].ts)} · 本周 ${weekMoods} 条`;
+  }
+
   wrap.innerHTML = `
     <div class="events-overview-card">
       <div class="eo-head">
         <span class="eo-icon">⏰</span>
-        <span class="eo-title">时间总览</span>
+        <span class="eo-title">健康速览</span>
       </div>
       <div class="eo-grid">
-        <div class="eo-stat">
-          <div class="eo-stat-label">最近一次</div>
-          <div class="eo-stat-val">${lastText}</div>
+        <div class="eo-stat" style="background:rgba(236,72,153,0.07);">
+          <div class="eo-stat-label">🌸 下次月经</div>
+          <div class="eo-stat-val" style="color:${periodColor};">${periodVal}</div>
+          <div class="eo-stat-sub">${periodSub}</div>
         </div>
-        <div class="eo-stat">
-          <div class="eo-stat-label">近 7 天</div>
-          <div class="eo-stat-val">${bodyEvents.filter(e => e.ts >= weekStart).length}<span class="eo-unit">次</span></div>
+        <div class="eo-stat" style="background:rgba(239,68,68,0.07);">
+          <div class="eo-stat-label">🦴 痛风</div>
+          <div class="eo-stat-val" style="color:#b91c1c;">${goutVal}</div>
+          <div class="eo-stat-sub">${goutSub}</div>
         </div>
-        <div class="eo-stat">
-          <div class="eo-stat-label">本月</div>
-          <div class="eo-stat-val">${bodyEvents.filter(e => e.ts >= monthStartTs).length}<span class="eo-unit">次</span></div>
+        <div class="eo-stat" style="background:rgba(245,158,11,0.07);">
+          <div class="eo-stat-label">📝 本周记录</div>
+          <div class="eo-stat-val" style="color:#b45309;">${weekVal}</div>
+          <div class="eo-stat-sub" style="color:${todayCount > 0 ? 'var(--text-3)' : '#be123c'};font-weight:${todayCount > 0 ? 400 : 600};">${weekSub}</div>
         </div>
-        <div class="eo-stat">
-          <div class="eo-stat-label">累计</div>
-          <div class="eo-stat-val">${bodyEvents.length}<span class="eo-unit">次</span></div>
-        </div>
-      </div>
-      <div class="eo-catbar">
-        <div class="eo-cat-row"><span>🌸 月经</span><div class="eo-cat-bar"><span style="width:${catCounts.menstrual ? Math.min(100, catCounts.menstrual * 25) : 8}%;background:#ec4899;"></span></div><b>${catCounts.menstrual}</b></div>
-        <div class="eo-cat-row"><span>🦴 痛风</span><div class="eo-cat-bar"><span style="width:${catCounts.gout ? Math.min(100, catCounts.gout * 25) : 8}%;background:#ef4444;"></span></div><b>${catCounts.gout}</b></div>
-        <div class="eo-cat-row"><span>💢 异常</span><div class="eo-cat-bar"><span style="width:${catCounts.anomaly ? Math.min(100, catCounts.anomaly * 25) : 8}%;background:#f59e0b;"></span></div><b>${catCounts.anomaly}</b></div>
-        <div class="eo-cat-row"><span>📝 自定义</span><div class="eo-cat-bar"><span style="width:${catCounts.custom ? Math.min(100, catCounts.custom * 25) : 8}%;background:#8b5cf6;"></span></div><b>${catCounts.custom}</b></div>
-      </div>
-      <div class="eo-heatmap">
-        <div class="eo-heatlabel">近 7 天事件分布</div>
-        <div class="eo-heatgrid">
-          ${last7Days.map(d => {
-            const intensity = d.count === 0 ? 0 : Math.max(1, Math.round((d.count / max7) * 4));
-            return `<div class="eo-heatcell" data-level="${intensity}" title="${d.date.toLocaleDateString('zh-CN')} · ${d.count} 次">${d.date.getDate()}</div>`;
-          }).join('')}
+        <div class="eo-stat" style="background:rgba(244,63,94,0.07);">
+          <div class="eo-stat-label">❤️ 最近心情</div>
+          <div class="eo-stat-val">${moodVal}</div>
+          <div class="eo-stat-sub">${moodSub}</div>
         </div>
       </div>
     </div>
@@ -5284,6 +5398,9 @@ function renderEventCard(ev) {
     if (ev.payload.anomaly_type) chips.push(`<span class="event-meta-chip">${escapeHtml(ev.payload.anomaly_type)}</span>`);
     if (ev.payload.treatment) chips.push(`<span class="event-meta-chip tag">${escapeHtml(ev.payload.treatment)}</span>`);
   }
+  if (ev.category === 'mood' && Array.isArray(ev.payload.moods) && ev.payload.moods.length) {
+    chips.push(`<span class="event-meta-chip" style="background:linear-gradient(135deg,#fff1f2,#ffe4e6);color:#9f1239;">${ev.payload.moods.map(escapeHtml).join(' · ')}</span>`);
+  }
   if ((ev.category === 'custom' || (ev.category && ev.category.startsWith && ev.category.startsWith('cust_'))) && ev.payload.custom_name) {
     chips.push(`<span class="event-meta-chip">${escapeHtml(ev.payload.custom_name)}</span>`);
   }
@@ -5318,27 +5435,34 @@ function renderEventsCharts() {
   }
 
   const charts = [];
-  // 1. 月经周期趋势（折线）：同时显示周期长度 + 来潮天数；副标题显示平均周期
+  // 1. 月经周期趋势（折线）：同时显示周期长度 + 来潮天数
+  //    时间范围自适应（与痛风频率图同逻辑 v39）：
+  //    - 从第一次有记录的周期开始显示
+  //    - 周期数超过 24 个（两年）→ 只显示最近 24 个周期
   const menstrual = bodyEvents.filter(e => e.category === 'menstrual' && e.payload?.is_period_start !== false).sort((a,b) => a.ts - b.ts);
   if (menstrual.length >= 2) {
+    const CYCLES_CAP = 24;
+    const totalCycles = menstrual.length - 1;
+    const idxStart = totalCycles > CYCLES_CAP ? menstrual.length - CYCLES_CAP : 1;
     const cycles = [];
     const durations = [];
-    for (let i = 1; i < menstrual.length; i++) {
+    for (let i = idxStart; i < menstrual.length; i++) {
       cycles.push(Math.round((menstrual[i].ts - menstrual[i-1].ts) / 86400000));
       const start = menstrual[i];
       let dur = (start.payload && start.payload.duration_days) ? start.payload.duration_days : null;
       if (!dur && start.end_ts) dur = Math.max(1, Math.ceil((start.end_ts - start.ts) / 86400000));
       durations.push(dur);
     }
-    const labels = menstrual.slice(1).map(m => new Date(m.ts).toLocaleDateString('zh-CN', {month:'2-digit', day:'2-digit'}));
+    const labels = menstrual.slice(idxStart).map(m => new Date(m.ts).toLocaleDateString('zh-CN', {month:'2-digit', day:'2-digit'}));
     const cycleAvg = cycles.length ? Math.round(cycles.reduce((s,v) => s+v, 0) / cycles.length) : 0;
     const cycleMin = cycles.length ? Math.min(...cycles) : 0;
     const cycleMax = cycles.length ? Math.max(...cycles) : 0;
     const durationData = labels.map((_, i) => durations[i] == null ? null : durations[i]);
+    const rangeLabel = totalCycles > cycles.length ? `近 24 个周期` : `全部 ${cycles.length} 个周期`;
     charts.push({
       id: 'menstrual-cycle',
       title: '🌸 月经周期 & 来潮天数',
-      subtitle: `平均周期 ${cycleAvg} 天（${cycleMin}~${cycleMax}）· 基于 ${cycles.length} 个周期`,
+      subtitle: `平均周期 ${cycleAvg} 天（${cycleMin}~${cycleMax}）· ${rangeLabel}`,
       type: 'menstrual-cycle',
       labels,
       cycles,
@@ -5347,36 +5471,44 @@ function renderEventsCharts() {
     });
   }
 
-  // 2. 痛风发作频率（按月，近两年 = 24 个月连续柱状图，X 轴很长）
+  // 2. 痛风发作频率（按月柱状图）：时间范围自适应
+  //    - 从最早一次有记录的月份开始显示（数据会"从第一次记录开始生长"）
+  //    - 跨度超过 24 个月（两年）→ 只显示最近 24 个月
   const gout = bodyEvents.filter(e => e.category === 'gout');
   if (gout.length >= 1) {
     const now = new Date();
-    // 起始月 = 当前月 - 23（共 24 个月柱）
-    const startMonth = new Date(now.getFullYear(), now.getMonth() - 23, 1);
+    const nowIdx = now.getFullYear() * 12 + now.getMonth();
+    const earliestTs = Math.min(...gout.map(e => e.ts));
+    const earliest = new Date(earliestTs);
+    const earliestIdx = earliest.getFullYear() * 12 + earliest.getMonth();
+    const span = nowIdx - earliestIdx + 1;   // 从首次记录到本月的月数
+    const MONTHS_CAP = 24;
+    const months = Math.min(span, MONTHS_CAP);
+    const startMonth = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
     const byMonth = {};
-    // 先填 0
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < months; i++) {
       const d = new Date(startMonth.getFullYear(), startMonth.getMonth() + i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
       byMonth[key] = 0;
     }
     gout.forEach(e => {
       const d = new Date(e.ts);
-      if (d < startMonth) return;  // 超过 24 个月的不画
+      if (d < startMonth) return;  // 范围外的不画
       const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
       byMonth[key] = (byMonth[key] || 0) + 1;
     });
     const entries = Object.entries(byMonth).sort();
-    const total2y = gout.filter(e => new Date(e.ts) >= startMonth).length;
+    const totalInRange = gout.filter(e => new Date(e.ts) >= startMonth).length;
     const sortedAllGout = gout.slice().sort((a, b) => b.ts - a.ts);
     const lastGout = sortedAllGout[0];
     const daysSinceGout = lastGout ? Math.floor((Date.now() - lastGout.ts) / 86400000) : null;
     // 把"距上次痛风"放到副标题尾部，节省单独 stat 卡
     const goutExtra = daysSinceGout == null ? '' : ` · 距上次 ${daysSinceGout} 天`;
+    const rangeLabel = span > months ? '近 24 个月' : `${startMonth.getFullYear()}/${startMonth.getMonth()+1} 至今`;
     charts.push({
       id: 'gout-frequency',
       title: '🦴 痛风发作频率',
-      subtitle: `近 24 个月（共 ${total2y} 次，跨度越久数据越能反映趋势）${goutExtra}`,
+      subtitle: `${rangeLabel}（共 ${totalInRange} 次，跨度越久数据越能反映趋势）${goutExtra}`,
       data: entries.map(([k, v]) => ({ x: k, y: v })),
       type: 'bar',
       color: '#ef4444',
