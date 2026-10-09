@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_bg">#D9CFC4</color>
+    <color name="w_text_main">#5F5348</color>
+    <color name="w_text_soft">#8E8076</color>
+    <color name="w_phase_text">#4F5B4A</color>
+</resources>
