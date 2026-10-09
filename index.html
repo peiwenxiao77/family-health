@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v54: 日期与编辑/删除按钮同高居中（time 移入右侧组，间隔2格26px），卡片右侧留空加宽 -->
+<!-- v55: 月历同日多事件角标全部显示（otherMarkers 改数组+并排row，>2个时缩小图标） -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -505,7 +505,9 @@
   .menstrual-day.in-range { background: #fbcfe8 !important; color: #9d174d !important; }
   @keyframes mcPulse { 0%, 100% { box-shadow: inset 0 0 0 2px #ec4899, 0 0 0 0 rgba(236, 72, 153, 0.5); } 50% { box-shadow: inset 0 0 0 2px #ec4899, 0 0 0 4px rgba(236, 72, 153, 0); } }
   .menstrual-day .marker { position: absolute; top: 1px; right: 2px; font-size: 8px; line-height: 1; }
-  .menstrual-day .other-marker { position: absolute; bottom: 1px; right: 2px; font-size: 13px; line-height: 1; width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+  .menstrual-day .other-marker-row { position: absolute; bottom: 1px; right: 2px; display: flex; flex-direction: row-reverse; gap: 1px; }
+  .menstrual-day .other-marker-row.compact .other-marker { width: 14px; height: 14px; font-size: 11px; }
+  .menstrual-day .other-marker { font-size: 13px; line-height: 1; width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
 
   /* 月经选择操作条（更显眼的反馈） */
   .menstrual-select-bar { margin-top: 10px; padding: 10px 14px; border-radius: 10px; background: linear-gradient(135deg, #fce7f3, #fbcfe8); border: 2px dashed #ec4899; display: none; align-items: center; flex-wrap: wrap; gap: 10px; }
@@ -4610,8 +4612,8 @@ function renderMenstrualCalendar() {
   // 已记录月经日期 + 痛经日期
   const recordedKeys = new Set();
   const dysmenorrheaKeys = new Set();
-  // 其他类型事件（小角标）
-  const otherMarkers = {};  // k -> {icon, color, label}
+  // 其他类型事件（小角标）：同日多事件全部显示（v55，数组去重）
+  const otherMarkers = {};  // k -> [{icon, label}, ...]
   bodyEvents.filter(e => {
     if (member !== 'all' && e.member !== member) return false;
     return true;
@@ -4625,7 +4627,10 @@ function renderMenstrualCalendar() {
       const k = dateKey(startOfDay(e.ts));
       if (recordedKeys.has(k)) return;  // 已记录月经优先
       const meta = getEventCategoryMeta(e.category);
-      otherMarkers[k] = { icon: meta.icon, color: meta.color, label: meta.label };
+      if (!otherMarkers[k]) otherMarkers[k] = [];
+      if (!otherMarkers[k].some(m => m.icon === meta.icon)) {  // 同类同日去重
+        otherMarkers[k].push({ icon: meta.icon, label: meta.label });
+      }
     }
   });
 
@@ -4742,11 +4747,12 @@ function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, sel
     else if (isSelectedEnd) { classes.push('selecting'); marker = '<span class="marker">🅱️</span>'; }
     else if (isInRange) classes.push('in-range');
 
-    // 痛风/异常/自定义事件的小角标（即使在月经期也显示）
-    const other = otherMarkers && otherMarkers[k];
-    if (other) {
+    // 痛风/异常/自定义事件的小角标（即使在月经期也显示）：同日多个全部并排显示（v55）
+    const others = otherMarkers && otherMarkers[k];
+    if (others && others.length) {
       classes.push('has-other-event');
-      marker += `<span class="other-marker" title="${escapeHtml(other.label)}">${other.icon}</span>`;
+      const sizeCls = others.length > 2 ? ' compact' : '';
+      marker += `<span class="other-marker-row${sizeCls}">` + others.map(o => `<span class="other-marker" title="${escapeHtml(o.label)}">${o.icon}</span>`).join('') + `</span>`;
     }
 
     html += `<div class="${classes.join(' ')}" data-ts="${ts}" title="${k}${isRecorded ? '（已记录）' : ''}${isDysmenorrhea ? '（痛经）' : ''}${other ? '（' + escapeHtml(other.label) + '）' : ''}"><span class="day-num">${day}</span>${tagText ? `<span class="phase-tag">${tagText}</span>` : ''}${marker}</div>`;
