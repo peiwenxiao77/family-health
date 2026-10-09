@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v73: 周期图y轴改从0起步(beginAtZero)——真正根因：轴自动缩放到数据最小值24，等于最小值的柱高度为0被误判"消失"；柱顶标数值插件(v72)帮助定位了此问题 -->
+<!-- v74: APP专属样式(html.in-app，经AndroidBridge检测，网页版不受影响)——①健康页本周/今年/类别/成员四卡固定2行2列 ②顶栏右侧组margin-left:auto贴右(修复APP WebView系统字体放大致flex-wrap换行后靠左) -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -85,6 +85,14 @@
   /* 顶栏收纳（v58）：下滑时右侧状态区整体释放空间，只留大标题+tabs */
   .header-right { transition: opacity 0.2s ease; }
   .header-right.header-collapsed { display: none; }
+
+  /* v74：APP 专属样式（html.in-app 仅在 APK WebView 中存在，网页版不受影响）
+     ①健康页四张统计卡（本周/今年/类别/成员）固定 2 行 2 列
+     ②顶栏右侧组（本地模式/时间/设置）强制贴右：APP WebView 系统字体放大导致
+       标题变宽、右侧组被 flex-wrap 挤到第二行后靠左，margin-left:auto 保证换行也贴右 */
+  html.in-app .stats-grid { grid-template-columns: 1fr 1fr; }
+  html.in-app .topbar > header { justify-content: flex-start; }
+  html.in-app .topbar > header > .header-right { margin-left: auto; }
 
   /* Hero (输入区) */
   .hero { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #fb923c 100%); border-radius: var(--radius); padding: 22px 22px; color: white; box-shadow: 0 20px 40px -8px rgba(245, 158, 11, 0.35), inset 0 1px 0 rgba(255,255,255,0.2); position: relative; overflow: hidden; margin-bottom: 16px; }
@@ -1256,6 +1264,11 @@ const CFG_LOCAL_KEY = 'sb_local_mode';
 let SUPABASE_URL = localStorage.getItem(CFG_URL_KEY) || '';
 let SUPABASE_ANON_KEY = localStorage.getItem(CFG_KEY_KEY) || '';
 let LOCAL_MODE = localStorage.getItem(CFG_LOCAL_KEY) === '1';
+
+// v74：APP 环境检测——AndroidBridge 仅存在于 APK WebView，网页浏览器没有。
+//      html.in-app 用于挂 APP 专属样式（四张统计卡 2×2、顶栏右侧组强制贴右），网页版不受影响
+const IN_APP = typeof window.AndroidBridge !== 'undefined';
+if (IN_APP) document.documentElement.classList.add('in-app');
 
 // APK 桥：把 Supabase 配置传给安卓原生层（桌面小组件用）
 function pushConfigToNative() {
