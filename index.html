@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v44: 身体tab图标 🎀→💪（强壮身体） -->
+<!-- v45: 月经周期&来潮天数图改为柱状+全宽（与痛风一致）；月历小角标去彩色背景并放大(9→13px) -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -503,7 +503,7 @@
   .menstrual-day.in-range { background: #fbcfe8 !important; color: #9d174d !important; }
   @keyframes mcPulse { 0%, 100% { box-shadow: inset 0 0 0 2px #ec4899, 0 0 0 0 rgba(236, 72, 153, 0.5); } 50% { box-shadow: inset 0 0 0 2px #ec4899, 0 0 0 4px rgba(236, 72, 153, 0); } }
   .menstrual-day .marker { position: absolute; top: 1px; right: 2px; font-size: 8px; line-height: 1; }
-  .menstrual-day .other-marker { position: absolute; bottom: 1px; right: 2px; font-size: 9px; line-height: 1; width: 14px; height: 14px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.18); }
+  .menstrual-day .other-marker { position: absolute; bottom: 1px; right: 2px; font-size: 13px; line-height: 1; width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
 
   /* 月经选择操作条（更显眼的反馈） */
   .menstrual-select-bar { margin-top: 10px; padding: 10px 14px; border-radius: 10px; background: linear-gradient(135deg, #fce7f3, #fbcfe8); border: 2px dashed #ec4899; display: none; align-items: center; flex-wrap: wrap; gap: 10px; }
@@ -4739,7 +4739,7 @@ function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, sel
     const other = otherMarkers && otherMarkers[k];
     if (other) {
       classes.push('has-other-event');
-      marker += `<span class="other-marker" style="background:${other.color};color:white;" title="${escapeHtml(other.label)}">${other.icon}</span>`;
+      marker += `<span class="other-marker" title="${escapeHtml(other.label)}">${other.icon}</span>`;
     }
 
     html += `<div class="${classes.join(' ')}" data-ts="${ts}" title="${k}${isRecorded ? '（已记录）' : ''}${isDysmenorrhea ? '（痛经）' : ''}${other ? '（' + escapeHtml(other.label) + '）' : ''}"><span class="day-num">${day}</span>${tagText ? `<span class="phase-tag">${tagText}</span>` : ''}${marker}</div>`;
@@ -5496,6 +5496,7 @@ function renderEventsCharts() {
       cycles,
       durations: durationData,
       color: '#ec4899',
+      wide: true,  // 与痛风/同房图同宽同长（v45）
     });
   }
 
@@ -5558,39 +5559,33 @@ function renderEventsCharts() {
     const ctx = canvas.getContext('2d');
     let cfg;
     if (c.type === 'menstrual-cycle') {
-      // 双 Y 轴折线：周期长度 + 来潮天数
+      // 双系列柱状：周期长度 + 来潮天数（v45：形式与痛风柱状图一致，全宽卡）
       cfg = {
-        type: 'line',
+        type: 'bar',
         data: {
           labels: c.labels,
           datasets: [
             {
               label: '周期（天）',
               data: c.cycles,
+              backgroundColor: '#ec489988',
               borderColor: '#ec4899',
-              backgroundColor: '#ec489922',
-              borderWidth: 2.5,
-              tension: 0.3,
+              borderWidth: 2,
               yAxisID: 'y',
-              pointRadius: 4,
-              pointBackgroundColor: '#ec4899',
             },
             {
               label: '来潮天数',
               data: c.durations,
+              backgroundColor: '#a855f788',
               borderColor: '#a855f7',
-              backgroundColor: '#a855f722',
               borderWidth: 2,
-              tension: 0.3,
-              borderDash: [5, 3],
               yAxisID: 'y1',
-              pointRadius: 4,
-              pointBackgroundColor: '#a855f7',
             }
           ]
         },
         options: {
           responsive: true, maintainAspectRatio: false,
+          aspectRatio: 3.5,
           interaction: { mode: 'index', intersect: false },
           plugins: {
             legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 14, padding: 8 } }
@@ -5598,7 +5593,7 @@ function renderEventsCharts() {
           scales: {
             y: { position: 'left', beginAtZero: false, ticks: { font: { size: 10 } }, title: { display: true, text: '周期(天)', font: { size: 10 } } },
             y1: { position: 'right', beginAtZero: true, ticks: { font: { size: 10 } }, grid: { drawOnChartArea: false }, title: { display: true, text: '来潮(天)', font: { size: 10 } } },
-            x: { ticks: { font: { size: 10 }, maxRotation: 45 } }
+            x: { ticks: { font: { size: 10 }, maxRotation: 45, autoSkip: false, maxTicksLimit: 24 } }
           }
         }
       };
