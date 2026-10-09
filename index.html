@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v70: 微增版本（无功能变化，保持CDN可验证）；周期图首条记录的周期柱为null属预期（无上次起点可减），tooltip显示0为Chart.js对null的渲染行为 -->
+<!-- v71: 周期天数归属修正为医学口径——周期柱挂在本次月经第一天(=下次开始日-本次开始日)，第一条记录有柱、最后一条为空；tooltip过滤空值不再显示0 -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -5567,12 +5567,13 @@ function renderEventsCharts() {
   if (menstrual.length >= 2) {
     const CYCLES_CAP = 24;
     const totalCycles = menstrual.length - 1;
-    // v68：第一条记录也进图（它没有「上一次」可算周期，周期柱为空，但来潮天数可见）
+    // v71：周期天数归属本次月经第一天（医学口径：本次来潮第一天 → 下次来潮前一天）
+    //      第一条记录有周期柱（= 第二次开始日 − 第一次开始日）；最后一条没有「下次」，为空
     const idxStart = totalCycles > CYCLES_CAP ? menstrual.length - CYCLES_CAP - 1 : 0;
     const cycles = [];
     const durations = [];
     for (let i = idxStart; i < menstrual.length; i++) {
-      cycles.push(i === idxStart ? null : Math.round((menstrual[i].ts - menstrual[i-1].ts) / 86400000));
+      cycles.push(i < menstrual.length - 1 ? Math.round((menstrual[i+1].ts - menstrual[i].ts) / 86400000) : null);
       const start = menstrual[i];
       // v68：天数从 end_ts 重算且含尾日——旧记录存的 duration_days 是间隔口径（少 1 天），重算立即修正
       let dur = start.end_ts
@@ -5696,7 +5697,9 @@ function renderEventsCharts() {
           aspectRatio: 3.5,
           interaction: { mode: 'index', intersect: false },
           plugins: {
-            legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 14, padding: 8 } }
+            legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 14, padding: 8 } },
+            // v71：空值不进 tooltip（最后一条记录无周期值，避免被显示成 0 造成误读）
+            tooltip: { filter: (item) => item.raw != null }
           },
           scales: {
             y: { position: 'left', beginAtZero: false, ticks: { font: { size: 10 } }, title: { display: true, text: '周期(天)', font: { size: 10 } } },
