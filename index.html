@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v47: 趋势分析/详细信息标题升级(13px/700+行间距，对齐健康速览)；健康&身体tab分两边(space-between) -->
+<!-- v48: 健康&身体tab改为均分各半、内容各自居中（flex:1，非space-between） -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -308,7 +308,6 @@
   /* 顶部视图切换 tabs（居中 + 加大） */
   .view-tabs {
     display: flex;
-    justify-content: space-between;
     align-items: center;
     background: linear-gradient(135deg, #fff7ed, #ffedd5);
     border-radius: 14px;
@@ -318,7 +317,7 @@
     box-shadow: 0 1px 4px rgba(245, 158, 11, 0.08);
   }
   .view-tab {
-    flex: 0 0 auto;
+    flex: 1 1 0;
     min-width: 120px;
     padding: 10px 22px;
     border-radius: 10px;
