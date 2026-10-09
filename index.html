@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v56: 修复v55崩溃(other is not defined)：格子title同步改用others数组 -->
+<!-- v57: 新增安卓APK桥接(pushConfigToNative→AndroidBridge)，供桌面小组件读取Supabase配置 -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -1245,6 +1245,16 @@ const CFG_LOCAL_KEY = 'sb_local_mode';
 let SUPABASE_URL = localStorage.getItem(CFG_URL_KEY) || '';
 let SUPABASE_ANON_KEY = localStorage.getItem(CFG_KEY_KEY) || '';
 let LOCAL_MODE = localStorage.getItem(CFG_LOCAL_KEY) === '1';
+
+// APK 桥：把 Supabase 配置传给安卓原生层（桌面小组件用）
+function pushConfigToNative() {
+  try {
+    if (window.AndroidBridge && window.AndroidBridge.saveConfig) {
+      window.AndroidBridge.saveConfig(SUPABASE_URL || '', SUPABASE_ANON_KEY || '');
+    }
+  } catch (e) {}
+}
+pushConfigToNative();
 
 // 支持 ?url=...&key=... 一键配置
 (function checkUrlConfig() {
@@ -2841,6 +2851,11 @@ bindClick('cfgSave', () => {
   localStorage.setItem(CFG_URL_KEY, url);
   localStorage.setItem(CFG_KEY_KEY, key);
   localStorage.removeItem(CFG_LOCAL_KEY);
+  try {
+    if (window.AndroidBridge && window.AndroidBridge.saveConfig) {
+      window.AndroidBridge.saveConfig(url, key);
+    }
+  } catch (e) {}
   showToast('✓ 已保存，正在刷新…');
   setTimeout(() => location.reload(), 800);
 });
