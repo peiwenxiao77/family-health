@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v59: 顶栏收纳改为释放空间（display:none，不再仅淡出占位） -->
+<!-- v60: 手机端编辑/删除按钮靠拢(space-between→flex-end+时间margin auto)；日历弹窗隐藏类型选择格(类型已在上方选过) -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -431,11 +431,11 @@
   .event-card-actions .event-card-time { margin-right: 26px; }
   .ev-mini-btn { background: #f8fafc; border: 1px solid var(--border); cursor: pointer; font-size: 18px; padding: 7px 9px; line-height: 1; border-radius: 8px; }
   .ev-mini-btn:hover { background: #e2e8f0; transform: scale(1.06); }
-  /* 手机端：日期+按钮改为卡片底部一行，正文恢复全宽（v58） */
+  /* 手机端：日期+按钮改为卡片底部一行，正文恢复全宽（v58/v60：按钮靠拢右侧） */
   @media (max-width: 600px) {
     .event-card { padding: 8px 12px; }
-    .event-card-actions { position: static; transform: none; justify-content: space-between; margin-top: 6px; width: 100%; }
-    .event-card-actions .event-card-time { margin-right: 0; }
+    .event-card-actions { position: static; transform: none; justify-content: flex-end; margin-top: 6px; width: 100%; }
+    .event-card-actions .event-card-time { margin-right: auto; }
   }
 
   /* 类型颜色 */
@@ -4881,8 +4881,9 @@ async function onMenstrualDayClick(ts, el) {
     return;
   }
 
-  // 弹窗：日期预填为点击日
+  // 弹窗：日期预填为点击日（类型已在上方选过，隐藏弹窗里的类型格 v60）
   openEventModal();
+  document.getElementById('eventTypeGrid').style.display = 'none';
   document.getElementById('eventTs').value = toLocalDatetimeInput(ts);
   document.getElementById('eventEndTs').value = '';
   // 切换弹窗里的类型按钮
@@ -4920,8 +4921,9 @@ function confirmMenstrualSelection() {
   document.getElementById('mcSelectBar').classList.remove('active');
   renderMenstrualCalendar();
 
-  // 弹窗
+  // 弹窗（月经范围保存，类型固定 menstrual，隐藏类型格 v60）
   openEventModal();
+  document.getElementById('eventTypeGrid').style.display = 'none';
   document.getElementById('eventTs').value = toLocalDatetimeInput(startTs);
   document.getElementById('eventEndTs').value = toLocalDatetimeInput(endTs);
   if (currentEventType !== 'menstrual') {
@@ -5100,6 +5102,8 @@ function openEventModal(ev) {
     renderCustomTypesDatalist();
     renderGoutLocation();
   }
+  // ➕ 等通用入口：保证类型格可见（日历入口已在上一步隐藏，这里恢复 v60）
+  document.getElementById('eventTypeGrid').style.display = '';
   showModal('eventModalMask');
 }
 
