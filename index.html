@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v55: 月历同日多事件角标全部显示（otherMarkers 改数组+并排row，>2个时缩小图标） -->
+<!-- v56: 修复v55崩溃(other is not defined)：格子title同步改用others数组 -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -4755,7 +4755,7 @@ function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, sel
       marker += `<span class="other-marker-row${sizeCls}">` + others.map(o => `<span class="other-marker" title="${escapeHtml(o.label)}">${o.icon}</span>`).join('') + `</span>`;
     }
 
-    html += `<div class="${classes.join(' ')}" data-ts="${ts}" title="${k}${isRecorded ? '（已记录）' : ''}${isDysmenorrhea ? '（痛经）' : ''}${other ? '（' + escapeHtml(other.label) + '）' : ''}"><span class="day-num">${day}</span>${tagText ? `<span class="phase-tag">${tagText}</span>` : ''}${marker}</div>`;
+    html += `<div class="${classes.join(' ')}" data-ts="${ts}" title="${k}${isRecorded ? '（已记录）' : ''}${isDysmenorrhea ? '（痛经）' : ''}${others && others.length ? '（' + escapeHtml(others.map(o => o.label).join('·')) + '）' : ''}"><span class="day-num">${day}</span>${tagText ? `<span class="phase-tag">${tagText}</span>` : ''}${marker}</div>`;
   }
   html += `</div></div>`;
   return html;
