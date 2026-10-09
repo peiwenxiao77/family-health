@@ -83,8 +83,22 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                         phaseText = "暂无月经记录"
                     } else {
                         val sorted = starts.sorted()
-                        val gaps = sorted.zipWithNext { a, b -> ((b - a) / day).toInt() }
-                        val avg = if (gaps.isNotEmpty()) (gaps.sum() / gaps.size).coerceIn(20, 45) else 28
+                        // v66：与网页同步——剔除 15~45 天外离群周期 + 最近 6 个有效周期加权平均(6:5:4:3:2:1)
+                        val allGaps = sorted.zipWithNext { a, b -> ((b - a) / day).toInt() }
+                        val validGaps = allGaps.filter { it in 15..45 }
+                        val avg = when {
+                            validGaps.isEmpty() -> 28
+                            validGaps.size >= 3 -> {
+                                val recent = validGaps.takeLast(6)
+                                var ws = 0.0; var vs = 0.0
+                                recent.forEachIndexed { i, v ->
+                                    val w = (i + 1 + (6 - recent.size)).toDouble()
+                                    ws += w; vs += v * w
+                                }
+                                (vs / ws).toInt().coerceIn(15, 45)
+                            }
+                            else -> (validGaps.sum().toDouble() / validGaps.size).toInt().coerceIn(15, 45)
+                        }
                         val last = sorted.last()
                         val next = last + avg * day
                         val now = System.currentTimeMillis()
