@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v74: APP专属样式(html.in-app，经AndroidBridge检测，网页版不受影响)——①健康页本周/今年/类别/成员四卡固定2行2列 ②顶栏右侧组margin-left:auto贴右(修复APP WebView系统字体放大致flex-wrap换行后靠左) -->
+<!-- v75: ①原生confirm全部替换为美化版uiConfirm弹窗(图标+红/蓝主题+Promise) ②弹窗顶部渐变色条 ③身体tab「详细信息」改名「全部记录」+健康/身体两侧全部记录一键收起 ④APP身体图表不限两年cap+横向滑动(默认定位最近,网页端不变) -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -125,7 +125,17 @@
   /* promptModal 必须盖在所有其他 modal 之上（点"添加新成员"时 previewMask 还在显示） */
   .modal-mask#promptModalMask { z-index: 10050; }
   .modal-mask.show { display: flex; }
-  .modal { background: white; border-radius: 20px; padding: 24px; max-width: 460px; width: 100%; box-shadow: 0 25px 50px -12px rgba(120, 53, 15, 0.4); max-height: 90vh; overflow-y: auto; position: relative; z-index: 10000; animation: slideUp 0.25s; }
+  .modal { background: white; border-radius: 20px; padding: 24px; max-width: 460px; width: 100%; box-shadow: 0 25px 50px -12px rgba(120, 53, 15, 0.4); max-height: 90vh; overflow-y: auto; position: relative; z-index: 10000; animation: slideUp 0.25s; overflow-x: hidden; }
+  /* v75：弹窗美化——顶部渐变色条 + 确认弹窗主题化 */
+  .modal::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 5px; background: linear-gradient(90deg, #fda4af, #fcd34d, #a5b4fc, #86efac); border-radius: 20px 20px 0 0; }
+  .ui-confirm { text-align: center; padding-top: 30px; }
+  .ui-confirm .ui-confirm-icon { width: 68px; height: 68px; border-radius: 50%; margin: 2px auto 12px; display: flex; align-items: center; justify-content: center; font-size: 32px; background: linear-gradient(135deg, #fff1f2, #fecdd3); box-shadow: 0 6px 16px rgba(244, 63, 94, 0.18); }
+  .ui-confirm.danger .ui-confirm-icon { background: linear-gradient(135deg, #ffe4e6, #fda4af); }
+  .ui-confirm.danger h3 { color: #be123c; }
+  .ui-confirm h3 { font-size: 17px; margin: 0 0 8px; }
+  .ui-confirm .ui-confirm-msg { font-size: 13px; color: var(--text-3); white-space: pre-wrap; line-height: 1.6; background: #fff8f5; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; max-height: 160px; overflow-y: auto; word-break: break-all; }
+  .ui-confirm .modal-actions { display: flex; gap: 10px; }
+  .ui-confirm .modal-actions button { flex: 1; padding: 11px 0; font-size: 14px; border-radius: 12px; }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
   .modal h3 { font-size: 18px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; color: #78350f; }
@@ -730,18 +740,21 @@
       <div class="card-header">
         <div class="card-title">📋 全部记录 <span class="badge" id="historyCount">0 条</span></div>
         <div class="actions">
+          <button class="btn-secondary" id="btnToggleHistory" style="font-size:11px;padding:4px 10px;">⇕ 收起</button>
           <span class="time-filter-chip" id="timeFilterChip" style="display:none;">📅 <span id="timeFilterLabel"></span> <button class="time-filter-clear" id="timeFilterClear" title="清除时间筛选">✕</button></span>
           <button class="btn-secondary" id="btnExport">📤 JSON</button>
           <button class="btn-secondary" id="btnExportCSV">📊 CSV</button>
           <button class="btn-danger" id="btnDelete">🗑 删除</button>
         </div>
       </div>
+      <div id="historyWrap">
       <div class="member-filter" id="memberFilter"></div>
       <div style="position:relative;margin-bottom:10px;">
         <input type="search" id="historySearch" class="preview-input" placeholder="搜索类别、家人、数值..." style="width:100%;padding-left:36px;">
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-3);font-size:14px;">🔍</span>
       </div>
       <div class="history-list" id="historyList"></div>
+      </div><!-- /historyWrap -->
     </div>
 
   </div>
@@ -818,10 +831,14 @@
         <div class="mini-charts-grid" id="eventsChartsGrid"></div>
       </div>
 
-      <!-- 详细信息（可搜索的全部记录）：大框（v50，同日历记录框样式） -->
+      <!-- 全部记录（原"详细信息"，v75 改名 + 可收起）：大框（v50，同日历记录框样式） -->
       <div style="margin-top:16px;background:white;border-radius:12px;padding:14px;border:1px solid var(--border);">
-        <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:12px;">📋 详细信息</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="font-weight:700;font-size:13px;color:var(--text);">📋 全部记录</div>
+          <button class="btn-secondary" id="btnToggleEventsList" style="font-size:11px;padding:4px 10px;">⇕ 收起</button>
+        </div>
 
+        <div id="eventsListWrap">
         <!-- 筛选 + 搜索 -->
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
           <div class="member-filter" id="eventsMemberFilter"></div>
@@ -838,6 +855,7 @@
 
         <!-- 列表 -->
         <div id="eventsList" style="margin-top:14px;"></div>
+        </div><!-- /eventsListWrap -->
       </div>
     </div>
 
@@ -846,6 +864,19 @@
   <footer>
     <span id="footerText">数据存于本浏览器（本地模式）· 建议定期导出 CSV 备份</span>
   </footer>
+</div>
+
+<!-- ===== 通用确认弹窗（v75：替代原生 confirm，美化 + 危险操作主题） ===== -->
+<div class="modal-mask" id="uiConfirmMask">
+  <div class="modal ui-confirm" style="max-width:400px;" id="uiConfirmBox">
+    <div class="ui-confirm-icon" id="uiConfirmIcon">🗑</div>
+    <h3 id="uiConfirmTitle">确认操作</h3>
+    <div class="ui-confirm-msg" id="uiConfirmMsg"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="uiConfirmCancel">取消</button>
+      <button class="btn-danger" id="uiConfirmOk">删除</button>
+    </div>
+  </div>
 </div>
 
 <!-- ===== 添加/编辑 身体事件弹窗 ===== -->
@@ -2924,11 +2955,11 @@ bindClick('cfgSave', () => {
   setTimeout(() => location.reload(), 800);
 });
 
-function deleteRecord(id) {
+async function deleteRecord(id) {
   const rec = records.find(r => r.id === id);
   if (!rec) return;
   const label = `${formatDateTime(rec.ts)} · ${rec.member} · ${rec.category.name}`;
-  if (!confirm(`确认删除这条记录？\n\n${label}`)) return;
+  if (!(await uiConfirm({ title: '删除这条记录？', message: label, icon: '🗑' }))) return;
   records = records.filter(r => r.id !== id);
   saveLocalCache(); render();
   if (!id.startsWith('pending-') && !id.startsWith('local-')) {
@@ -2938,8 +2969,8 @@ function deleteRecord(id) {
 }
 
 async function clearAll() {
-  if (!confirm(`清空全部 ${records.length} 条记录？\n\n建议先导出 CSV 备份`)) return;
-  if (!confirm(`再确认一次：真的要清空全部吗？\n此操作不可恢复！`)) return;
+  if (!(await uiConfirm({ title: `清空全部 ${records.length} 条记录？`, message: '建议先导出 CSV 备份', icon: '🧨', okText: '继续' }))) return;
+  if (!(await uiConfirm({ title: '再确认一次：真的要清空全部吗？', message: '此操作不可恢复！', icon: '💥', okText: '清空' }))) return;
   records = []; saveLocalCache(); render();
   if (!LOCAL_MODE && isConfigured) {
     try { await clearCloud(); } catch (e) { console.error(e); }
@@ -3143,12 +3174,12 @@ function openMemberManager() {
     });
     // 删除
     list.querySelectorAll('.member-del-btn').forEach(btn => {
-      btn.onclick = () => {
+      btn.onclick = async () => {
         const name = btn.dataset.name;
         const count = records.filter(r => r.member === name).length;
         let msg = `确认删除成员「${name}」？`;
         if (count > 0) msg += `\n\n该成员下还有 ${count} 条记录。\n删除后这些记录的成员会被标记为"未分类"。`;
-        if (!confirm(msg)) return;
+        if (!(await uiConfirm({ title: '删除成员？', message: msg, icon: '👤' }))) return;
         familyMembers = familyMembers.filter(m => m !== name);
         records.forEach(r => { if (r.member === name) r.member = '未分类'; });
         saveMembers(); saveLocalCache();
@@ -3537,9 +3568,9 @@ function renderHistory() {
     `;
   }).join('');
   list.querySelectorAll('.h-delete').forEach(btn => {
-    btn.onclick = () => {
+    btn.onclick = async () => {
       const rec = records.find(r => r.id === btn.dataset.id);
-      if (rec && confirm(`删除 ${rec.member} 的 ${rec.category.name} 记录？`)) deleteRecord(btn.dataset.id);
+      if (rec && await uiConfirm({ title: '删除记录？', message: `${rec.member} 的 ${rec.category.name} 记录`, icon: '🗑' })) deleteRecord(btn.dataset.id);
     };
   });
   // 状态按钮点击 → 弹窗确认是否修正
@@ -3604,7 +3635,7 @@ async function confirmAndToggleStatus(id) {
   const nextText = next === 'normal' ? '正常' : '异常';
   const curText = cur.cls === 'normal' ? '正常' : '异常';
   const msg = `确认将这条数据手动改为「${nextText}」吗？\n\n当前判定：${curText}\n将改为：${nextText}\n${cur.rangeText ? '参考范围：' + cur.rangeText : ''}`.trim();
-  if (!confirm(msg)) return;
+  if (!(await uiConfirm({ title: '手动修改判定？', message: msg, icon: '🔄', okText: `改为「${nextText}」`, danger: false }))) return;
   rec.statusLabel = nextText;
   rec.statusManual = true;
   saveLocalCache(); render();
@@ -3802,7 +3833,7 @@ function openCategoryManager() {
 
     // 删除
     list.querySelectorAll('.cat-del-btn').forEach(btn => {
-      btn.onclick = () => {
+      btn.onclick = async () => {
         const name = btn.dataset.name;
         const isStd = btn.dataset.std === 'true';
         const count = records.filter(r => r.category.name === name).length;
@@ -3810,7 +3841,7 @@ function openCategoryManager() {
           ? `标准类别「${name}」无法直接删除，但可以改名。\n是否要继续？`
           : `确认删除自定义类别「${name}」？`;
         if (count > 0) msg += `\n\n该类别下还有 ${count} 条记录。这些记录将保留显示，但标记为"未知类别"。`;
-        if (!confirm(msg)) return;
+        if (!(await uiConfirm({ title: isStd ? '类别改名提示' : '删除类别？', message: msg, icon: isStd ? '🔒' : '🏷️' }))) return;
         if (isStd) { showToast('标准类别已锁定，请改名后保存'); return; }
         delete customCategories[name];
         saveCustomCategories();
@@ -4411,7 +4442,7 @@ function initEventsView() {
   document.getElementById('btnAddEvent').addEventListener('click', () => openEventModal());
 
   // 身体类型选择器（月经/痛风/异常/自定义项目）
-  document.getElementById('bodyTypeSelector').addEventListener('click', e => {
+  document.getElementById('bodyTypeSelector').addEventListener('click', async e => {
     // 优先处理删除按钮
     const delBtn = e.target.closest('.bts-del');
     if (delBtn) {
@@ -4431,7 +4462,7 @@ function initEventsView() {
       const msg = used
         ? `「${item.name}」已被 ${refCount} 条记录引用，删除该项目将把这些记录改为「未分类自定义」`
         : `删除自定义项目「${item.name}」？`;
-      if (confirm(msg)) {
+      if (await uiConfirm({ title: '删除自定义项目？', message: msg, icon: '🖍️' })) {
         if (used) {
           // 关联的记录把 custom_name 保留，category/cust_id 置空
           bodyEvents.forEach(ev => {
@@ -4563,6 +4594,51 @@ document.addEventListener('click', e => {
     if (el) el.classList.remove('show');
   }
 });
+
+// v75：美化版确认弹窗（替代原生 confirm）——Promise 化，await uiConfirm({...})
+// danger=true（默认）显示红色删除主题；false 显示普通确认主题
+let _uiConfirmResolve = null;
+function uiConfirm(opts) {
+  opts = opts || {};
+  return new Promise(resolve => {
+    _uiConfirmResolve = resolve;
+    const danger = opts.danger !== false;
+    const box = document.getElementById('uiConfirmBox');
+    box.classList.toggle('danger', danger);
+    document.getElementById('uiConfirmIcon').textContent = opts.icon || (danger ? '🗑' : '❓');
+    document.getElementById('uiConfirmTitle').textContent = opts.title || '确认操作';
+    document.getElementById('uiConfirmMsg').textContent = opts.message || '';
+    const okBtn = document.getElementById('uiConfirmOk');
+    okBtn.textContent = opts.okText || (danger ? '删除' : '确定');
+    okBtn.className = danger ? 'btn-danger' : 'btn-primary';
+    document.getElementById('uiConfirmCancel').textContent = opts.cancelText || '取消';
+    showModal('uiConfirmMask');
+  });
+}
+function _settleUiConfirm(ok) {
+  showModal('uiConfirmMask', 'hide');
+  if (_uiConfirmResolve) { const r = _uiConfirmResolve; _uiConfirmResolve = null; r(ok); }
+}
+bindClick('uiConfirmOk', () => _settleUiConfirm(true), 'uiConfirm 确定');
+bindClick('uiConfirmCancel', () => _settleUiConfirm(false), 'uiConfirm 取消');
+
+// v75：两个「全部记录」一键收起/展开（健康 tab + 身体 tab）
+bindClick('btnToggleHistory', () => {
+  const w = document.getElementById('historyWrap');
+  const b = document.getElementById('btnToggleHistory');
+  if (!w || !b) return;
+  const hide = w.style.display !== 'none';
+  w.style.display = hide ? 'none' : '';
+  b.textContent = hide ? '⇕ 展开' : '⇕ 收起';
+}, 'toggle 健康全部记录');
+bindClick('btnToggleEventsList', () => {
+  const w = document.getElementById('eventsListWrap');
+  const b = document.getElementById('btnToggleEventsList');
+  if (!w || !b) return;
+  const hide = w.style.display !== 'none';
+  w.style.display = hide ? 'none' : '';
+  b.textContent = hide ? '⇕ 展开' : '⇕ 收起';
+}, 'toggle 身体全部记录');
 
 /* ============================================================
    月经月历：双月视图 + range 选择 + 周期预测
@@ -4883,7 +4959,7 @@ async function onMenstrualDayClick(ts, el) {
     });
     if (recordedEvents.length > 0) {
       const ev = recordedEvents[0];
-      if (confirm(`删除 ${ev.member} 的这次月经记录（${k}）？`)) {
+      if (await uiConfirm({ title: '删除这次月经记录？', message: `${ev.member} · ${k}`, icon: '🌷' })) {
         await removeBodyEvent(ev.id);
         showToast('✓ 已删除');
       }
@@ -4914,7 +4990,7 @@ async function onMenstrualDayClick(ts, el) {
       startOfDay(e.ts).getTime() === day.getTime()
     );
     if (existingLove) {
-      if (confirm(`删除 ${memberName} 在 ${k} 的 ❤️ 记录？`)) {
+      if (await uiConfirm({ title: '删除 ❤️ 记录？', message: `${memberName} · ${k}`, icon: '❤️' })) {
         await removeBodyEvent(existingLove.id);
         showToast('✓ 已删除');
       }
@@ -4941,7 +5017,7 @@ async function onMenstrualDayClick(ts, el) {
     startOfDay(e.ts).getTime() === day.getTime()
   );
   if (existing) {
-    if (confirm(`删除 ${memberName} 在 ${k} 的${getEventCategoryMeta(currentType).label}？`)) {
+    if (await uiConfirm({ title: '删除这条记录？', message: `${memberName} · ${k}${getEventCategoryMeta(currentType) ? ' · ' + getEventCategoryMeta(currentType).label : ''}`, icon: '🗑' })) {
       await removeBodyEvent(existing.id);
       showToast('✓ 已删除');
     }
@@ -5477,13 +5553,13 @@ function renderEventsList() {
   wrap.innerHTML = list.slice(0, 50).map(ev => renderEventCard(ev)).join('');
   // 绑定事件
   wrap.querySelectorAll('[data-ev-action]').forEach(btn => {
-    btn.onclick = () => {
+    btn.onclick = async () => {
       const id = btn.dataset.evId;
       const ev = bodyEvents.find(e => e.id === id);
       if (!ev) return;
       if (btn.dataset.evAction === 'edit') openEventModal(ev);
       else if (btn.dataset.evAction === 'delete') {
-        if (confirm('删除这条记录？')) removeBodyEvent(id);
+        if (await uiConfirm({ title: '删除这条记录？', message: `${formatDateTime(ev.ts)} · ${ev.member}`, icon: '🗑' })) removeBodyEvent(id);
       }
     };
   });
@@ -5549,7 +5625,7 @@ function buildMonthlyFrequency(events) {
   const earliest = new Date(Math.min(...events.map(e => e.ts)));
   const earliestIdx = earliest.getFullYear() * 12 + earliest.getMonth();
   const span = nowIdx - earliestIdx + 1;   // 从首次记录到本月的月数
-  const MONTHS_CAP = 24;
+  const MONTHS_CAP = IN_APP ? Infinity : 24;  // v75：APP 不截断（横向滑动），网页近 24 个月
   const months = Math.min(span, MONTHS_CAP);
   const startMonth = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
   const byMonth = {};
@@ -5598,7 +5674,8 @@ function renderEventsCharts() {
   //    - 周期数超过 24 个（两年）→ 只显示最近 24 个周期
   const menstrual = bodyEvents.filter(e => e.category === 'menstrual' && e.payload?.is_period_start !== false).sort((a,b) => a.ts - b.ts);
   if (menstrual.length >= 2) {
-    const CYCLES_CAP = 24;
+    // v75：APP 端不截断（横向滑动查看全部）；网页端保持近 24 个周期（约两年）
+    const CYCLES_CAP = IN_APP ? Infinity : 24;
     const totalCycles = menstrual.length - 1;
     // v71：周期天数归属本次月经第一天（医学口径：本次来潮第一天 → 下次来潮前一天）
     //      第一条记录有周期柱（= 第二次开始日 − 第一次开始日）；最后一条没有「下次」，为空
@@ -5629,7 +5706,7 @@ function renderEventsCharts() {
       regLabel = ' · ' + cycleRegularityLabel(sdV);
     }
     const durationData = labels.map((_, i) => durations[i] == null ? null : durations[i]);
-    const rangeLabel = totalCycles > validIntervals.length ? `近 24 个周期` : `全部 ${validIntervals.length} 个周期`;
+    const rangeLabel = IN_APP ? `全部 ${validIntervals.length} 个周期` : (totalCycles > validIntervals.length ? `近 24 个周期` : `全部 ${validIntervals.length} 个周期`);
     charts.push({
       id: 'menstrual-cycle',
       title: '🌷 月经周期 & 来潮天数',
@@ -5687,13 +5764,18 @@ function renderEventsCharts() {
     return;
   }
 
-  wrap.innerHTML = charts.map(c => `
+  wrap.innerHTML = charts.map(c => {
+    // v75：APP 端数据点多时给 canvas 固定加宽 + 横向滚动容器，默认滚到最右（最近记录）
+    const nL = c.labels ? c.labels.length : (c.data ? c.data.length : 0);
+    const wPx = IN_APP && nL > 8 ? nL * 46 + 40 : 0;
+    return `
     <div class="mini-chart-card${c.wide ? ' wide' : ''}" style="background:white;border-radius:12px;padding:14px;border:1px solid var(--border);">
       <div style="font-weight:700;font-size:13px;color:var(--text);">${c.title}</div>
       <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;">${c.subtitle}</div>
-      <div style="position:relative;height:${c.wide ? 200 : 160}px;overflow-x:auto;"><canvas id="ev-chart-${c.id}"></canvas></div>
+      <div style="position:relative;height:${c.wide ? 200 : 160}px;overflow-x:auto;" data-evscroll="1"><div style="position:relative;height:100%;${wPx ? `width:${wPx}px;min-width:100%;` : ''}"><canvas id="ev-chart-${c.id}"></canvas></div></div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   // 渲染每个 chart
   charts.forEach(c => {
@@ -5810,7 +5892,11 @@ function renderEventsCharts() {
       };
     }
     // v69：单个图表渲染失败只跳过该图，不中断整个渲染链
-    try { eventCharts[c.id] = new Chart(ctx, cfg); } catch (e) { console.error('chart render failed:', c.id, e); }
+    try {
+      eventCharts[c.id] = new Chart(ctx, cfg);
+      // v75：APP 端横向滚动容器初始定位到最右（默认展示最近的约一年）
+      if (IN_APP) { const sc = canvas.closest('[data-evscroll]'); if (sc) sc.scrollLeft = sc.scrollWidth; }
+    } catch (e) { console.error('chart render failed:', c.id, e); }
   });
 }
 
