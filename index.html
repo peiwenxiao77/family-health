@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v67: 网页无改动；修复APK内删除/确认弹窗无反应——MainActivity补WebChromeClient(WebView默认压制confirm/alert) -->
+<!-- v68: 月经天数口径修正(含尾日)①duration_days按自然日重算②图表从end_ts重算旧记录立即正确③第一条月经也进图(周期柱空/来潮天数可见)④卡片时长与预测来潮天数同步含尾日 -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -2377,6 +2377,10 @@ function formatEventDateTime(ts) {
 
 function getEventDurationStr(ev) {
   if (!ev.end_ts) return null;
+  // v68：月经按自然日含首尾计（9.5~9.9 = 5 天）；其他类别保持间隔显示
+  if (ev.category === 'menstrual') {
+    return `${Math.max(1, Math.round((startOfDay(ev.end_ts) - startOfDay(ev.ts)) / 86400000) + 1)}天`;
+  }
   const ms = ev.end_ts - ev.ts;
   if (ms <= 0) return null;
   const days = Math.floor(ms / 86400000);
@@ -4586,7 +4590,7 @@ function computeCyclePrediction(starts) {
   const stat = computeAvgCycle(starts);
   if (!stat) return null;  // v66：所有周期间隔都被判为离群时无法预测
   const last = starts[starts.length - 1];
-  const lastPeriodDays = last.end_ts ? Math.max(1, Math.round((last.end_ts - last.ts) / 86400000)) : 5;  // 默认 5 天
+  const lastPeriodDays = last.end_ts ? Math.max(1, Math.round((startOfDay(last.end_ts) - startOfDay(last.ts)) / 86400000) + 1) : 5;  // v68：含尾日（预测来潮天数同步修正）
   const cycle = stat.avg;
 
   const nextStart = new Date(last.ts + cycle * 86400000);
@@ -5207,7 +5211,7 @@ function saveEventFromForm() {
     const dysDates = Array.from(document.querySelectorAll('#eventDysmenorrheaDays .dys-day.active')).map(el => el.dataset.datekey);
     payload = {
       dysmenorrhea_dates: dysDates,
-      duration_days: end_ts ? Math.ceil((end_ts - ts) / 86400000) : null,
+      duration_days: end_ts ? (Math.round((startOfDay(end_ts) - startOfDay(ts)) / 86400000) + 1) : null,  // v68：结束日算在内（9.5~9.9 = 5 天）
       is_period_start: true,
     };
   } else if (currentEventType === 'gout') {
@@ -5259,7 +5263,7 @@ function saveEventFromForm() {
   } else if (finalCategory === 'custom' || (finalCategory && finalCategory.startsWith && finalCategory.startsWith('cust_'))) {
     autoTitle = (payload.custom_name || '').trim() || meta.label;
   } else if (finalCategory === 'menstrual') {
-    autoTitle = `月经期（${payload.duration_days || Math.max(1, Math.ceil(((end_ts || ts) - ts) / 86400000) + 1)} 天）`;
+    autoTitle = `月经期（${payload.duration_days || Math.max(1, Math.round((startOfDay(end_ts || ts) - startOfDay(ts)) / 86400000) + 1)} 天）`;
   }
 
   const ev = {
@@ -5554,20 +5558,24 @@ function renderEventsCharts() {
   if (menstrual.length >= 2) {
     const CYCLES_CAP = 24;
     const totalCycles = menstrual.length - 1;
-    const idxStart = totalCycles > CYCLES_CAP ? menstrual.length - CYCLES_CAP : 1;
+    // v68：第一条记录也进图（它没有「上一次」可算周期，周期柱为空，但来潮天数可见）
+    const idxStart = totalCycles > CYCLES_CAP ? menstrual.length - CYCLES_CAP - 1 : 0;
     const cycles = [];
     const durations = [];
     for (let i = idxStart; i < menstrual.length; i++) {
-      cycles.push(Math.round((menstrual[i].ts - menstrual[i-1].ts) / 86400000));
+      cycles.push(i === idxStart ? null : Math.round((menstrual[i].ts - menstrual[i-1].ts) / 86400000));
       const start = menstrual[i];
-      let dur = (start.payload && start.payload.duration_days) ? start.payload.duration_days : null;
-      if (!dur && start.end_ts) dur = Math.max(1, Math.ceil((start.end_ts - start.ts) / 86400000));
+      // v68：天数从 end_ts 重算且含尾日——旧记录存的 duration_days 是间隔口径（少 1 天），重算立即修正
+      let dur = start.end_ts
+        ? Math.max(1, Math.round((startOfDay(start.end_ts) - startOfDay(start.ts)) / 86400000) + 1)
+        : ((start.payload && start.payload.duration_days) || null);
       durations.push(dur);
     }
     const labels = menstrual.slice(idxStart).map(m => new Date(m.ts).toLocaleDateString('zh-CN', {month:'2-digit', day:'2-digit'}));
-    const cycleAvg = cycles.length ? Math.round(cycles.reduce((s,v) => s+v, 0) / cycles.length) : 0;
-    const cycleMin = cycles.length ? Math.min(...cycles) : 0;
-    const cycleMax = cycles.length ? Math.max(...cycles) : 0;
+    const validIntervals = cycles.filter(v => v != null);
+    const cycleAvg = validIntervals.length ? Math.round(validIntervals.reduce((s,v) => s+v, 0) / validIntervals.length) : 0;
+    const cycleMin = validIntervals.length ? Math.min(...validIntervals) : 0;
+    const cycleMax = validIntervals.length ? Math.max(...validIntervals) : 0;
     // v66：规律度提示（标准差基于有效周期，15~45 天外剔除）
     const validCycles = cycles.filter(v => v >= 15 && v <= 45);
     let regLabel = '';
@@ -5577,7 +5585,7 @@ function renderEventsCharts() {
       regLabel = ' · ' + cycleRegularityLabel(sdV);
     }
     const durationData = labels.map((_, i) => durations[i] == null ? null : durations[i]);
-    const rangeLabel = totalCycles > cycles.length ? `近 24 个周期` : `全部 ${cycles.length} 个周期`;
+    const rangeLabel = totalCycles > validIntervals.length ? `近 24 个周期` : `全部 ${validIntervals.length} 个周期`;
     charts.push({
       id: 'menstrual-cycle',
       title: '🌷 月经周期 & 来潮天数',
