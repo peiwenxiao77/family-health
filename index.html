@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v71: 周期天数归属修正为医学口径——周期柱挂在本次月经第一天(=下次开始日-本次开始日)，第一条记录有柱、最后一条为空；tooltip过滤空值不再显示0 -->
+<!-- v72: 修复部分周期柱不显示——根因：云端取回的 ts 为字符串时字符串相减=NaN；数据层 ts/end_ts 类型归一化(cloud/realtime/cache三入口)+图表NaN兜底+柱顶标数值 -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -1308,7 +1308,9 @@ const STANDARD_CATEGORIES = {
 
 const STORAGE_KEYS = { CACHE: 'sb_local_cache', CATS: 'sb_custom_cats', MEMBERS: 'sb_members', EVENTS: 'sb_body_events' };
 let records = [];
-let bodyEvents = JSON.parse(localStorage.getItem(STORAGE_KEYS.EVENTS) || '[]');
+let bodyEvents = [];
+try { bodyEvents = (JSON.parse(localStorage.getItem(STORAGE_KEYS.EVENTS)) || []).map(normalizeBodyEvent); }
+catch (e) { console.warn('parse events cache failed', e); }
 let customCategories = JSON.parse(localStorage.getItem(STORAGE_KEYS.CATS) || '{}');
 // v42 萌化迁移：老数据里存的旧图标 → 新图标（仅在"类别名匹配且图标还是旧版"时替换，不覆盖用户自选）
 const CUTE_ICON_MIGRATION = { '血压': ['💉', '💗'], '血糖': ['🩸', '🍬'], '血氧': ['🫁', '🫧'], '身高': ['📏', '🦒'] };
@@ -1987,6 +1989,24 @@ function setupRealtime() {
 
 // ===== 身体事件（body_events）数据层 =====
 
+// v72：ts/end_ts 类型归一化——若云端取回的是字符串（时间戳列/数字字符串），
+//      字符串直接相减会得 NaN（周期柱消失、预测错乱），所有入口统一转成毫秒数
+function normalizeBodyEvent(e) {
+  if (!e || typeof e !== 'object') return e;
+  const toTs = (v) => {
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string' && /^\d{10,}$/.test(v.trim())) return Number(v.trim());  // 纯数字字符串
+    const t = new Date(v).getTime();  // ISO/日期字符串
+    return Number.isFinite(t) ? t : NaN;
+  };
+  if (e.ts != null) { const t = toTs(e.ts); if (Number.isFinite(t)) e.ts = t; }
+  if (e.end_ts != null && typeof e.end_ts !== 'number') {
+    const t = toTs(e.end_ts);
+    e.end_ts = Number.isFinite(t) ? t : null;
+  }
+  return e;
+}
+
 async function loadBodyEventsFromCloud() {
   if (!dbClient) return;
   const { data, error } = await dbClient
@@ -1995,7 +2015,7 @@ async function loadBodyEventsFromCloud() {
     .order('ts', { ascending: false })
     .limit(2000);
   if (error) { console.error('body_events load error', error); throw error; }
-  bodyEvents = data || [];
+  bodyEvents = (data || []).map(normalizeBodyEvent);
   saveBodyEventsCache();
 }
 
@@ -2022,7 +2042,7 @@ function subscribeBodyEvents() {
   realtimeEventsChannel = dbClient.channel('body_events_changes');
   realtimeEventsChannel
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'body_events' }, payload => {
-      const newEv = payload.new;
+      const newEv = normalizeBodyEvent(payload.new);
       if (!bodyEvents.find(e => e.id === newEv.id)) {
         bodyEvents.unshift(newEv);
         saveBodyEventsCache();
@@ -2033,8 +2053,8 @@ function subscribeBodyEvents() {
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'body_events' }, payload => {
       const idx = bodyEvents.findIndex(e => e.id === payload.new.id);
-      if (idx >= 0) bodyEvents[idx] = payload.new;
-      else bodyEvents.unshift(payload.new);
+      if (idx >= 0) bodyEvents[idx] = normalizeBodyEvent(payload.new);
+      else bodyEvents.unshift(normalizeBodyEvent(payload.new));
       saveBodyEventsCache();
       renderEvents();
     })
@@ -5573,7 +5593,8 @@ function renderEventsCharts() {
     const cycles = [];
     const durations = [];
     for (let i = idxStart; i < menstrual.length; i++) {
-      cycles.push(i < menstrual.length - 1 ? Math.round((menstrual[i+1].ts - menstrual[i].ts) / 86400000) : null);
+      const gapDays = i < menstrual.length - 1 ? Math.round((menstrual[i+1].ts - menstrual[i].ts) / 86400000) : null;
+      cycles.push(Number.isFinite(gapDays) ? gapDays : null);  // v72：NaN 不画柱（脏数据兜底）
       const start = menstrual[i];
       // v68：天数从 end_ts 重算且含尾日——旧记录存的 duration_days 是间隔口径（少 1 天），重算立即修正
       let dur = start.end_ts
@@ -5671,6 +5692,26 @@ function renderEventsCharts() {
       // 双系列柱状：周期长度 + 来潮天数（v45：形式与痛风柱状图一致，全宽卡）
       cfg = {
         type: 'bar',
+        // v72：柱顶标数值——哪根柱没值一眼可辨
+        plugins: [{
+          id: 'barValueLabels',
+          afterDatasetsDraw(chart) {
+            const ctx = chart.ctx;
+            chart.data.datasets.forEach((ds, di) => {
+              const meta = chart.getDatasetMeta(di);
+              meta.data.forEach((bar, i) => {
+                const v = ds.data[i];
+                if (v == null || !Number.isFinite(v)) return;
+                ctx.save();
+                ctx.fillStyle = ds.borderColor || '#475569';
+                ctx.font = 'bold 10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(v, bar.x, bar.y - 4);
+                ctx.restore();
+              });
+            });
+          },
+        }],
         data: {
           labels: c.labels,
           datasets: [
