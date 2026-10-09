@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v58: 身体板块去最外层大框；趋势图不超容器(min-width:0+canvas限宽)；详细信息手机端恢复横排；健康搜索提示语去🔍；顶栏上滑收纳(隐藏本地模式/时间/设置) -->
+<!-- v59: 顶栏收纳改为释放空间（display:none，不再仅淡出占位） -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -81,9 +81,9 @@
   .clock .time { font-size: 20px; font-weight: 700; color: #9a3412; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; }
   .clock .time .pulse { display: inline-block; width: 6px; height: 6px; background: var(--primary); border-radius: 50%; margin-right: 6px; animation: pulse 1.6s ease-in-out infinite; vertical-align: middle; }
   .clock .date { font-size: 11px; color: var(--text-3); margin-top: 0; }
-  /* 顶栏收纳（v58）：下滑时右侧状态区淡出，只留大标题+tabs */
-  .header-right { transition: opacity 0.25s ease, transform 0.25s ease; }
-  .header-right.header-collapsed { opacity: 0; transform: translateY(-10px); pointer-events: none; }
+  /* 顶栏收纳（v58）：下滑时右侧状态区整体释放空间，只留大标题+tabs */
+  .header-right { transition: opacity 0.2s ease; }
+  .header-right.header-collapsed { display: none; }
 
   /* Hero (输入区) */
   .hero { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #fb923c 100%); border-radius: var(--radius); padding: 22px 22px; color: white; box-shadow: 0 20px 40px -8px rgba(245, 158, 11, 0.35), inset 0 1px 0 rgba(255,255,255,0.2); position: relative; overflow: hidden; margin-bottom: 16px; }
