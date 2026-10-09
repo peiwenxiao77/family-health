@@ -74,7 +74,15 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                         val p = o.optJSONObject("payload")
                         // is_period_start === false 的不是月经起点，跳过（与网页逻辑一致）
                         if (p != null && !p.optBoolean("is_period_start", true)) continue
-                        starts.add(o.getLong("ts"))
+                        // v75：兼容 ts 为字符串的情况（Supabase/PostgREST 可能将 int8 序列化为字符串，
+                        // o.getLong 会抛异常导致整次刷新失败 → 小组件一直显示初始文案）
+                        val tsVal = o.opt("ts")
+                        val ts = when (tsVal) {
+                            is Number -> tsVal.toLong()
+                            is String -> tsVal.toDoubleOrNull()?.toLong() ?: continue
+                            else -> continue
+                        }
+                        starts.add(ts)
                     }
 
                     val day = 86400000L
@@ -126,9 +134,21 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                 }
             }
 
+            // v75：配色重设计——背景渐变 + 每个时期专属配色（玫瑰红/紫/琥珀/青绿 ≥3 色）
+            val (daysColorRes, pillBgRes, pillTextRes) = when (phaseText) {
+                "月经期" -> Triple(R.color.w_menstrual, R.drawable.phase_pill_menstrual, R.color.w_menstrual_dark)
+                "卵泡期" -> Triple(R.color.w_follicular, R.drawable.phase_pill_follicular, R.color.w_follicular_dark)
+                "排卵期" -> Triple(R.color.w_ovulation, R.drawable.phase_pill_ovulation, R.color.w_ovulation_dark)
+                "黄体期" -> Triple(R.color.w_luteal, R.drawable.phase_pill_luteal, R.color.w_luteal_dark)
+                else -> Triple(R.color.w_text_main, R.drawable.phase_pill, R.color.w_phase_text)
+            }
             views.setTextViewText(R.id.tv_days, daysText)
+            views.setTextColor(R.id.tv_days, context.getColor(daysColorRes))
             views.setTextViewText(R.id.tv_sub, subText)
             views.setTextViewText(R.id.tv_phase, phaseText)
+            views.setTextColor(R.id.tv_phase, context.getColor(pillTextRes))
+            views.setInt(R.id.tv_phase, "setBackgroundResource", pillBgRes)
+            views.setTextColor(R.id.tv_title, context.getColor(R.color.w_title_pink))
 
             // 点击小组件打开 APP
             val intent = Intent(context, MainActivity::class.java)
