@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v68: 月经天数口径修正(含尾日)①duration_days按自然日重算②图表从end_ts重算旧记录立即正确③第一条月经也进图(周期柱空/来潮天数可见)④卡片时长与预测来潮天数同步含尾日 -->
+<!-- v69: 修复保存弹窗误报失败+趋势图空白——Chart.js本地化(./chart.umd.min.js+CDN兜底)，图表库缺失/单图渲染失败不再炸掉renderEvents链，saveBodyEvent渲染失败不影响保存与云端同步 -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -12,7 +12,8 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230891b2'/%3E%3Ctext x='32' y='42' font-size='36' text-anchor='middle' fill='white'%3E🏥%3C/text%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%230891b2'/%3E%3Ctext x='90' y='118' font-size='100' text-anchor='middle' fill='white'%3E🏥%3C/text%3E%3C/svg%3E">
 <title>家庭健康记录</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="./chart.umd.min.js"></script>
+<script>/* v69：Chart.js 本地化（jsdelivr 国内不稳，加载失败会导致趋势图抛错→保存弹窗误报失败），本地失败再回退 CDN */if(typeof Chart==='undefined')document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"><\/scr'+'ipt>');</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -2291,7 +2292,8 @@ async function saveBodyEvent(event) {
     const idx = bodyEvents.findIndex(e => e.id === event.id);
     if (idx >= 0) bodyEvents[idx] = event;
     saveBodyEventsCache();
-    renderEvents();
+    // v69：渲染失败不能让保存流程 reject（否则弹窗不关+误报保存失败）
+    try { renderEvents(); } catch (e) { console.error('render after update failed', e); }
     if (dbClient) {
       try { await dbClient.from('body_events').update(event).eq('id', event.id); }
       catch (e) { console.error('update body event failed', e); }
@@ -2303,7 +2305,8 @@ async function saveBodyEvent(event) {
     event.created_at = new Date().toISOString();
     bodyEvents.unshift(event);
     saveBodyEventsCache();
-    renderEvents();
+    // v69：同上——数据已入列，渲染失败只记日志，云端同步继续
+    try { renderEvents(); } catch (e) { console.error('render after insert failed', e); }
     if (dbClient) {
       try {
         const inserted = await pushBodyEventToCloud(event);
@@ -5540,6 +5543,12 @@ function buildMonthlyFrequency(events) {
 function renderEventsCharts() {
   const wrap = document.getElementById('eventsChartsGrid');
   if (!wrap) return;
+  // v69：图表库未加载（CDN 失败）时显示提示并跳过，绝不能在这里抛错——否则 renderEvents
+  // 后面的详细信息列表也不会渲染，且保存弹窗会误报"保存失败"
+  if (typeof Chart === 'undefined') {
+    wrap.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-3);font-size:12px;padding:14px;">📊 图表组件加载失败（网络原因），记录不受影响 · 刷新页面重试</div>';
+    return;
+  }
   // 销毁旧 chart
   Object.values(eventCharts).forEach(c => c.destroy());
   eventCharts = {};
@@ -5743,7 +5752,8 @@ function renderEventsCharts() {
         }
       };
     }
-    eventCharts[c.id] = new Chart(ctx, cfg);
+    // v69：单个图表渲染失败只跳过该图，不中断整个渲染链
+    try { eventCharts[c.id] = new Chart(ctx, cfg); } catch (e) { console.error('chart render failed:', c.id, e); }
   });
 }
 
