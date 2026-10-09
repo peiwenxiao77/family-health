@@ -1,7 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_bg">#D9CFC4</color>
-    <color name="w_text_main">#5F5348</color>
-    <color name="w_text_soft">#8E8076</color>
-    <color name="w_phase_text">#4F5B4A</color>
+    <color name="w_text_main">#57504B</color>
+    <color name="w_text_soft">#9A8F86</color>
+    <color name="w_phase_text">#9A8F86</color>
+    <color name="w_title_pink">#EC4899</color>
+    <color name="w_menstrual">#F43F5E</color>
+    <color name="w_menstrual_dark">#BE123C</color>
+    <color name="w_follicular">#8B5CF6</color>
+    <color name="w_follicular_dark">#6D28D9</color>
+    <color name="w_ovulation">#F59E0B</color>
+    <color name="w_ovulation_dark">#B45309</color>
+    <color name="w_luteal">#14B8A6</color>
+    <color name="w_luteal_dark">#0F766E</color>
 </resources>
