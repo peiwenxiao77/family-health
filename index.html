@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v45: 月经周期&来潮天数图改为柱状+全宽（与痛风一致）；月历小角标去彩色背景并放大(9→13px) -->
+<!-- v46: 身体tab「详细信息」板块前加小标题（与趋势分析同风格） -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -795,8 +795,11 @@
         <div class="mini-charts-grid" id="eventsChartsGrid"></div>
       </div>
 
+      <!-- 详细信息（可搜索的全部记录） -->
+      <div style="margin-top:16px;font-size:12px;color:var(--text-3);font-weight:600;">📋 详细信息</div>
+
       <!-- 筛选 + 搜索 -->
-      <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+      <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
         <div class="member-filter" id="eventsMemberFilter"></div>
         <select id="eventsCategoryFilter" class="preview-input" style="width:auto;font-size:13px;">
           <option value="">全部类型</option>
