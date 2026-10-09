@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v49: 趋势分析/详细信息标题右移2格(padding-left:2em)、间距加大(margin-bottom 14px)、颜色加深更明显 -->
+<!-- v50: 趋势分析/详细信息各自包进大框（同日历记录框样式），标题用日历同款 13px/700 -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -788,31 +788,33 @@
       <!-- 健康速览（v39 重做，原"时间总览"） -->
       <div class="events-overview" id="eventsOverview"></div>
 
-      <!-- 趋势图 -->
-      <div style="margin-top:16px;">
-        <div style="font-size:13px;color:var(--text);padding-left:2em;margin-bottom:14px;font-weight:700;line-height:1.5;">🎢 趋势分析</div>
+      <!-- 趋势图：大框（v50，同日历记录框样式） -->
+      <div style="margin-top:16px;background:white;border-radius:12px;padding:14px;border:1px solid var(--border);">
+        <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:12px;">🎢 趋势分析</div>
         <div class="mini-charts-grid" id="eventsChartsGrid"></div>
       </div>
 
-      <!-- 详细信息（可搜索的全部记录） -->
-      <div style="margin-top:16px;font-size:13px;color:var(--text);padding-left:2em;margin-bottom:14px;font-weight:700;line-height:1.5;">📋 详细信息</div>
+      <!-- 详细信息（可搜索的全部记录）：大框（v50，同日历记录框样式） -->
+      <div style="margin-top:16px;background:white;border-radius:12px;padding:14px;border:1px solid var(--border);">
+        <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:12px;">📋 详细信息</div>
 
-      <!-- 筛选 + 搜索 -->
-      <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
-        <div class="member-filter" id="eventsMemberFilter"></div>
-        <select id="eventsCategoryFilter" class="preview-input" style="width:auto;font-size:13px;">
-          <option value="">全部类型</option>
-          <option value="menstrual">🌷 月经</option>
-          <option value="gout">🦴 痛风</option>
-          <option value="anomaly">😖 异常</option>
-          <option value="intercourse">❤️</option>
-          <option value="custom">📝 自定义</option>
-        </select>
-        <input type="search" id="eventsSearch" class="preview-input" placeholder="🔍 搜索标题、备注..." style="flex:1;min-width:140px;">
+        <!-- 筛选 + 搜索 -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <div class="member-filter" id="eventsMemberFilter"></div>
+          <select id="eventsCategoryFilter" class="preview-input" style="width:auto;font-size:13px;">
+            <option value="">全部类型</option>
+            <option value="menstrual">🌷 月经</option>
+            <option value="gout">🦴 痛风</option>
+            <option value="anomaly">😖 异常</option>
+            <option value="intercourse">❤️</option>
+            <option value="custom">📝 自定义</option>
+          </select>
+          <input type="search" id="eventsSearch" class="preview-input" placeholder="🔍 搜索标题、备注..." style="flex:1;min-width:140px;">
+        </div>
+
+        <!-- 列表 -->
+        <div id="eventsList" style="margin-top:14px;"></div>
       </div>
-
-      <!-- 列表 -->
-      <div id="eventsList" style="margin-top:14px;"></div>
     </div>
 
   </div><!-- end view-events -->
