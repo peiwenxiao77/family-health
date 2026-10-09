@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v57: 新增安卓APK桥接(pushConfigToNative→AndroidBridge)，供桌面小组件读取Supabase配置 -->
+<!-- v58: 身体板块去最外层大框；趋势图不超容器(min-width:0+canvas限宽)；详细信息手机端恢复横排；健康搜索提示语去🔍；顶栏上滑收纳(隐藏本地模式/时间/设置) -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -81,6 +81,9 @@
   .clock .time { font-size: 20px; font-weight: 700; color: #9a3412; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; }
   .clock .time .pulse { display: inline-block; width: 6px; height: 6px; background: var(--primary); border-radius: 50%; margin-right: 6px; animation: pulse 1.6s ease-in-out infinite; vertical-align: middle; }
   .clock .date { font-size: 11px; color: var(--text-3); margin-top: 0; }
+  /* 顶栏收纳（v58）：下滑时右侧状态区淡出，只留大标题+tabs */
+  .header-right { transition: opacity 0.25s ease, transform 0.25s ease; }
+  .header-right.header-collapsed { opacity: 0; transform: translateY(-10px); pointer-events: none; }
 
   /* Hero (输入区) */
   .hero { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #fb923c 100%); border-radius: var(--radius); padding: 22px 22px; color: white; box-shadow: 0 20px 40px -8px rgba(245, 158, 11, 0.35), inset 0 1px 0 rgba(255,255,255,0.2); position: relative; overflow: hidden; margin-bottom: 16px; }
@@ -212,7 +215,8 @@
   .chart-wrap { position: relative; height: 280px; }
   .mini-charts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
   .mini-charts-grid .mini-chart-card.wide { grid-column: 1 / -1; }
-  .mini-chart-card { background: linear-gradient(135deg, #fffbf5 0%, #fff5e6 100%); border: 1px solid #fde6c8; border-radius: 16px; padding: 12px 14px; transition: all 0.2s; box-shadow: 0 1px 3px rgba(251, 191, 36, 0.08); }
+  .mini-chart-card { background: linear-gradient(135deg, #fffbf5 0%, #fff5e6 100%); border: 1px solid #fde6c8; border-radius: 16px; padding: 12px 14px; transition: all 0.2s; box-shadow: 0 1px 3px rgba(251, 191, 36, 0.08); min-width: 0; }
+  .mini-chart-card canvas { max-width: 100% !important; }
   .mini-chart-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(251, 191, 36, 0.15); border-color: #fdba74; }
   .mini-chart-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   .mini-chart-title { display: flex; align-items: center; gap: 6px; }
@@ -427,6 +431,12 @@
   .event-card-actions .event-card-time { margin-right: 26px; }
   .ev-mini-btn { background: #f8fafc; border: 1px solid var(--border); cursor: pointer; font-size: 18px; padding: 7px 9px; line-height: 1; border-radius: 8px; }
   .ev-mini-btn:hover { background: #e2e8f0; transform: scale(1.06); }
+  /* 手机端：日期+按钮改为卡片底部一行，正文恢复全宽（v58） */
+  @media (max-width: 600px) {
+    .event-card { padding: 8px 12px; }
+    .event-card-actions { position: static; transform: none; justify-content: space-between; margin-top: 6px; width: 100%; }
+    .event-card-actions .event-card-time { margin-right: 0; }
+  }
 
   /* 类型颜色 */
   .event-cat-menstrual { --accent: #ec4899; }
@@ -719,7 +729,7 @@
       </div>
       <div class="member-filter" id="memberFilter"></div>
       <div style="position:relative;margin-bottom:10px;">
-        <input type="search" id="historySearch" class="preview-input" placeholder="🔍 搜索类别、家人、数值..." style="width:100%;padding-left:36px;">
+        <input type="search" id="historySearch" class="preview-input" placeholder="搜索类别、家人、数值..." style="width:100%;padding-left:36px;">
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-3);font-size:14px;">🔍</span>
       </div>
       <div class="history-list" id="historyList"></div>
@@ -732,7 +742,7 @@
   <!-- ============ 视图 2：身体情况 ============ -->
   <div id="view-events" class="view-hidden">
 
-    <div class="card" style="margin: 16px 24px 0;">
+    <div style="margin: 16px 24px 0;">
       <div class="card-header">
         <div class="card-title">🌸 身体情况 <span class="badge" id="eventsCount">0 条</span></div>
         <div class="actions">
@@ -2824,6 +2834,20 @@ function bindClick(id, handler, label) {
 
 bindClick('settingsBtn', openConfig, '⚙ 设置按钮');
 bindClick('bannerConfigBtn', openConfig, '横幅配置按钮');
+
+// 顶栏收纳（v58）：滚动超过 60px 隐藏「本地模式/时间/设置」，回到顶部恢复
+(function () {
+  const headerRight = document.querySelector('.topbar .header-right');
+  if (!headerRight) return;
+  let collapsed = false;
+  window.addEventListener('scroll', () => {
+    const shouldCollapse = window.scrollY > 60;
+    if (shouldCollapse !== collapsed) {
+      collapsed = shouldCollapse;
+      headerRight.classList.toggle('header-collapsed', collapsed);
+    }
+  }, { passive: true });
+})();
 
 function openConfig() {
   document.getElementById('cfgUrl').value = SUPABASE_URL || '';
