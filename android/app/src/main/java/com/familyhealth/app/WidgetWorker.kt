@@ -283,20 +283,21 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             val pDays = periodDays.coerceIn(1, 14)
             val ovuStart = n - 14
 
-            // v93：马卡龙配色（已向用户确认，与网页日历格同一套色值）
-            val mensColor = 0xFFF7B3BD.toInt()     // 月经期 草莓粉
-            val follicleColor = 0xFFFAEDBF.toInt() // 卵泡期 奶黄
-            val ovuColor = 0xFFFDD9B5.toInt()      // 排卵期 杏桃
-            val ovuDayColor = 0xFFF5A96B.toInt()   // 排卵日 深杏
-            val lutealColor = 0xFFD6E8C8.toInt()   // 黄体期 开心果绿
-            // 今天高亮用深一档，浅底上也能看清
+            // v97：圆点恢复明亮配色——v93 的浅马卡龙（奶黄/开心果）在小组件浅色背景上几乎
+            // 看不见（用户反馈"圆点全消失"）。日历格保持浅马卡龙，圆点单独用明亮马卡龙
+            val mensColor = 0xFFF06A92.toInt()     // 月经期 亮粉
+            val follicleColor = 0xFFD9A93F.toInt() // 卵泡期 金黄
+            val ovuColor = 0xFFE8944A.toInt()      // 排卵期 亮橙
+            val ovuDayColor = 0xFFD9712E.toInt()   // 排卵日 深亮橙
+            val lutealColor = 0xFF7FB069.toInt()   // 黄体期 草绿
+            // 今天高亮用深一档
             val todayColor = when (phase) {
-                "月经期" -> 0xFFEF93A4.toInt()
-                "排卵日" -> 0xFFEE8F4A.toInt()
-                "排卵期" -> 0xFFF5B27E.toInt()
-                "卵泡期" -> 0xFFE4C75F.toInt()
-                "黄体期" -> 0xFFA8C68E.toInt()
-                else -> 0xFFC9C2BB.toInt()
+                "月经期" -> 0xFFD14D78.toInt()
+                "排卵日" -> 0xFFB85A1E.toInt()
+                "排卵期" -> 0xFFD97B2E.toInt()
+                "卵泡期" -> 0xFFB8892B.toInt()
+                "黄体期" -> 0xFF5E9450.toInt()
+                else -> 0xFF9C948B.toInt()
             }
             val highlight = if (today >= 1) ((today - 1) % n) + 1 else 0
 
