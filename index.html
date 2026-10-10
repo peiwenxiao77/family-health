@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v94: ①所有图表同人恒同色(getMemberColor:文文=粉/龙龙=蓝,按名字稳定哈希) ②日历排卵日去外框只留底色;当日格加蓝色外框#7B68EE ③hero记录时间行删除 ④两页全部记录加排序(实际时间/填写时间×升降序,记录新增filled_at,云端回退created_at) ⑤条目只显示一个时间(去relativeTime) ⑥条目成员名专属颜色 ⑦页脚文案改「要记得偶尔导出备份一下数据哦」 ⑧APP身体卡编辑/删除按钮垂直居中 ⑨修复APP吸顶频闪(折叠阈值加迟滞+rAF节流,渐隐蒙版改opacity过渡) -->
 <!-- v93: ①日历各时期+小组件圆点统一改为马卡龙配色(已向用户确认)：月经期草莓粉#F7B3BD/卵泡期奶黄#FAEDBF/排卵期杏桃#FDD9B5/排卵日深杏#F5A96B/黄体期开心果#D6E8C8 ②修复新成员不同步——成员列表此前只存本机，现从云端记录+身体事件自动合并 ③自定义事件类型同样从云端事件自动重建 -->
 <!-- v92: ①月经周期&来潮天数图去除每人最后一条记录(最新一次月经没有「下一次」算不出周期天数,整条不进图) ②身体频率图图例常显——单人有数据也显示成员名+次数,让「分人」一眼可见 -->
 <!-- v91: ①修复全部记录出现「文/龙」——早期版本存的单字名，云端已批量改为文文/龙龙(61+18条)，代码加 MEMBER_ALIASES 兜底归一 ②小组件圆点颜色与身体日历各时期统一为莫兰迪配色：月经期红/卵泡期黄/排卵期橙/排卵日深橙/黄体期绿 -->
@@ -112,8 +113,12 @@
   html.in-app #stickyFade {
     position: fixed; left: 0; right: 0; height: 42px; z-index: 49;
     background: linear-gradient(180deg, #ffedd5 0%, rgba(255, 237, 213, 0) 100%);
-    pointer-events: none; display: none;
+    pointer-events: none; opacity: 0; transition: opacity 0.15s linear;
   }
+  /* v94：APP 身体「全部记录」卡片——编辑/删除按钮垂直居中（与桌面端一致），不再压在卡片底部 */
+  html.in-app .event-card { padding: 8px 216px 8px 12px; }
+  html.in-app .event-card-actions { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); justify-content: flex-start; margin-top: 0; width: auto; }
+  html.in-app .event-card-actions .event-card-time { margin-right: 26px; }
 
   /* Hero (输入区) */
   .hero { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #fb923c 100%); border-radius: var(--radius); padding: 22px 22px; color: white; box-shadow: 0 20px 40px -8px rgba(245, 158, 11, 0.35), inset 0 1px 0 rgba(255,255,255,0.2); position: relative; overflow: hidden; margin-bottom: 16px; }
@@ -539,7 +544,7 @@
   .menstrual-day.empty .phase-tag { display: none; }
   /* 普通日期（有数字但无阶段标记）加浅色边框，让月历结构清晰 */
   .menstrual-day:not(.empty):not(.in-period):not(.menstrual-predicted):not(.follicular):not(.ovulation-window):not(.ovulation-day):not(.luteal):not(.dysmenorrhea-day) { border-color: #cbd5e1; }
-  .menstrual-day.today { box-shadow: inset 0 0 0 2px var(--primary, #f97316); font-weight: 800; }
+  .menstrual-day.today { font-weight: 800; }
   /* v93：各时期统一马卡龙配色（已向用户确认，与小组件圆点同一套色值）——月经期草莓粉/卵泡期奶黄/排卵期杏桃/排卵日深杏/黄体期开心果绿 */
   .menstrual-day.in-period { background: linear-gradient(135deg, #F9C2CB, #F2A0AC); color: #7A2837; cursor: pointer; }
   .menstrual-day.in-period .marker, .menstrual-day.in-period .phase-tag { color: #7A2837; }
@@ -547,9 +552,12 @@
   .menstrual-day.menstrual-predicted { background: #FBDCE1; color: #7A2837; box-shadow: inset 0 0 0 1.5px #F7B3BD; }
   .menstrual-day.follicular { background: #FAEDBF; color: #8A6D1E; }
   .menstrual-day.ovulation-window { background: #FDD9B5; color: #96551F; }
-  .menstrual-day.ovulation-day { background: #F5A96B; color: #6E3A10; font-weight: 800; box-shadow: 0 0 0 2px #E8873F; }
+  /* v94：排卵日不再特意加外框，只像其它时期一样改底色 */
+  .menstrual-day.ovulation-day { background: #F5A96B; color: #6E3A10; }
   .menstrual-day.luteal { background: #D6E8C8; color: #4E6B36; }
   .menstrual-day.dysmenorrhea-day { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #991b1b; box-shadow: inset 0 0 0 1.5px #ef4444; }
+  /* v94：当日日期加蓝色外框（用户指定 #7B68EE），放在最后并用 !important 盖过预测期/痛经日的内框 */
+  .menstrual-day.today { box-shadow: inset 0 0 0 2px #7B68EE !important; }
   /* 所有非空白日期 hover 都能缩放（包括月经期、痛经日） */
   .menstrual-day:hover:not(.empty) { transform: scale(1.05); z-index: 2; }
   .menstrual-day.selecting { background: linear-gradient(135deg, #fce7f3, #fbcfe8) !important; color: #9d174d !important; box-shadow: inset 0 0 0 2px #ec4899, 0 0 0 1px #ec4899; font-weight: 800; animation: mcPulse 1.2s ease-in-out infinite; }
@@ -667,8 +675,6 @@
 
     <section class="hero">
       <div class="hero-label">🌿 健健康康平平安安！</div>
-      <div class="hero-time" id="heroTime">记录时间：--</div>
-
       <div class="text-input-wrap">
         <textarea class="text-input" id="textInput" rows="1"
                placeholder='例：体温 36.5 / 文 血压 128/82 / 尿酸 380'></textarea>
@@ -762,6 +768,12 @@
       <div class="card-header">
         <div class="card-title">📋 全部记录 <span class="badge" id="historyCount">0 条</span></div>
         <div class="actions">
+          <select id="historySort" class="preview-input" style="width:auto;font-size:12px;padding:4px 8px;" title="排序方式">
+            <option value="actual-desc">实际时间 新→旧</option>
+            <option value="actual-asc">实际时间 旧→新</option>
+            <option value="fill-desc">填写时间 新→旧</option>
+            <option value="fill-asc">填写时间 旧→新</option>
+          </select>
           <button class="btn-secondary" id="btnToggleHistory" style="font-size:11px;padding:4px 10px;">⇕ 收起</button>
           <span class="time-filter-chip" id="timeFilterChip" style="display:none;">📅 <span id="timeFilterLabel"></span> <button class="time-filter-clear" id="timeFilterClear" title="清除时间筛选">✕</button></span>
           <button class="btn-secondary" id="btnExportCSV">📤 导出</button>
@@ -857,6 +869,12 @@
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
           <div style="font-weight:700;font-size:13px;color:var(--text);">📋 全部记录</div>
           <div style="display:flex;gap:6px;">
+            <select id="eventsSort" class="preview-input" style="width:auto;font-size:12px;padding:4px 8px;" title="排序方式">
+              <option value="actual-desc">实际时间 新→旧</option>
+              <option value="actual-asc">实际时间 旧→新</option>
+              <option value="fill-desc">填写时间 新→旧</option>
+              <option value="fill-asc">填写时间 旧→新</option>
+            </select>
             <button class="btn-secondary" id="btnExportBody" style="font-size:11px;padding:4px 10px;">📤 导出</button>
             <button class="btn-secondary" id="btnToggleEventsList" style="font-size:11px;padding:4px 10px;">⇕ 收起</button>
           </div>
@@ -1339,22 +1357,30 @@ function pushConfigToNative() {
 pushConfigToNative();
 
 // v84：APP 置顶卡片下方渐隐蒙版——吸顶后在其下缘铺一条渐变带，内容滚近时渐隐不叠在固定内容下
+// v94：修复频闪——display none/block 一刀切改为 opacity 过渡 + 迟滞阈值 + rAF 节流 + top 只在变化时写入
 if (IN_APP) {
   const fade = document.createElement('div');
   fade.id = 'stickyFade';
   document.body.appendChild(fade);
   const topbarEl = document.querySelector('.topbar');
+  let shown = false, lastTop = -1, ticking = false;
   const syncFade = () => {
+    ticking = false;
     if (!topbarEl) return;
-    if (window.scrollY > 6) {
-      const r = topbarEl.getBoundingClientRect();
-      fade.style.top = Math.round(r.bottom) + 'px';
-      fade.style.display = 'block';
-    } else {
-      fade.style.display = 'none';
+    const y = window.scrollY;
+    const want = shown ? y > 6 : y > 24;  // 迟滞：>24 显示、<6 隐藏，临界点不横跳
+    if (want !== shown) {
+      shown = want;
+      fade.style.opacity = shown ? '1' : '0';
+    }
+    if (shown) {
+      const t = Math.round(topbarEl.getBoundingClientRect().bottom);
+      if (t !== lastTop) { lastTop = t; fade.style.top = t + 'px'; }
     }
   };
-  window.addEventListener('scroll', syncFade, { passive: true });
+  window.addEventListener('scroll', () => {
+    if (!ticking) { ticking = true; requestAnimationFrame(syncFade); }
+  }, { passive: true });
   window.addEventListener('resize', syncFade);
   syncFade();
 }
@@ -1495,6 +1521,22 @@ let eventGoutMedications = [];
 let eventCharts = {};
 // v90：分人多折线的成员配色（文文=粉、龙龙=蓝，其余按序轮换）
 const MEMBER_CHART_COLORS = ['#ec4899', '#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4', '#ef4444', '#f97316'];
+// v94：成员专属颜色——同一个人在所有图表和记录条目中永远同一种颜色
+// 文文=粉色、龙龙=蓝色（用户指定）；其他成员按名字稳定哈希取色，跨图表/跨设备一致
+const MEMBER_COLOR_MAP = { '文文': '#ec4899', '龙龙': '#3b82f6' };
+function getMemberColor(name) {
+  const n = String(name || '');
+  if (MEMBER_COLOR_MAP[n]) return MEMBER_COLOR_MAP[n];
+  let h = 0;
+  for (const ch of n) h = (h * 31 + ch.codePointAt(0)) >>> 0;
+  return MEMBER_CHART_COLORS[h % MEMBER_CHART_COLORS.length];
+}
+// v94：记录的「填写时间」——本地 filled_at 优先，云端记录回退 created_at（入库时间），再兜底 ts
+function getFillTs(r) {
+  if (r.filled_at != null) return Number(r.filled_at);
+  if (r.created_at) { const t = new Date(r.created_at).getTime(); if (Number.isFinite(t)) return t; }
+  return r.ts;
+}
 
 let dbClient = null;
 
@@ -2082,7 +2124,8 @@ async function loadFromCloud() {
 
 async function pushToCloud(record) {
   if (!dbClient) throw new Error('未配置 Supabase');
-  const { id, ...data } = record;
+  // v94：filled_at 只存本地（云端表无此列，入库时间用 created_at 默认 NOW() 表达填写时间）
+  const { id, filled_at, ...data } = record;
   const { data: inserted, error } = await dbClient.from('health_records').insert(data).select().single();
   if (error) throw error;
   return inserted;
@@ -2603,7 +2646,7 @@ function updateSyncStatus() {
   if (!navigator.onLine) { el.classList.add('offline'); txt.textContent = '离线 · 等待同步'; return; }
   if (!realtimeChannel) { el.classList.add('syncing'); txt.textContent = '连接中…'; return; }
   el.classList.add('synced'); txt.textContent = '实时同步中';
-  if (footer) footer.textContent = '数据存于 Supabase（500MB 永久免费 · 实时同步）· 建议定期导出 CSV 备份';
+  if (footer) footer.textContent = '·  要记得偶尔导出备份一下数据哦  ·';
 }
 
 window.addEventListener('online', () => { showToast('🌐 网络恢复', 'success'); updateSyncStatus(); });
@@ -2617,7 +2660,6 @@ function updateClock() {
   document.getElementById('currentTime').textContent = now.toTimeString().slice(0, 8);
   const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
   document.getElementById('currentDate').textContent = `${now.getMonth()+1}月${now.getDate()}日 · ${weekdays[now.getDay()]}`;
-  document.getElementById('heroTime').textContent = '记录时间：' + formatDateTime(now.getTime());
 }
 setInterval(updateClock, 1000); updateClock();
 
@@ -2952,6 +2994,7 @@ async function saveOneRecord(ts, member, catName, currentItem, note) {
 
   const record = {
     ts, member,
+    filled_at: Date.now(),  // v94：填写时间（ts 可能被文本里的「上个月体检」等改成实际记录时间）
     category: catData,
     values: currentItem.values,
     note,
@@ -3035,17 +3078,26 @@ function bindClick(id, handler, label) {
 bindClick('settingsBtn', openConfig, '⚙ 设置按钮');
 bindClick('bannerConfigBtn', openConfig, '横幅配置按钮');
 
-// 顶栏收纳（v58）：滚动超过 60px 隐藏「本地模式/时间/设置」，回到顶部恢复
+// 顶栏收纳（v58）：滚动超过阈值隐藏「本地模式/时间/设置」，回到顶部恢复
+// v94：修复频闪——原来 >60 一刀切，滚动停在阈值附近时折叠/展开来回横跳；
+// 现加迟滞（>80 才折叠、<40 才展开）+ rAF 节流
 (function () {
   const headerRight = document.querySelector('.topbar .header-right');
   if (!headerRight) return;
-  let collapsed = false;
-  window.addEventListener('scroll', () => {
-    const shouldCollapse = window.scrollY > 60;
+  let collapsed = false, ticking = false;
+  const apply = shouldCollapse => {
     if (shouldCollapse !== collapsed) {
       collapsed = shouldCollapse;
       headerRight.classList.toggle('header-collapsed', collapsed);
     }
+  };
+  const onScroll = () => {
+    const y = window.scrollY;
+    apply(collapsed ? y < 40 : y > 80);
+    ticking = false;
+  };
+  window.addEventListener('scroll', () => {
+    if (!ticking) { ticking = true; requestAnimationFrame(onScroll); }
   }, { passive: true });
 })();
 
@@ -3570,7 +3622,7 @@ function renderChart() {
       const pts = byMember.get(m);
       const valMap = new Map(pts.map(p => [p.x, p.y]));
       const values = allTs.map(ts => valMap.has(ts) ? valMap.get(ts) : null);
-      const color = multi ? MEMBER_CHART_COLORS[mi % MEMBER_CHART_COLORS.length] : baseColor;
+      const color = getMemberColor(m);  // v94：同人恒同色（单人也用成员专属色）
       return {
         label: m,
         memberName: m,
@@ -3671,6 +3723,10 @@ function renderHistory() {
       return false;
     });
   }
+  // v94：排序——实际记录时间(ts) / 填写时间(filled_at，云端回退 created_at)，可升降序
+  const [sortKind, sortDir] = (localStorage.getItem('sort_health') || 'actual-desc').split('-');
+  const sortKey = r => (sortKind === 'fill' ? getFillTs(r) : r.ts);
+  filtered.sort((a, b) => sortDir === 'asc' ? sortKey(a) - sortKey(b) : sortKey(b) - sortKey(a));
   // 顶栏时间筛选 chip
   const chip = document.getElementById('timeFilterChip');
   const chipLabel = document.getElementById('timeFilterLabel');
@@ -3699,14 +3755,13 @@ function renderHistory() {
         <div class="h-icon" style="background:${getCategoryColor(r.category.name)}">${r.category.icon}</div>
         <div class="h-info">
           <div class="h-line1">
-            <span class="member">${escapeHtml(r.member)}</span>
+            <span class="member" style="color:${getMemberColor(r.member)};font-weight:700;">${escapeHtml(r.member)}</span>
             <span>${escapeHtml(r.category.name)}</span>
             <span class="values">${valuesText}</span>
           </div>
           <div class="h-line2">
             ${rangeInfo}
             <span>${formatDateTime(r.ts)}</span>
-            <span>· ${relativeTime(r.ts)}</span>
             ${r.note ? `<span class="h-note">📝 ${escapeHtml(r.note)}</span>` : ''}
             ${pendingBadge}
           </div>
@@ -3799,6 +3854,17 @@ document.getElementById('historySearch').addEventListener('input', (e) => {
   renderHistory();
 });
 
+// v94：健康页全部记录排序
+document.getElementById('historySort').addEventListener('change', (e) => {
+  localStorage.setItem('sort_health', e.target.value);
+  renderHistory();
+});
+// 恢复上次选择的排序（放在 DOM 绑定后，确保下拉框回显）
+(function initHistorySort() {
+  const sel = document.getElementById('historySort');
+  sel.value = localStorage.getItem('sort_health') || 'actual-desc';
+})();
+
 // 清除时间筛选
 document.getElementById('timeFilterClear').addEventListener('click', () => {
   currentTimeFilter = 'all';
@@ -3877,13 +3943,12 @@ function openTimeRecordsModal(range) {
           <div class="h-icon" style="background:${getCategoryColor(r.category.name)};width:32px;height:32px;font-size:16px;">${r.category.icon}</div>
           <div class="h-info">
             <div class="h-line1">
-              <span class="member">${escapeHtml(r.member)}</span>
+              <span class="member" style="color:${getMemberColor(r.member)};font-weight:700;">${escapeHtml(r.member)}</span>
               <span>${escapeHtml(r.category.name)}</span>
               <span class="values">${valuesText}</span>
             </div>
             <div class="h-line2">
               <span>${formatDateTime(r.ts)}</span>
-              <span>· ${relativeTime(r.ts)}</span>
               ${status}
               ${r.note ? `<span class="h-note">📝 ${escapeHtml(r.note)}</span>` : ''}
               ${pending}
@@ -4797,6 +4862,16 @@ bindClick('btnExportBody', () => {
   showToast('✓ 已导出 CSV');
 });
 
+// v94：身体页全部记录排序
+document.getElementById('eventsSort').addEventListener('change', (e) => {
+  localStorage.setItem('sort_body', e.target.value);
+  renderEventsList();
+});
+(function initEventsSort() {
+  const sel = document.getElementById('eventsSort');
+  sel.value = localStorage.getItem('sort_body') || 'actual-desc';
+})();
+
 bindClick('btnToggleEventsList', () => {
   const w = document.getElementById('eventsListWrap');
   const b = document.getElementById('btnToggleEventsList');
@@ -5023,7 +5098,7 @@ function renderMenstrualCalendar() {
     <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#FBDCE1;box-shadow:inset 0 0 0 1px #F7B3BD;"></span>预测月经期</div>
     <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#FAEDBF;"></span>卵泡期</div>
     <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#FDD9B5;"></span>排卵期</div>
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#F5A96B;box-shadow:0 0 0 2px #E8873F;"></span>排卵日</div>
+    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#F5A96B;"></span>排卵日</div>
     <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#D6E8C8;"></span>黄体期</div>
     <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#fee2e2,#fecaca);box-shadow:inset 0 0 0 1px #ef4444;"></span>痛经日</div>
   `;
@@ -5709,7 +5784,10 @@ function renderEventsList() {
       return hay.includes(q);
     });
   }
-  list.sort((a, b) => b.ts - a.ts);
+  // v94：排序——实际记录时间(ts) / 填写时间(created_at)，可升降序
+  const [evSortKind, evSortDir] = (localStorage.getItem('sort_body') || 'actual-desc').split('-');
+  const evSortKey = e => (evSortKind === 'fill' ? getFillTs(e) : e.ts);
+  list.sort((a, b) => evSortDir === 'asc' ? evSortKey(a) - evSortKey(b) : evSortKey(b) - evSortKey(a));
 
   if (list.length === 0) {
     wrap.innerHTML = `<div style="text-align:center;color:var(--text-3);padding:30px 0;">${bodyEvents.length === 0 ? '📝 还没有记录<br><span style="font-size:12px;">点右上角 ➕ 添加 开始记录</span>' : '没有匹配的记录'}</div>`;
@@ -5735,7 +5813,7 @@ function renderEventCard(ev) {
   const meta = getEventCategoryMeta(ev.category);
   const dur = getEventDurationStr(ev);
   const chips = [];
-  chips.push(`<span class="event-meta-chip">👤 ${escapeHtml(ev.member)}</span>`);
+  chips.push(`<span class="event-meta-chip" style="color:${getMemberColor(ev.member)};font-weight:700;">👤 ${escapeHtml(ev.member)}</span>`);
   // 强度字段已删除，不再在 chip 中显示
   if (dur) chips.push(`<span class="event-meta-chip">⏱ ${dur}</span>`);
   // 痛风"仍在持续"状态已移除（不再有"标记结束"按钮，end_ts 仅用于持续时长显示）
@@ -5981,7 +6059,7 @@ function renderEventsCharts() {
       // v90：一人两条折线——周期天数（实线，左轴）+ 来潮天数（虚线，右轴）
       const ds = [];
       c.series.forEach((s, i) => {
-        const color = MEMBER_CHART_COLORS[i % MEMBER_CHART_COLORS.length];
+        const color = getMemberColor(s.member);  // v94：同人恒同色
         const solo = c.series.length === 1;
         ds.push({
           label: solo ? '周期（天）' : `${s.member} · 周期`,
@@ -6033,7 +6111,7 @@ function renderEventsCharts() {
         data: {
           labels: c.labels,
           datasets: c.series.map((s, i) => {
-            const color = MEMBER_CHART_COLORS[i % MEMBER_CHART_COLORS.length];
+            const color = getMemberColor(s.member);  // v94：同人恒同色
             return {
               // v92：图例常显——单人有数据也标成员名+次数，「分人」一眼可见
               label: `${s.member}（${s.total} 次）`,
