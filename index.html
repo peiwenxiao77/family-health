@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v78: 百炼旧模型下线迁移——AI默认预设 qwen-turbo→qwen3.6-flash，识图提示 qwen-vl-plus→qwen3-vl-flash(qwen-turbo/qwen-vl-plus 2026-10-10下线) -->
 <!-- v77: 修复健康页单条删除弹两次确认(外层uiConfirm+deleteRecord内部uiConfirm叠加)——按钮直调deleteRecord只确认一次 -->
 <!-- v76: 修复uiConfirm弹窗取消按钮文字偏左(inline-flex缺justify-content:center) -->
 <!-- v75: ①原生confirm全部替换为美化版uiConfirm弹窗(图标+红/蓝主题+Promise) ②弹窗顶部渐变色条 ③身体tab「详细信息」改名「全部记录」+健康/身体两侧全部记录一键收起 ④APP身体图表不限两年cap+横向滑动(默认定位最近,网页端不变) -->
@@ -1256,8 +1257,8 @@ ALTER PUBLICATION supabase_realtime ADD TABLE body_events;</pre>
 
     <div class="cfg-field">
       <label>模型</label>
-      <input type="text" id="aiModel" placeholder="qwen-turbo">
-      <div class="hint">默认 qwen-turbo；要识图可填 qwen-vl-plus</div>
+      <input type="text" id="aiModel" placeholder="qwen3.6-flash">
+      <div class="hint">默认 qwen3.6-flash（2026-10-10 起 qwen-turbo/qwen-vl-plus 已下线）；识图可填 qwen3-vl-flash</div>
     </div>
 
     <details style="margin: 0 0 12px;">
@@ -4066,7 +4067,7 @@ document.getElementById('btnToggleCharts').addEventListener('click', () => {
    AI 智能识别（OpenAI 兼容 API）
    ============================================================ */
 const AI_PRESETS = {
-  dashscope: { baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-turbo', kvLabel: 'API Key (sk-xxx)' },
+  dashscope: { baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen3.6-flash', kvLabel: 'API Key (sk-xxx)' }, // v78: qwen-turbo 于 2026-10-10 下线，官方推荐替换 qwen3.6-flash
   deepseek:   { baseUrl: 'https://api.deepseek.com/v1',                  model: 'deepseek-chat', kvLabel: 'API Key (sk-xxx)' },
   openai:     { baseUrl: 'https://api.openai.com/v1',                   model: 'gpt-4o-mini', kvLabel: 'API Key (sk-xxx)' },
   zhipu:      { baseUrl: 'https://open.bigmodel.cn/api/paas/v4',        model: 'glm-4-flash', kvLabel: 'API Key' },
