@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!-- v86: AI已下线模型自动迁移(qwen-turbo等死模型名→qwen3.6-flash,修复404 Model not exist)；qwen3.6-flash实测支持识图；设置提示改为qwen3-vl-plus -->
 <!-- v87: AI识别提速——qwen3系默认深度思考关闭(enable_thinking:false,实测3.2s→0.7s) -->
+<!-- v88: 身体数据云恢复——Supabase恢复后body_events表丢失，检测到云端空+本地有数据时自动upsert回云端(按id去重) -->
 <!-- v85: 云端启动失败时顶栏状态改显「云端失联」(不再卡「连接中」误导)；附 ci test-supabase workflow 诊断 = 项目域名 DNS 已失效 -->
 <!-- v84: ①Supabase配置+AI配置全部内置为兜底默认值(重装/新手机开箱即用) ②APP吸顶栏下渐隐蒙版 ③身体页容器边距收窄(框框加宽) ④健康导出去JSON只留CSV并改名「📤导出」+身体全部记录新增导出 ⑤删除找不到记录时给出提示(配合sw缓存v4+新APK强制刷新旧页面) -->
 <!-- v83: 内置Supabase云端配置为兜底默认值——重装/换手机打开即自动恢复配置，小组件不再「未配置」 -->
@@ -2101,8 +2102,39 @@ async function loadBodyEventsFromCloud() {
     .order('ts', { ascending: false })
     .limit(2000);
   if (error) { console.error('body_events load error', error); throw error; }
+  // v88：云端身体数据为空但本地缓存有记录（如 Supabase 恢复后丢表重建）→ 保留本地数据并自动推回云端
+  if ((data || []).length === 0 && bodyEvents.length > 0) {
+    console.log('[recovery] 云端 body_events 为空，本地有', bodyEvents.length, '条 → 自动恢复上传');
+    showToast(`☁ 检测到云端身体数据为空，正在自动恢复 ${bodyEvents.length} 条本地记录…`);
+    recoverBodyEventsToCloud(bodyEvents.slice());
+    return;
+  }
   bodyEvents = (data || []).map(normalizeBodyEvent);
   saveBodyEventsCache();
+}
+
+// v88：把本地身体记录批量推回云端（upsert 按 id 去重，多设备同时恢复也不会重复）
+async function recoverBodyEventsToCloud(list) {
+  try {
+    const rows = list.map(e => {
+      const c = { ...e };
+      delete c.__local;
+      if (!c.id || String(c.id).startsWith('pending-')) delete c.id; // 云端自动生成
+      if (!c.created_at) c.created_at = new Date(c.ts || Date.now()).toISOString();
+      if (c.ts != null) c.ts = Number(c.ts);
+      if (c.end_ts != null) c.end_ts = Number(c.end_ts);
+      return c;
+    });
+    for (let i = 0; i < rows.length; i += 50) {
+      const { error } = await dbClient.from('body_events').upsert(rows.slice(i, i + 50), { onConflict: 'id' });
+      if (error) throw error;
+    }
+    showToast(`✓ 已恢复 ${rows.length} 条身体记录到云端`);
+    console.log('[recovery] 完成，共', rows.length, '条');
+  } catch (e) {
+    console.error('[recovery] failed', e);
+    showToast('⚠ 云端恢复失败：' + (e.message || e), 'error');
+  }
 }
 
 async function pushBodyEventToCloud(ev) {
