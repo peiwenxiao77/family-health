@@ -1,66 +1,97 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center"
-    android:padding="10dp"
     android:background="@drawable/widget_bg">
 
-    <TextView
-        android:id="@+id/tv_title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="🌷 月经提醒"
-        android:textSize="11sp"
-        android:textStyle="bold"
-        android:textColor="@color/w_title_pink" />
+    <!-- v79：环形点阵（Bitmap 绘制，参考周期圆环图） -->
+    <ImageView
+        android:id="@+id/iv_ring"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter" />
 
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="bottom">
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:gravity="center_horizontal">
 
         <TextView
-            android:id="@+id/tv_days"
+            android:id="@+id/tv_date"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
+            android:text="M月D日"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/pill_pink" />
+
+        <TextView
+            android:id="@+id/tv_phase"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
             android:text="—"
-            android:textSize="32sp"
-            android:textColor="@color/w_text_main" />
+            android:textSize="10sp"
+            android:textColor="@color/w_text_soft" />
 
-        <TextView
-            android:id="@+id/tv_unit"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="天"
-            android:textSize="12sp"
-            android:textColor="@color/w_text_soft"
-            android:layout_marginLeft="3dp"
-            android:layout_marginBottom="5dp" />
+            android:orientation="horizontal"
+            android:gravity="bottom"
+            android:layout_marginTop="2dp">
+
+            <TextView
+                android:id="@+id/tv_pre"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="第"
+                android:textSize="14sp"
+                android:textColor="@color/w_text_soft"
+                android:layout_marginBottom="6dp" />
+
+            <TextView
+                android:id="@+id/tv_days"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="—"
+                android:textSize="36sp"
+                android:textStyle="bold"
+                android:textColor="@color/w_menstrual"
+                android:layout_marginLeft="3dp"
+                android:layout_marginRight="3dp" />
+
+            <TextView
+                android:id="@+id/tv_unit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="天"
+                android:textSize="14sp"
+                android:textColor="@color/w_text_soft"
+                android:layout_marginBottom="6dp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
+            android:text="—"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/pill_green" />
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/tv_sub"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="距下次月经"
-        android:textSize="10sp"
-        android:textColor="@color/w_text_soft" />
-
-    <TextView
-        android:id="@+id/tv_phase"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:paddingLeft="12dp"
-        android:paddingRight="12dp"
-        android:paddingTop="3dp"
-        android:paddingBottom="3dp"
-        android:text="—"
-        android:textSize="12sp"
-        android:textColor="@color/w_phase_text"
-        android:background="@drawable/phase_pill" />
-</LinearLayout>
+</FrameLayout>
