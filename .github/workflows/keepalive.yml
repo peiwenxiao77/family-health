@@ -1,27 +1,56 @@
 name: Supabase Keep-Alive
 
+# 目标：让 Supabase 免费版项目不被自动暂停。
+# 官方标准（https://supabase.com/docs/guides/platform/free-project-pausing）：
+#   「过去一周内每天都有少量数据库查询」才不算低活跃。
+#   旧版一周只 ping 一次 → 2026-10-10 项目仍被暂停（10-05 成功 ping 过也没用）。
+# 新策略：每天 3 次运行（避开整点，GitHub cron 常延迟），每次对多张表
+#   发送真实 SELECT 查询（PostgREST 每个请求都会真正打到数据库上执行 SQL），
+#   带自动重试；任一步骤失败则整个 job 标红，去 Actions 页一眼可见。
+
 on:
   schedule:
-    # 北京时间周一 8 点 = UTC 周一 0 点
-    - cron: '0 0 * * 1'
-  workflow_dispatch:
+    # UTC 01:17 / 09:17 / 17:17 = 北京 09:17 / 17:17 / 01:17
+    - cron: '17 1,9,17 * * *'
+  workflow_dispatch:  # 允许从 GitHub Actions 页面手动触发
 
 jobs:
-  ping:
+  keepalive:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 5
     steps:
-      - name: Touch health_records (keep project active)
+      - name: Ping database with real queries
         run: |
-          HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" \
-            "https://dlnqhosjodkgyuojbyxo.supabase.co/rest/v1/health_records?select=id&limit=1" \
-            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
-            --max-time 30)
-          echo "Supabase responded with HTTP $HTTP_CODE"
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "Project is healthy"
+          BASE="https://dlnqhosjodkgyuojbyxo.supabase.co/rest/v1"
+          # publishable 公开钥，专为公开客户端设计（同 index.html 内置值一致）
+          KEY="sb_publishable_WJ4NSoqO2LTfq6WUo728DQ_0eMnvABo"
+          AUTH=(-H "apikey: $KEY" -H "Authorization: Bearer $KEY" --max-time 25 --retry 3 --retry-delay 5)
+
+          fail=0
+
+          # 查询 1：health_records 最近 3 条
+          C1=$(curl -sS -o /dev/null -w "%{http_code}" "${AUTH[@]}" \
+            "$BASE/health_records?select=id&order=ts.desc&limit=3") || C1=000
+          echo "health_records select: HTTP $C1"
+
+          # 查询 2：body_events 最近 3 条
+          C2=$(curl -sS -o /dev/null -w "%{http_code}" "${AUTH[@]}" \
+            "$BASE/body_events?select=id,ts&order=ts.desc&limit=3") || C2=000
+          echo "body_events select: HTTP $C2"
+
+          # 查询 3：health_records 计数（HEAD + Prefer count）
+          C3=$(curl -sS -o /dev/null -w "%{http_code}" -I "${AUTH[@]}" \
+            -H "Prefer: count=exact" \
+            "$BASE/health_records?select=id&limit=0") || C3=000
+          echo "health_records count: HTTP $C3"
+
+          for c in $C1 $C2 $C3; do
+            if [ "$c" != "200" ]; then fail=1; fi
+          done
+
+          if [ $fail -eq 0 ]; then
+            echo "✓ All queries OK — project active"
           else
-            echo "Unexpected: $HTTP_CODE"
+            echo "✗ Some queries failed (project paused? network? schema?)"
             exit 1
           fi
