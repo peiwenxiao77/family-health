@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v86: AI已下线模型自动迁移(qwen-turbo等死模型名→qwen3.6-flash,修复404 Model not exist)；qwen3.6-flash实测支持识图；设置提示改为qwen3-vl-plus -->
 <!-- v85: 云端启动失败时顶栏状态改显「云端失联」(不再卡「连接中」误导)；附 ci test-supabase workflow 诊断 = 项目域名 DNS 已失效 -->
 <!-- v84: ①Supabase配置+AI配置全部内置为兜底默认值(重装/新手机开箱即用) ②APP吸顶栏下渐隐蒙版 ③身体页容器边距收窄(框框加宽) ④健康导出去JSON只留CSV并改名「📤导出」+身体全部记录新增导出 ⑤删除找不到记录时给出提示(配合sw缓存v4+新APK强制刷新旧页面) -->
 <!-- v83: 内置Supabase云端配置为兜底默认值——重装/换手机打开即自动恢复配置，小组件不再「未配置」 -->
@@ -1271,7 +1272,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE body_events;</pre>
     <div class="cfg-field">
       <label>模型</label>
       <input type="text" id="aiModel" placeholder="qwen3.6-flash">
-      <div class="hint">默认 qwen3.6-flash（2026-10-10 起 qwen-turbo/qwen-vl-plus 已下线）；识图可填 qwen3-vl-flash</div>
+      <div class="hint">默认 qwen3.6-flash（支持识图）；识图专用可填 qwen3-vl-plus。qwen-turbo / qwen-vl-plus / qwen3-vl-flash 已下线不可用</div>
     </div>
 
     <details style="margin: 0 0 12px;">
@@ -4108,6 +4109,13 @@ const AI_PRESETS = {
 // v84：内置 AI 配置兜底——未保存过 AI 配置的设备（重装/新手机）开箱即用；在设置里保存后自动覆盖
 const AI_DEFAULT_CONFIG = { provider: 'dashscope', baseUrl: AI_PRESETS.dashscope.baseUrl, model: AI_PRESETS.dashscope.model, apiKey: 'sk-ws-H.ERHXRDI.g0J6.MEYCIQDwE7IGQSLL1EIz1icIZfKUkW67YxDRtO_vcTCuT3-mXQIhALYsJu9ALrT_ewf1-mS2uDV6OYBj4IBp8RuBoCGo9gs1' };
 let aiConfig = Object.assign({}, AI_DEFAULT_CONFIG, JSON.parse(localStorage.getItem('ai_config') || 'null') || {});
+// v86：已下线模型自动迁移——旧设备 localStorage 里存的 qwen-turbo 等死模型名会覆盖新默认值导致 404 Model not exist
+const AI_DEAD_MODELS = ['qwen-turbo', 'qwen-vl-plus', 'qwen3-vl-flash', 'qwen-vl-max', 'qwen3.5-vl-plus', 'qwen3.5-vl-flash'];
+if (AI_DEAD_MODELS.includes(aiConfig.model)) {
+  console.warn('[AI] 检测到已下线模型', aiConfig.model, '，自动迁移为', AI_PRESETS.dashscope.model);
+  aiConfig.model = AI_PRESETS.dashscope.model;
+  localStorage.setItem('ai_config', JSON.stringify(aiConfig));
+}
 
 function getAiConfig() {
   const cfg = aiConfig && aiConfig.baseUrl && aiConfig.apiKey ? aiConfig : null;
