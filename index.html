@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v92: ①月经周期&来潮天数图去除每人最后一条记录(最新一次月经没有「下一次」算不出周期天数,整条不进图) ②身体频率图图例常显——单人有数据也显示成员名+次数,让「分人」一眼可见 -->
 <!-- v91: ①修复全部记录出现「文/龙」——早期版本存的单字名，云端已批量改为文文/龙龙(61+18条)，代码加 MEMBER_ALIASES 兜底归一 ②小组件圆点颜色与身体日历各时期统一为莫兰迪配色：月经期红/卵泡期黄/排卵期橙/排卵日深橙/黄体期绿 -->
 <!-- v90: 趋势图/频率图按家人分人多折线——健康趋势图一人一条线(颜色区分+图例)、月经周期&来潮天数改按人分组折线(实线=周期/虚线=来潮)、痛风&同房频率图改按人多折线(同人相邻才算周期，修正混人算错周期的问题) -->
 <!-- v86: AI已下线模型自动迁移(qwen-turbo等死模型名→qwen3.6-flash,修复404 Model not exist)；qwen3.6-flash实测支持识图；设置提示改为qwen3-vl-plus -->
@@ -5817,7 +5818,9 @@ function renderEventsCharts() {
     const allShownTs = [];
     menstrualByMember.forEach((list, m) => {
       const idxStart = list.length > CYCLES_CAP + 1 ? list.length - CYCLES_CAP - 1 : 0;
-      const shown = list.slice(idxStart);
+      // v92：每人的最后一条记录没有「下一次来潮」→ 算不出周期天数，整条不进图（标签/来潮天数一并去掉）
+      const shown = list.slice(idxStart, Math.max(idxStart, list.length - 1));
+      if (shown.length === 0) return;
       const cycleMap = {}, durMap = {};
       shown.forEach((s, i) => {
         if (i < shown.length - 1) {
@@ -5851,7 +5854,8 @@ function renderEventsCharts() {
     }
     const totalCycles = menstrual.length - 1;
     const rangeLabel = IN_APP ? `全部 ${validIntervals.length} 个周期` : (totalCycles > validIntervals.length ? `近 24 个周期` : `全部 ${validIntervals.length} 个周期`);
-    charts.push({
+    // v92：所有成员的最后一条都被去掉后可能无数据可画
+    if (perMember.length > 0) charts.push({
       id: 'menstrual-cycle',
       title: '🌷 月经周期 & 来潮天数',
       subtitle: `平均周期 ${cycleAvg} 天（${cycleMin}~${cycleMax}）· ${rangeLabel}${regLabel}`,
@@ -5989,7 +5993,8 @@ function renderEventsCharts() {
           datasets: c.series.map((s, i) => {
             const color = MEMBER_CHART_COLORS[i % MEMBER_CHART_COLORS.length];
             return {
-              label: c.series.length > 1 ? `${s.member}（${s.total} 次）` : s.member,
+              // v92：图例常显——单人有数据也标成员名+次数，「分人」一眼可见
+              label: `${s.member}（${s.total} 次）`,
               data: s.data,
               borderColor: color,
               backgroundColor: c.series.length === 1 ? color + '22' : color + '11',
@@ -6004,7 +6009,7 @@ function renderEventsCharts() {
           responsive: true, maintainAspectRatio: false,
           aspectRatio: c.wide ? 3.5 : 2,
           interaction: { mode: 'index', intersect: false },
-          plugins: { legend: { display: c.series.length > 1, position: 'top', labels: { font: { size: 11 }, boxWidth: 14, padding: 8, usePointStyle: true } } },
+          plugins: { legend: { display: true, position: 'top', labels: { font: { size: 11 }, boxWidth: 14, padding: 8, usePointStyle: true } } },
           scales: {
             y: { beginAtZero: true, ticks: { font: { size: 10 }, precision: 0 } },
             x: {
