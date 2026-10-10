@@ -1,0 +1,27 @@
+name: Test Supabase Key
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test baked key against REST API
+        run: |
+          KEY=$(grep -oP "const DEFAULT_SB_KEY = '\K[^']+" index.html)
+          echo "key head: ${KEY:0:16}... | tail: ...${KEY: -6} | len: ${#KEY}"
+          CODE=$(curl -s -o /tmp/resp.json -w "%{http_code}" --max-time 20 \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+            "https://dlnqhosjodkgyuojbyxo.supabase.co/rest/v1/body_events?select=id&limit=1")
+          echo "REST HTTP status: $CODE"
+          echo "response body:"
+          head -c 400 /tmp/resp.json
+          echo ""
+          CODE2=$(curl -s -o /tmp/resp2.json -w "%{http_code}" --max-time 20 \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+            "https://dlnqhosjodkgyuojbyxo.supabase.co/rest/v1/health_records?select=id&limit=1")
+          echo "health_records HTTP status: $CODE2"
+          head -c 400 /tmp/resp2.json
