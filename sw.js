@@ -1,7 +1,7 @@
 /* 家庭健康记录 Service Worker
  * 缓存策略：network-first（HTML/JS/CSS，避免新版本被旧缓存遮蔽）+ stale-while-revalidate（CDN 资源）
  */
-const CACHE = 'family-health-v10';  // 改 cache 名强制旧 SW 失效（v95：范围选项/类别框上移/频闪根治/成员主题色）
+const CACHE = 'family-health-v11';  // 改 cache 名强制旧 SW 失效（v96：AI字段/两行制/筛选一人一色/频闪折叠终修）
 const CORE = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
