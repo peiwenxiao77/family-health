@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v90: 趋势图/频率图按家人分人多折线——健康趋势图一人一条线(颜色区分+图例)、月经周期&来潮天数改按人分组折线(实线=周期/虚线=来潮)、痛风&同房频率图改按人多折线(同人相邻才算周期，修正混人算错周期的问题) -->
 <!-- v86: AI已下线模型自动迁移(qwen-turbo等死模型名→qwen3.6-flash,修复404 Model not exist)；qwen3.6-flash实测支持识图；设置提示改为qwen3-vl-plus -->
 <!-- v87: AI识别提速——qwen3系默认深度思考关闭(enable_thinking:false,实测3.2s→0.7s) -->
 <!-- v88: 身体数据云恢复——Supabase恢复后body_events表丢失，检测到云端空+本地有数据时自动upsert回云端(按id去重) -->
@@ -1451,6 +1452,8 @@ let eventPainLevel = 5;      // 0-9 (代表 1-10)
 let eventGoutTriggers = [];
 let eventGoutMedications = [];
 let eventCharts = {};
+// v90：分人多折线的成员配色（文文=粉、龙龙=蓝，其余按序轮换）
+const MEMBER_CHART_COLORS = ['#ec4899', '#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4', '#ef4444', '#f97316'];
 
 let dbClient = null;
 
@@ -3453,7 +3456,10 @@ function renderChart() {
   }
 
   grid.innerHTML = toShow.map((c, idx) => {
-    const info = getCategoryInfo(c.name);
+    // v90：按家人分组——每类图里一个人一条线
+    const memberNames = [];
+    c.points.forEach(p => { if (!memberNames.includes(p.member)) memberNames.push(p.member); });
+    const multi = memberNames.length > 1;
     const colors = ['#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#10b981', '#3b82f6', '#ef4444', '#a855f7'];
     const color = colors[idx % colors.length];
     const latest = c.points[c.points.length - 1];
@@ -3468,14 +3474,16 @@ function renderChart() {
             <span class="mini-icon" style="background:${color}22;color:${color};">${c.icon}</span>
             <span class="mini-name">${escapeHtml(c.name)}</span>
           </div>
-          <div class="mini-chart-trend" style="color:${trendColor};">${trendArrow}</div>
+          ${multi
+            ? `<span style="font-size:11px;color:var(--text-3);font-weight:600;">👥${memberNames.length}人</span>`
+            : `<div class="mini-chart-trend" style="color:${trendColor};">${trendArrow}</div>`}
         </div>
         <div class="mini-chart-canvas-wrap">
           <canvas id="miniChart_${idx}"></canvas>
         </div>
         <div class="mini-chart-foot">
           <span class="mini-stat"><b>${c.points.length}</b> 条</span>
-          <span class="mini-stat">最新 <b>${latest.y}${c.unit || ''}</b></span>
+          <span class="mini-stat">最新 <b>${multi ? escapeHtml(latest.member) + ' ' : ''}${latest.y}${c.unit || ''}</b></span>
         </div>
       </div>
     `;
@@ -3484,38 +3492,52 @@ function renderChart() {
   // 渲染每个 canvas
   toShow.forEach((c, idx) => {
     const colors = ['#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#10b981', '#3b82f6', '#ef4444', '#a855f7'];
-    const color = colors[idx % colors.length];
+    const baseColor = colors[idx % colors.length];
     const info = getCategoryInfo(c.name);
     const rangeInfo = info.range;
 
-    const labels = c.points.map((p, idx) => {
-      const d = new Date(p.x);
+    // v90：按家人分组，一人一条折线（x 轴 = 所有人时间点并集，缺的时间点为 null，spanGaps 各自连线）
+    const byMember = new Map();
+    c.points.forEach(p => {
+      if (!byMember.has(p.member)) byMember.set(p.member, []);
+      byMember.get(p.member).push(p);
+    });
+    const members = [...byMember.keys()];
+    const multi = members.length > 1;
+    const allTs = [...new Set(c.points.map(p => p.x))].sort((a, b) => a - b);
+    const labels = allTs.map((ts, i) => {
+      const d = new Date(ts);
       const yShort = String(d.getFullYear()).slice(2);
-      const prev = idx > 0 ? new Date(c.points[idx - 1].x) : null;
-      const isFirst = idx === 0;
+      const prev = i > 0 ? new Date(allTs[i - 1]) : null;
       const isYearBoundary = prev && prev.getFullYear() !== d.getFullYear();
-      const isJanuary = d.getMonth() === 0;
-      if (isFirst || isYearBoundary || isJanuary) {
+      if (i === 0 || isYearBoundary || d.getMonth() === 0) {
         return `${yShort}/${d.getMonth()+1}/${d.getDate()}`;
       }
       return `${d.getMonth()+1}/${d.getDate()}`;
     });
-    const values = c.points.map(p => p.y);
 
-    const datasets = [{
-      data: values,
-      borderColor: color,
-      backgroundColor: ctx => {
-        const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, 160);
-        g.addColorStop(0, color + '40');
-        g.addColorStop(1, color + '05');
-        return g;
-      },
-      tension: 0.4, borderWidth: 2,
-      pointBackgroundColor: color, pointBorderColor: '#fff', pointBorderWidth: 1.5,
-      pointRadius: values.length > 20 ? 2 : 4,
-      pointHoverRadius: 6, fill: true, spanGaps: true
-    }];
+    const datasets = members.map((m, mi) => {
+      const pts = byMember.get(m);
+      const valMap = new Map(pts.map(p => [p.x, p.y]));
+      const values = allTs.map(ts => valMap.has(ts) ? valMap.get(ts) : null);
+      const color = multi ? MEMBER_CHART_COLORS[mi % MEMBER_CHART_COLORS.length] : baseColor;
+      return {
+        label: m,
+        memberName: m,
+        data: values,
+        borderColor: color,
+        backgroundColor: ctx => {
+          const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, 160);
+          g.addColorStop(0, color + '40');
+          g.addColorStop(1, color + '05');
+          return g;
+        },
+        tension: 0.4, borderWidth: 2,
+        pointBackgroundColor: color, pointBorderColor: '#fff', pointBorderWidth: 1.5,
+        pointRadius: pts.length > 20 ? 2 : 4,
+        pointHoverRadius: 6, fill: !multi, spanGaps: true
+      };
+    });
 
     // 正常值范围背景
     const rangePlugin = {
@@ -3549,12 +3571,13 @@ function renderChart() {
         responsive: true, maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: { display: false },
+          legend: { display: multi, position: 'top', labels: { font: { size: 10 }, boxWidth: 12, padding: 6, usePointStyle: true } },
           tooltip: {
             backgroundColor: 'rgba(15, 23, 42, 0.92)', padding: 8, cornerRadius: 6, titleFont: { size: 11 }, bodyFont: { size: 11 },
+            filter: item => item.parsed.y != null,
             callbacks: {
-              title: items => { const p = c.points[items[0].dataIndex]; return formatDateTime(p.x); },
-              label: ctx => { const p = c.points[ctx.dataIndex]; return `${p.member} · ${ctx.parsed.y}${c.unit || ''}`; }
+              title: items => { const ts = allTs[items[0].dataIndex]; return formatDateTime(ts); },
+              label: ctx => { return `${ctx.dataset.memberName} · ${ctx.parsed.y}${c.unit || ''}`; }
             }
           }
         },
@@ -5710,9 +5733,9 @@ function renderEventCard(ev) {
   `;
 }
 
-// 构建"按月频率"柱状图数据（时间范围自适应 v39/v40）：
+// 构建"按月频率"数据（v90：按家人分组——一人一条折线；时间范围自适应 v39/v40）：
 // 从最早一次有记录的月份开始显示；跨度超过 24 个月（两年）→ 只显示最近 24 个月
-function buildMonthlyFrequency(events) {
+function buildMonthlyFrequencyByMember(events) {
   const now = new Date();
   const nowIdx = now.getFullYear() * 12 + now.getMonth();
   const earliest = new Date(Math.min(...events.map(e => e.ts)));
@@ -5721,23 +5744,33 @@ function buildMonthlyFrequency(events) {
   const MONTHS_CAP = IN_APP ? Infinity : 24;  // v75：APP 不截断（横向滑动），网页近 24 个月
   const months = Math.min(span, MONTHS_CAP);
   const startMonth = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
-  const byMonth = {};
+  const keys = [];
+  const zero = {};
   for (let i = 0; i < months; i++) {
     const d = new Date(startMonth.getFullYear(), startMonth.getMonth() + i, 1);
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    byMonth[key] = 0;
+    keys.push(key);
+    zero[key] = 0;
   }
+  const byMember = {};
+  const firstTs = {};
   events.forEach(e => {
+    if (new Date(e.ts) < startMonth) return;  // 范围外的不画
     const d = new Date(e.ts);
-    if (d < startMonth) return;  // 范围外的不画
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    byMonth[key] = (byMonth[key] || 0) + 1;
+    if (!byMember[e.member]) { byMember[e.member] = { ...zero }; firstTs[e.member] = e.ts; }
+    byMember[e.member][key] = (byMember[e.member][key] || 0) + 1;
   });
-  const entries = Object.entries(byMonth).sort();
   const totalInRange = events.filter(e => new Date(e.ts) >= startMonth).length;
   const rangeLabel = span > months ? '近 24 个月' : `${startMonth.getFullYear()}/${startMonth.getMonth()+1} 至今`;
   return {
-    data: entries.map(([k, v]) => ({ x: k, y: v })),
+    labels: keys,
+    // v90：按首次记录先后排序（最早记录的人拿主色=粉，与月经图配色一致）
+    series: Object.keys(byMember).sort((a, b) => firstTs[a] - firstTs[b]).map(m => ({
+      member: m,
+      data: keys.map(k => byMember[m][k] || 0),
+      total: keys.reduce((s, k) => s + (byMember[m][k] || 0), 0),
+    })),
     subtitle: `${rangeLabel}（共 ${totalInRange} 次）`,
   };
 }
@@ -5761,44 +5794,55 @@ function renderEventsCharts() {
   }
 
   const charts = [];
-  // 1. 月经周期趋势（折线）：同时显示周期长度 + 来潮天数
-  //    时间范围自适应（与痛风频率图同逻辑 v39）：
-  //    - 从第一次有记录的周期开始显示
-  //    - 周期数超过 24 个（两年）→ 只显示最近 24 个周期
+  // 1. 月经周期趋势（v90：按家人分组，一人两条线——实线=周期天数、虚线=来潮天数）
+  //    时间范围自适应（与痛风频率图同逻辑 v39）：周期数超过 24 个（两年）→ 每人只显示最近 24 个周期
   const menstrual = bodyEvents.filter(e => e.category === 'menstrual' && e.payload?.is_period_start !== false).sort((a,b) => a.ts - b.ts);
+  const menstrualByMember = new Map();
+  menstrual.forEach(e => {
+    if (!menstrualByMember.has(e.member)) menstrualByMember.set(e.member, []);
+    menstrualByMember.get(e.member).push(e);
+  });
   if (menstrual.length >= 2) {
     // v75：APP 端不截断（横向滑动查看全部）；网页端保持近 24 个周期（约两年）
     const CYCLES_CAP = IN_APP ? Infinity : 24;
-    const totalCycles = menstrual.length - 1;
-    // v71：周期天数归属本次月经第一天（医学口径：本次来潮第一天 → 下次来潮前一天）
-    //      第一条记录有周期柱（= 第二次开始日 − 第一次开始日）；最后一条没有「下次」，为空
-    const idxStart = totalCycles > CYCLES_CAP ? menstrual.length - CYCLES_CAP - 1 : 0;
-    const cycles = [];
-    const durations = [];
-    for (let i = idxStart; i < menstrual.length; i++) {
-      const gapDays = i < menstrual.length - 1 ? Math.round((menstrual[i+1].ts - menstrual[i].ts) / 86400000) : null;
-      cycles.push(Number.isFinite(gapDays) ? gapDays : null);  // v72：NaN 不画柱（脏数据兜底）
-      const start = menstrual[i];
-      // v68：天数从 end_ts 重算且含尾日——旧记录存的 duration_days 是间隔口径（少 1 天），重算立即修正
-      let dur = start.end_ts
-        ? Math.max(1, Math.round((startOfDay(start.end_ts) - startOfDay(start.ts)) / 86400000) + 1)
-        : ((start.payload && start.payload.duration_days) || null);
-      durations.push(dur);
-    }
-    const labels = menstrual.slice(idxStart).map(m => new Date(m.ts).toLocaleDateString('zh-CN', {month:'2-digit', day:'2-digit'}));
-    const validIntervals = cycles.filter(v => v != null);
+    // v90：每人各自算周期/来潮天数（同一人相邻两次来潮的间隔——此前混人合并会把不同人的间隔算错）
+    const perMember = [];
+    const allShownTs = [];
+    menstrualByMember.forEach((list, m) => {
+      const idxStart = list.length > CYCLES_CAP + 1 ? list.length - CYCLES_CAP - 1 : 0;
+      const shown = list.slice(idxStart);
+      const cycleMap = {}, durMap = {};
+      shown.forEach((s, i) => {
+        if (i < shown.length - 1) {
+          const gapDays = Math.round((shown[i+1].ts - s.ts) / 86400000);
+          if (Number.isFinite(gapDays)) cycleMap[s.ts] = gapDays;  // v72：NaN 不画（脏数据兜底）
+        }
+        // v68：天数从 end_ts 重算且含尾日——旧记录存的 duration_days 是间隔口径（少 1 天），重算立即修正
+        const dur = s.end_ts
+          ? Math.max(1, Math.round((startOfDay(s.end_ts) - startOfDay(s.ts)) / 86400000) + 1)
+          : ((s.payload && s.payload.duration_days) || null);
+        if (dur != null) durMap[s.ts] = dur;
+      });
+      shown.forEach(s => allShownTs.push(s.ts));
+      perMember.push({ member: m, cycleMap, durMap });
+    });
+    // 合并 x 轴：所有人的来潮日开始日期并集（升序）
+    allShownTs.sort((a, b) => a - b);
+    const labels = allShownTs.map(ts => new Date(ts).toLocaleDateString('zh-CN', {month:'2-digit', day:'2-digit'}));
+    // 全局统计（副标题用）
+    const validIntervals = perMember.flatMap(p => Object.values(p.cycleMap));
     const cycleAvg = validIntervals.length ? Math.round(validIntervals.reduce((s,v) => s+v, 0) / validIntervals.length) : 0;
     const cycleMin = validIntervals.length ? Math.min(...validIntervals) : 0;
     const cycleMax = validIntervals.length ? Math.max(...validIntervals) : 0;
     // v66：规律度提示（标准差基于有效周期，15~45 天外剔除）
-    const validCycles = cycles.filter(v => v >= 15 && v <= 45);
+    const validCycles = validIntervals.filter(v => v >= 15 && v <= 45);
     let regLabel = '';
     if (validCycles.length >= 3) {
       const meanV = validCycles.reduce((s,v)=>s+v,0) / validCycles.length;
       const sdV = Math.sqrt(validCycles.reduce((s,v)=>s+(v-meanV)**2,0) / validCycles.length);
       regLabel = ' · ' + cycleRegularityLabel(sdV);
     }
-    const durationData = labels.map((_, i) => durations[i] == null ? null : durations[i]);
+    const totalCycles = menstrual.length - 1;
     const rangeLabel = IN_APP ? `全部 ${validIntervals.length} 个周期` : (totalCycles > validIntervals.length ? `近 24 个周期` : `全部 ${validIntervals.length} 个周期`);
     charts.push({
       id: 'menstrual-cycle',
@@ -5806,17 +5850,19 @@ function renderEventsCharts() {
       subtitle: `平均周期 ${cycleAvg} 天（${cycleMin}~${cycleMax}）· ${rangeLabel}${regLabel}`,
       type: 'menstrual-cycle',
       labels,
-      cycles,
-      durations: durationData,
-      color: '#ec4899',
+      series: perMember.map(p => ({
+        member: p.member,
+        cycles: allShownTs.map(ts => (p.cycleMap[ts] != null ? p.cycleMap[ts] : null)),
+        durations: allShownTs.map(ts => (p.durMap[ts] != null ? p.durMap[ts] : null)),
+      })),
       wide: true,  // 与痛风/同房图同宽同长（v45）
     });
   }
 
-  // 2. 痛风发作频率（按月柱状图，时间范围自适应）
+  // 2. 痛风发作频率（v90：按家人分组多折线，时间范围自适应）
   const gout = bodyEvents.filter(e => e.category === 'gout');
   if (gout.length >= 1) {
-    const freq = buildMonthlyFrequency(gout);
+    const freq = buildMonthlyFrequencyByMember(gout);
     const sortedAllGout = gout.slice().sort((a, b) => b.ts - a.ts);
     const daysSinceGout = Math.floor((Date.now() - sortedAllGout[0].ts) / 86400000);
     // 把"距上次痛风"放到副标题尾部，节省单独 stat 卡
@@ -5825,25 +5871,27 @@ function renderEventsCharts() {
       id: 'gout-frequency',
       title: '🦴 痛风发作频率',
       subtitle: `${freq.subtitle}，跨度越久数据越能反映趋势${goutExtra}`,
-      data: freq.data,
-      type: 'bar',
+      type: 'freq-lines',
+      labels: freq.labels,
+      series: freq.series,
       color: '#ef4444',
       wide: true,  // 标记 X 轴很长
     });
   }
 
-  // 3. 同房频率（按月柱状图，与痛风图同逻辑 v40）
+  // 3. 同房频率（v90：按家人分组多折线，与痛风图同逻辑 v40）
   const loveEvents = bodyEvents.filter(e => e.category === 'intercourse' || e.category === 'mood');
   if (loveEvents.length >= 1) {
-    const freq = buildMonthlyFrequency(loveEvents);
+    const freq = buildMonthlyFrequencyByMember(loveEvents);
     const lastLove = loveEvents.slice().sort((a, b) => b.ts - a.ts)[0];
     const daysSinceLove = Math.floor((Date.now() - lastLove.ts) / 86400000);
     charts.push({
       id: 'intercourse-frequency',
       title: '❤️ 频率',
       subtitle: `${freq.subtitle} · 距上次 ${daysSinceLove} 天`,
-      data: freq.data,
-      type: 'bar',
+      type: 'freq-lines',
+      labels: freq.labels,
+      series: freq.series,
       color: '#f43f5e',
       wide: true,
     });
@@ -5877,56 +5925,44 @@ function renderEventsCharts() {
     const ctx = canvas.getContext('2d');
     let cfg;
     if (c.type === 'menstrual-cycle') {
-      // 双系列柱状：周期长度 + 来潮天数（v45：形式与痛风柱状图一致，全宽卡）
+      // v90：一人两条折线——周期天数（实线，左轴）+ 来潮天数（虚线，右轴）
+      const ds = [];
+      c.series.forEach((s, i) => {
+        const color = MEMBER_CHART_COLORS[i % MEMBER_CHART_COLORS.length];
+        const solo = c.series.length === 1;
+        ds.push({
+          label: solo ? '周期（天）' : `${s.member} · 周期`,
+          data: s.cycles,
+          borderColor: color,
+          backgroundColor: color + '33',
+          borderWidth: 2, tension: 0.35, spanGaps: true,
+          pointRadius: 3, pointHoverRadius: 5,
+          pointBackgroundColor: color, pointBorderColor: '#fff', pointBorderWidth: 1.5,
+          yAxisID: 'y',
+        });
+        ds.push({
+          label: solo ? '来潮天数' : `${s.member} · 来潮`,
+          data: s.durations,
+          borderColor: color + '99',
+          backgroundColor: color + '18',
+          borderWidth: 2, borderDash: [5, 4], tension: 0.35, spanGaps: true,
+          pointRadius: 2, pointHoverRadius: 4,
+          pointBackgroundColor: color + '99', pointBorderColor: '#fff', pointBorderWidth: 1,
+          yAxisID: 'y1',
+        });
+      });
       cfg = {
-        type: 'bar',
-        // v72：柱顶标数值——哪根柱没值一眼可辨
-        plugins: [{
-          id: 'barValueLabels',
-          afterDatasetsDraw(chart) {
-            const ctx = chart.ctx;
-            chart.data.datasets.forEach((ds, di) => {
-              const meta = chart.getDatasetMeta(di);
-              meta.data.forEach((bar, i) => {
-                const v = ds.data[i];
-                if (v == null || !Number.isFinite(v)) return;
-                ctx.save();
-                ctx.fillStyle = ds.borderColor || '#475569';
-                ctx.font = 'bold 10px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(v, bar.x, bar.y - 4);
-                ctx.restore();
-              });
-            });
-          },
-        }],
+        type: 'line',
         data: {
           labels: c.labels,
-          datasets: [
-            {
-              label: '周期（天）',
-              data: c.cycles,
-              backgroundColor: '#ec489988',
-              borderColor: '#ec4899',
-              borderWidth: 2,
-              yAxisID: 'y',
-            },
-            {
-              label: '来潮天数',
-              data: c.durations,
-              backgroundColor: '#a855f788',
-              borderColor: '#a855f7',
-              borderWidth: 2,
-              yAxisID: 'y1',
-            }
-          ]
+          datasets: ds
         },
         options: {
           responsive: true, maintainAspectRatio: false,
           aspectRatio: 3.5,
           interaction: { mode: 'index', intersect: false },
           plugins: {
-            legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 14, padding: 8 } },
+            legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 14, padding: 8, usePointStyle: true } },
             // v71：空值不进 tooltip（最后一条记录无周期值，避免被显示成 0 造成误读）
             tooltip: { filter: (item) => item.raw != null }
           },
@@ -5934,6 +5970,44 @@ function renderEventsCharts() {
             y: { position: 'left', beginAtZero: true, ticks: { font: { size: 10 }, precision: 0 }, title: { display: true, text: '周期(天)', font: { size: 10 } } },  // v73：从0起步——原先轴自动缩放到数据范围(24~26)，等于最小值的柱高度为0「消失」
             y1: { position: 'right', beginAtZero: true, ticks: { font: { size: 10 } }, grid: { drawOnChartArea: false }, title: { display: true, text: '来潮(天)', font: { size: 10 } } },
             x: { ticks: { font: { size: 10 }, maxRotation: 45, autoSkip: false, maxTicksLimit: 24 } }
+          }
+        }
+      };
+    } else if (c.type === 'freq-lines') {
+      // v90：按家人分组的多折线频率图（一人一条线）
+      cfg = {
+        type: 'line',
+        data: {
+          labels: c.labels,
+          datasets: c.series.map((s, i) => {
+            const color = MEMBER_CHART_COLORS[i % MEMBER_CHART_COLORS.length];
+            return {
+              label: c.series.length > 1 ? `${s.member}（${s.total} 次）` : s.member,
+              data: s.data,
+              borderColor: color,
+              backgroundColor: c.series.length === 1 ? color + '22' : color + '11',
+              borderWidth: 2, tension: 0.3, spanGaps: true,
+              pointRadius: 3, pointHoverRadius: 5,
+              pointBackgroundColor: color, pointBorderColor: '#fff', pointBorderWidth: 1.5,
+              fill: c.series.length === 1,
+            };
+          })
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          aspectRatio: c.wide ? 3.5 : 2,
+          interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { display: c.series.length > 1, position: 'top', labels: { font: { size: 11 }, boxWidth: 14, padding: 8, usePointStyle: true } } },
+          scales: {
+            y: { beginAtZero: true, ticks: { font: { size: 10 }, precision: 0 } },
+            x: {
+              ticks: {
+                font: { size: c.wide ? 10 : 10 },
+                maxRotation: c.wide ? 45 : 45,
+                autoSkip: c.wide ? false : true,
+                maxTicksLimit: c.wide ? 24 : undefined,
+              }
+            }
           }
         }
       };
