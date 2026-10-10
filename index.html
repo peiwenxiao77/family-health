@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v91: ①修复全部记录出现「文/龙」——早期版本存的单字名，云端已批量改为文文/龙龙(61+18条)，代码加 MEMBER_ALIASES 兜底归一 ②小组件圆点颜色与身体日历各时期统一为莫兰迪配色：月经期红/卵泡期黄/排卵期橙/排卵日深橙/黄体期绿 -->
 <!-- v90: 趋势图/频率图按家人分人多折线——健康趋势图一人一条线(颜色区分+图例)、月经周期&来潮天数改按人分组折线(实线=周期/虚线=来潮)、痛风&同房频率图改按人多折线(同人相邻才算周期，修正混人算错周期的问题) -->
 <!-- v86: AI已下线模型自动迁移(qwen-turbo等死模型名→qwen3.6-flash,修复404 Model not exist)；qwen3.6-flash实测支持识图；设置提示改为qwen3-vl-plus -->
 <!-- v87: AI识别提速——qwen3系默认深度思考关闭(enable_thinking:false,实测3.2s→0.7s) -->
@@ -537,14 +538,15 @@
   /* 普通日期（有数字但无阶段标记）加浅色边框，让月历结构清晰 */
   .menstrual-day:not(.empty):not(.in-period):not(.menstrual-predicted):not(.follicular):not(.ovulation-window):not(.ovulation-day):not(.luteal):not(.dysmenorrhea-day) { border-color: #cbd5e1; }
   .menstrual-day.today { box-shadow: inset 0 0 0 2px var(--primary, #f97316); font-weight: 800; }
-  .menstrual-day.in-period { background: linear-gradient(135deg, #ec4899, #be185d); color: white; cursor: pointer; }
+  /* v91：各时期统一莫兰迪配色（与小组件圆点一致）——月经期红/卵泡期黄/排卵期橙/排卵日深橙/黄体期绿 */
+  .menstrual-day.in-period { background: linear-gradient(135deg, #C1716B, #9E544E); color: white; cursor: pointer; }
   .menstrual-day.in-period .marker, .menstrual-day.in-period .phase-tag { color: white; }
-  /* 修复 bug：CSS 名要和 JS 一致 —— 预测月经期粉色格 */
-  .menstrual-day.menstrual-predicted { background: linear-gradient(135deg, #fbcfe8, #f9a8d4); color: #831843; box-shadow: inset 0 0 0 1.5px #ec4899; }
-  .menstrual-day.follicular { background: #d1fae5; color: #065f46; }
-  .menstrual-day.ovulation-window { background: #fed7aa; color: #9a3412; }
-  .menstrual-day.ovulation-day { background: linear-gradient(135deg, #fb923c, #ea580c); color: white; font-weight: 800; box-shadow: 0 0 0 2px #f59e0b; }
-  .menstrual-day.luteal { background: #dbeafe; color: #1e40af; }
+  /* 修复 bug：CSS 名要和 JS 一致 —— 预测月经期浅红格 */
+  .menstrual-day.menstrual-predicted { background: linear-gradient(135deg, #E8C9C4, #D9AEA7); color: #7A3E38; box-shadow: inset 0 0 0 1.5px #C1716B; }
+  .menstrual-day.follicular { background: #E7DCB4; color: #77631F; }
+  .menstrual-day.ovulation-window { background: #EBCBA6; color: #7E4E1E; }
+  .menstrual-day.ovulation-day { background: linear-gradient(135deg, #C67946, #A85A2E); color: white; font-weight: 800; box-shadow: 0 0 0 2px #B06234; }
+  .menstrual-day.luteal { background: #CBD6BC; color: #475C36; }
   .menstrual-day.dysmenorrhea-day { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #991b1b; box-shadow: inset 0 0 0 1.5px #ef4444; }
   /* 所有非空白日期 hover 都能缩放（包括月经期、痛经日） */
   .menstrual-day:hover:not(.empty) { transform: scale(1.05); z-index: 2; }
@@ -1395,6 +1397,9 @@ const STANDARD_CATEGORIES = {
 };
 
 const STORAGE_KEYS = { CACHE: 'sb_local_cache', CATS: 'sb_custom_cats', MEMBERS: 'sb_members', EVENTS: 'sb_body_events' };
+// v91：旧版本把成员名存成了单字（文/龙），云端已批量修复为文文/龙龙；这里兜底归一，防各设备本地缓存残留
+const MEMBER_ALIASES = { '文': '文文', '龙': '龙龙' };
+function normalizeMemberName(m) { return MEMBER_ALIASES[m] || m; }
 let records = [];
 let bodyEvents = [];
 try { bodyEvents = (JSON.parse(localStorage.getItem(STORAGE_KEYS.EVENTS)) || []).map(normalizeBodyEvent); }
@@ -1572,6 +1577,7 @@ function loadLocalCache() {
   try { const c = localStorage.getItem(STORAGE_KEYS.CACHE); if (c) records = JSON.parse(c); } catch (e) { records = []; }
   // 一次性迁移：把旧记录的 📊 图标更新为建议图标；v42 萌化迁移旧图标
   records.forEach(r => {
+    if (r.member) r.member = normalizeMemberName(r.member);  // v91：旧版单字名兜底归一
     if (r.category && r.category.icon === '📊') {
       r.category.icon = suggestIcon(r.category.name);
     }
@@ -2027,6 +2033,7 @@ async function loadFromCloud() {
   if (error) throw error;
   records = data || [];
   records.forEach(r => {
+    if (r.member) r.member = normalizeMemberName(r.member);  // v91：旧版单字名兜底归一
     if (!STANDARD_CATEGORIES[r.category.name] && !customCategories[r.category.name]) {
       customCategories[r.category.name] = { icon: r.category.icon || '📊', unit: r.category.unit || '' };
     }
@@ -4969,12 +4976,12 @@ function renderMenstrualCalendar() {
 
   // 图例（简化：颜色 + 文字标签）
   legendEl.innerHTML = `
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#ec4899,#be185d);"></span>已记录月经期</div>
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#fbcfe8,#f9a8d4);box-shadow:inset 0 0 0 1px #ec4899;"></span>预测月经期</div>
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#d1fae5;"></span>卵泡期</div>
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#fed7aa;"></span>排卵期</div>
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#fb923c,#ea580c);box-shadow:0 0 0 2px #f59e0b;"></span>排卵日</div>
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#dbeafe;"></span>黄体期</div>
+    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#C1716B,#9E544E);"></span>已记录月经期</div>
+    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#E8C9C4,#D9AEA7);box-shadow:inset 0 0 0 1px #C1716B;"></span>预测月经期</div>
+    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#E7DCB4;"></span>卵泡期</div>
+    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#EBCBA6;"></span>排卵期</div>
+    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#C67946,#A85A2E);box-shadow:0 0 0 2px #B06234;"></span>排卵日</div>
+    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#CBD6BC;"></span>黄体期</div>
     <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#fee2e2,#fecaca);box-shadow:inset 0 0 0 1px #ef4444;"></span>痛经日</div>
   `;
 }
