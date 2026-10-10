@@ -6,22 +6,17 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Test baked key against REST API
+      - name: DNS & reachability diagnostics
         run: |
+          echo "=== 1. DNS resolve project domain ==="
+          getent hosts dlnqhosjodkgyuojbyxo.supabase.co || echo "RESOLVE FAILED: project domain"
+          echo "=== 2. DNS resolve supabase.co (sanity) ==="
+          getent hosts supabase.co || echo "RESOLVE FAILED: supabase.co"
+          echo "=== 3. REST without key (project alive? expect 401/健康JSON) ==="
+          curl -s --max-time 15 -w "\nHTTP %{http_code}\n" "https://dlnqhosjodkgyuojbyxo.supabase.co/rest/v1/" || echo "CURL FAILED exit $?"
+          echo "=== 4. REST with baked key, body_events ==="
           KEY=$(grep -oP "const DEFAULT_SB_KEY = '\K[^']+" index.html)
-          echo "key head: ${KEY:0:16}... | tail: ...${KEY: -6} | len: ${#KEY}"
-          CODE=$(curl -s -o /tmp/resp.json -w "%{http_code}" --max-time 20 \
+          echo "key head: ${KEY:0:16}... len: ${#KEY}"
+          curl -s --max-time 15 -w "\nHTTP %{http_code}\n" \
             -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
-            "https://dlnqhosjodkgyuojbyxo.supabase.co/rest/v1/body_events?select=id&limit=1")
-          echo "REST HTTP status: $CODE"
-          echo "response body:"
-          head -c 400 /tmp/resp.json
-          echo ""
-          CODE2=$(curl -s -o /tmp/resp2.json -w "%{http_code}" --max-time 20 \
-            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
-            "https://dlnqhosjodkgyuojbyxo.supabase.co/rest/v1/health_records?select=id&limit=1")
-          echo "health_records HTTP status: $CODE2"
-          head -c 400 /tmp/resp2.json
+            "https://dlnqhosjodkgyuojbyxo.supabase.co/rest/v1/body_events?select=id&limit=1" || echo "CURL FAILED exit $?"
