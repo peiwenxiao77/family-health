@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v84: ①Supabase配置+AI配置全部内置为兜底默认值(重装/新手机开箱即用) ②APP吸顶栏下渐隐蒙版 ③身体页容器边距收窄(框框加宽) ④健康导出去JSON只留CSV并改名「📤导出」+身体全部记录新增导出 ⑤删除找不到记录时给出提示(配合sw缓存v4+新APK强制刷新旧页面) -->
 <!-- v83: 内置Supabase云端配置为兜底默认值——重装/换手机打开即自动恢复配置，小组件不再「未配置」 -->
 <!-- v78: 百炼旧模型下线迁移——AI默认预设 qwen-turbo→qwen3.6-flash，识图提示 qwen-vl-plus→qwen3-vl-flash(qwen-turbo/qwen-vl-plus 2026-10-10下线) -->
 <!-- v77: 修复健康页单条删除弹两次确认(外层uiConfirm+deleteRecord内部uiConfirm叠加)——按钮直调deleteRecord只确认一次 -->
@@ -97,6 +98,14 @@
   html.in-app .stats-grid { grid-template-columns: 1fr 1fr; }
   html.in-app .topbar > header { justify-content: flex-start; }
   html.in-app .topbar > header > .header-right { margin-left: auto; }
+  /* v84：APP 身体页容器收窄边距——所有框框加宽，仍比健康页（总内边距20px）窄一点点 */
+  html.in-app #eventsPageWrap { margin: 16px 4px 0 !important; }
+  /* v84：APP 置顶卡片下方渐隐蒙版——内容滚动靠近吸顶栏时渐隐，不叠在固定内容下 */
+  html.in-app #stickyFade {
+    position: fixed; left: 0; right: 0; height: 42px; z-index: 49;
+    background: linear-gradient(180deg, #ffedd5 0%, rgba(255, 237, 213, 0) 100%);
+    pointer-events: none; display: none;
+  }
 
   /* Hero (输入区) */
   .hero { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #fb923c 100%); border-radius: var(--radius); padding: 22px 22px; color: white; box-shadow: 0 20px 40px -8px rgba(245, 158, 11, 0.35), inset 0 1px 0 rgba(255,255,255,0.2); position: relative; overflow: hidden; margin-bottom: 16px; }
@@ -746,8 +755,7 @@
         <div class="actions">
           <button class="btn-secondary" id="btnToggleHistory" style="font-size:11px;padding:4px 10px;">⇕ 收起</button>
           <span class="time-filter-chip" id="timeFilterChip" style="display:none;">📅 <span id="timeFilterLabel"></span> <button class="time-filter-clear" id="timeFilterClear" title="清除时间筛选">✕</button></span>
-          <button class="btn-secondary" id="btnExport">📤 JSON</button>
-          <button class="btn-secondary" id="btnExportCSV">📊 CSV</button>
+          <button class="btn-secondary" id="btnExportCSV">📤 导出</button>
           <button class="btn-danger" id="btnDelete">🗑 删除</button>
         </div>
       </div>
@@ -768,7 +776,7 @@
   <!-- ============ 视图 2：身体情况 ============ -->
   <div id="view-events" class="view-hidden">
 
-    <div style="margin: 16px 24px 0;">
+    <div id="eventsPageWrap" style="margin: 16px 24px 0;">
       <div class="card-header">
         <div class="card-title">🌸 身体情况 <span class="badge" id="eventsCount">0 条</span></div>
         <div class="actions">
@@ -839,7 +847,10 @@
       <div style="margin-top:16px;background:white;border-radius:12px;padding:14px;border:1px solid var(--border);">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
           <div style="font-weight:700;font-size:13px;color:var(--text);">📋 全部记录</div>
-          <button class="btn-secondary" id="btnToggleEventsList" style="font-size:11px;padding:4px 10px;">⇕ 收起</button>
+          <div style="display:flex;gap:6px;">
+            <button class="btn-secondary" id="btnExportBody" style="font-size:11px;padding:4px 10px;">📤 导出</button>
+            <button class="btn-secondary" id="btnToggleEventsList" style="font-size:11px;padding:4px 10px;">⇕ 收起</button>
+          </div>
         </div>
 
         <div id="eventsListWrap">
@@ -1317,6 +1328,27 @@ function pushConfigToNative() {
   } catch (e) {}
 }
 pushConfigToNative();
+
+// v84：APP 置顶卡片下方渐隐蒙版——吸顶后在其下缘铺一条渐变带，内容滚近时渐隐不叠在固定内容下
+if (IN_APP) {
+  const fade = document.createElement('div');
+  fade.id = 'stickyFade';
+  document.body.appendChild(fade);
+  const topbarEl = document.querySelector('.topbar');
+  const syncFade = () => {
+    if (!topbarEl) return;
+    if (window.scrollY > 6) {
+      const r = topbarEl.getBoundingClientRect();
+      fade.style.top = Math.round(r.bottom) + 'px';
+      fade.style.display = 'block';
+    } else {
+      fade.style.display = 'none';
+    }
+  };
+  window.addEventListener('scroll', syncFade, { passive: true });
+  window.addEventListener('resize', syncFade);
+  syncFade();
+}
 
 // 支持 ?url=...&key=... 一键配置
 (function checkUrlConfig() {
@@ -2964,7 +2996,7 @@ bindClick('cfgSave', () => {
 
 async function deleteRecord(id) {
   const rec = records.find(r => r.id === id);
-  if (!rec) return;
+  if (!rec) { showToast('记录不存在或已被删除，请刷新页面', 'warning'); return; }
   const label = `${formatDateTime(rec.ts)} · ${rec.member} · ${rec.category.name}`;
   if (!(await uiConfirm({ title: '删除这条记录？', message: label, icon: '🗑' }))) return;
   records = records.filter(r => r.id !== id);
@@ -4015,15 +4047,7 @@ function downloadFile(filename, content, type) {
   URL.revokeObjectURL(url);
 }
 
-document.getElementById('btnExport').onclick = () => {
-  if (!records.length) { showToast('暂无数据', 'warning'); return; }
-  downloadFile(`家庭健康记录_${formatDate(Date.now())}.json`, JSON.stringify({
-    exportTime: new Date().toISOString(), count: records.length,
-    records: records.map(r => ({ timestamp: new Date(r.ts).toISOString(), member: r.member, category: r.category.name, values: r.values, note: r.note }))
-  }, null, 2), 'application/json');
-  showToast('✓ 已导出 JSON');
-};
-
+// v84：健康页导出去掉 JSON 模式，只保留 CSV 一种（按钮改名「📤 导出」）；JSON 导出已移除
 document.getElementById('btnExportCSV').onclick = () => {
   if (!records.length) { showToast('暂无数据', 'warning'); return; }
   const rows = [['记录时间', '家人', '类别', '数值', '单位', '状态', '备注']];
@@ -4078,7 +4102,9 @@ const AI_PRESETS = {
   custom:     { baseUrl: '',                                            model: '', kvLabel: 'API Key' }
 };
 
-let aiConfig = JSON.parse(localStorage.getItem('ai_config') || 'null') || {};
+// v84：内置 AI 配置兜底——未保存过 AI 配置的设备（重装/新手机）开箱即用；在设置里保存后自动覆盖
+const AI_DEFAULT_CONFIG = { provider: 'dashscope', baseUrl: AI_PRESETS.dashscope.baseUrl, model: AI_PRESETS.dashscope.model, apiKey: 'sk-ws-H.ERHXRDI.g0J6.MEYCIQDwE7IGQSLL1EIz1icIZfKUkW67YxDRtO_vcTCuT3-mXQIhALYsJu9ALrT_ewf1-mS2uDV6OYBj4IBp8RuBoCGo9gs1' };
+let aiConfig = Object.assign({}, AI_DEFAULT_CONFIG, JSON.parse(localStorage.getItem('ai_config') || 'null') || {});
 
 function getAiConfig() {
   const cfg = aiConfig && aiConfig.baseUrl && aiConfig.apiKey ? aiConfig : null;
@@ -4637,6 +4663,18 @@ bindClick('btnToggleHistory', () => {
   w.style.display = hide ? 'none' : '';
   b.textContent = hide ? '⇕ 展开' : '⇕ 收起';
 }, 'toggle 健康全部记录');
+// v84：身体全部记录导出 CSV（与健康页同款单模式导出）
+bindClick('btnExportBody', () => {
+  if (!bodyEvents.length) { showToast('暂无数据', 'warning'); return; }
+  const rows = [['记录时间', '类型', '家人', '持续', '备注']];
+  bodyEvents.slice().sort((a, b) => a.ts - b.ts).forEach(ev => {
+    const meta = getEventCategoryMeta(ev.category);
+    rows.push([formatEventDateTime(ev.ts), ev.title || meta.label, ev.member || '', getEventDurationStr(ev) || '', ev.note || '']);
+  });
+  downloadFile(`身体记录_${formatDate(Date.now())}.csv`, '\ufeff' + rows.map(row => row.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n'), 'text/csv;charset=utf-8');
+  showToast('✓ 已导出 CSV');
+});
+
 bindClick('btnToggleEventsList', () => {
   const w = document.getElementById('eventsListWrap');
   const b = document.getElementById('btnToggleEventsList');
