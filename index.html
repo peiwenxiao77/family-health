@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v82: 小组件配套说明：APP端 v82 改版（顶部药丸=时期、中间=距下次月经还有N天）；网页本身无功能变化 -->
+<!-- v83: 内置Supabase云端配置为兜底默认值——重装/换手机打开即自动恢复配置，小组件不再「未配置」 -->
 <!-- v78: 百炼旧模型下线迁移——AI默认预设 qwen-turbo→qwen3.6-flash，识图提示 qwen-vl-plus→qwen3-vl-flash(qwen-turbo/qwen-vl-plus 2026-10-10下线) -->
 <!-- v77: 修复健康页单条删除弹两次确认(外层uiConfirm+deleteRecord内部uiConfirm叠加)——按钮直调deleteRecord只确认一次 -->
 <!-- v76: 修复uiConfirm弹窗取消按钮文字偏左(inline-flex缺justify-content:center) -->
@@ -1296,8 +1296,11 @@ const CFG_URL_KEY = 'sb_url';
 const CFG_KEY_KEY = 'sb_key';
 const CFG_LOCAL_KEY = 'sb_local_mode';
 
-let SUPABASE_URL = localStorage.getItem(CFG_URL_KEY) || '';
-let SUPABASE_ANON_KEY = localStorage.getItem(CFG_KEY_KEY) || '';
+// v83：内置云端配置兜底——重装/新手机打开 APP 即自动恢复配置（publishable 公开钥，受 RLS 保护）
+const DEFAULT_SB_URL = 'https://dlnqhosjodkgyuojbyxo.supabase.co';
+const DEFAULT_SB_KEY = 'sb_publishable_WJ4NSoqO2LTfq6WUo728DQ_0eMnvABo';
+let SUPABASE_URL = localStorage.getItem(CFG_URL_KEY) || DEFAULT_SB_URL;
+let SUPABASE_ANON_KEY = localStorage.getItem(CFG_KEY_KEY) || DEFAULT_SB_KEY;
 let LOCAL_MODE = localStorage.getItem(CFG_LOCAL_KEY) === '1';
 
 // v74：APP 环境检测——AndroidBridge 仅存在于 APK WebView，网页浏览器没有。
