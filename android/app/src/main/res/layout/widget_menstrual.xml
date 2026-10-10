@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_bg">
 
-    <!-- v79：环形点阵（Bitmap 绘制，参考周期圆环图） -->
+    <!-- 环形点阵（Bitmap 绘制） -->
     <ImageView
         android:id="@+id/iv_ring"
         android:layout_width="match_parent"
@@ -19,6 +19,7 @@
         android:orientation="vertical"
         android:gravity="center_horizontal">
 
+        <!-- v82：顶部药丸显示时期（卵泡期等），按时期配色 -->
         <TextView
             android:id="@+id/tv_date"
             android:layout_width="wrap_content"
@@ -27,43 +28,44 @@
             android:paddingRight="12dp"
             android:paddingTop="3dp"
             android:paddingBottom="3dp"
-            android:text="M月D日"
-            android:textSize="11sp"
+            android:text="—"
+            android:textSize="12sp"
             android:textStyle="bold"
-            android:textColor="#FFFFFF"
-            android:background="@drawable/pill_pink" />
+            android:textColor="@color/w_menstrual_dark"
+            android:background="@drawable/pill_menstrual" />
 
+        <!-- 上次月经日期 + 平均周期（自诊断） -->
         <TextView
             android:id="@+id/tv_phase"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="3dp"
-            android:text="—"
+            android:text=""
             android:textSize="10sp"
+            android:textColor="@color/w_text_soft" />
+
+        <!-- v82：小字「距下次月经还有」+ 大字天数 -->
+        <TextView
+            android:id="@+id/tv_pre"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="距下次月经还有"
+            android:textSize="11sp"
             android:textColor="@color/w_text_soft" />
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="bottom"
-            android:layout_marginTop="2dp">
-
-            <TextView
-                android:id="@+id/tv_pre"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="第"
-                android:textSize="14sp"
-                android:textColor="@color/w_text_soft"
-                android:layout_marginBottom="6dp" />
+            android:gravity="bottom">
 
             <TextView
                 android:id="@+id/tv_days"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="—"
-                android:textSize="36sp"
+                android:textSize="34sp"
                 android:textStyle="bold"
                 android:textColor="@color/w_menstrual"
                 android:layout_marginLeft="3dp"
@@ -74,7 +76,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="天"
-                android:textSize="14sp"
+                android:textSize="12sp"
                 android:textColor="@color/w_text_soft"
                 android:layout_marginBottom="6dp" />
         </LinearLayout>
@@ -83,12 +85,12 @@
             android:id="@+id/tv_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="5dp"
+            android:layout_marginTop="4dp"
             android:paddingLeft="12dp"
             android:paddingRight="12dp"
             android:paddingTop="3dp"
             android:paddingBottom="3dp"
-            android:text="—"
+            android:text=""
             android:textSize="11sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF"
