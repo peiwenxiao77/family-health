@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v93: ①日历各时期+小组件圆点统一改为马卡龙配色(已向用户确认)：月经期草莓粉#F7B3BD/卵泡期奶黄#FAEDBF/排卵期杏桃#FDD9B5/排卵日深杏#F5A96B/黄体期开心果#D6E8C8 ②修复新成员不同步——成员列表此前只存本机，现从云端记录+身体事件自动合并 ③自定义事件类型同样从云端事件自动重建 -->
 <!-- v92: ①月经周期&来潮天数图去除每人最后一条记录(最新一次月经没有「下一次」算不出周期天数,整条不进图) ②身体频率图图例常显——单人有数据也显示成员名+次数,让「分人」一眼可见 -->
 <!-- v91: ①修复全部记录出现「文/龙」——早期版本存的单字名，云端已批量改为文文/龙龙(61+18条)，代码加 MEMBER_ALIASES 兜底归一 ②小组件圆点颜色与身体日历各时期统一为莫兰迪配色：月经期红/卵泡期黄/排卵期橙/排卵日深橙/黄体期绿 -->
 <!-- v90: 趋势图/频率图按家人分人多折线——健康趋势图一人一条线(颜色区分+图例)、月经周期&来潮天数改按人分组折线(实线=周期/虚线=来潮)、痛风&同房频率图改按人多折线(同人相邻才算周期，修正混人算错周期的问题) -->
@@ -539,15 +540,15 @@
   /* 普通日期（有数字但无阶段标记）加浅色边框，让月历结构清晰 */
   .menstrual-day:not(.empty):not(.in-period):not(.menstrual-predicted):not(.follicular):not(.ovulation-window):not(.ovulation-day):not(.luteal):not(.dysmenorrhea-day) { border-color: #cbd5e1; }
   .menstrual-day.today { box-shadow: inset 0 0 0 2px var(--primary, #f97316); font-weight: 800; }
-  /* v91：各时期统一莫兰迪配色（与小组件圆点一致）——月经期红/卵泡期黄/排卵期橙/排卵日深橙/黄体期绿 */
-  .menstrual-day.in-period { background: linear-gradient(135deg, #C1716B, #9E544E); color: white; cursor: pointer; }
-  .menstrual-day.in-period .marker, .menstrual-day.in-period .phase-tag { color: white; }
-  /* 修复 bug：CSS 名要和 JS 一致 —— 预测月经期浅红格 */
-  .menstrual-day.menstrual-predicted { background: linear-gradient(135deg, #E8C9C4, #D9AEA7); color: #7A3E38; box-shadow: inset 0 0 0 1.5px #C1716B; }
-  .menstrual-day.follicular { background: #E7DCB4; color: #77631F; }
-  .menstrual-day.ovulation-window { background: #EBCBA6; color: #7E4E1E; }
-  .menstrual-day.ovulation-day { background: linear-gradient(135deg, #C67946, #A85A2E); color: white; font-weight: 800; box-shadow: 0 0 0 2px #B06234; }
-  .menstrual-day.luteal { background: #CBD6BC; color: #475C36; }
+  /* v93：各时期统一马卡龙配色（已向用户确认，与小组件圆点同一套色值）——月经期草莓粉/卵泡期奶黄/排卵期杏桃/排卵日深杏/黄体期开心果绿 */
+  .menstrual-day.in-period { background: linear-gradient(135deg, #F9C2CB, #F2A0AC); color: #7A2837; cursor: pointer; }
+  .menstrual-day.in-period .marker, .menstrual-day.in-period .phase-tag { color: #7A2837; }
+  /* 修复 bug：CSS 名要和 JS 一致 —— 预测月经期浅粉格 */
+  .menstrual-day.menstrual-predicted { background: #FBDCE1; color: #7A2837; box-shadow: inset 0 0 0 1.5px #F7B3BD; }
+  .menstrual-day.follicular { background: #FAEDBF; color: #8A6D1E; }
+  .menstrual-day.ovulation-window { background: #FDD9B5; color: #96551F; }
+  .menstrual-day.ovulation-day { background: #F5A96B; color: #6E3A10; font-weight: 800; box-shadow: 0 0 0 2px #E8873F; }
+  .menstrual-day.luteal { background: #D6E8C8; color: #4E6B36; }
   .menstrual-day.dysmenorrhea-day { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #991b1b; box-shadow: inset 0 0 0 1.5px #ef4444; }
   /* 所有非空白日期 hover 都能缩放（包括月经期、痛经日） */
   .menstrual-day:hover:not(.empty) { transform: scale(1.05); z-index: 2; }
@@ -1401,6 +1402,40 @@ const STORAGE_KEYS = { CACHE: 'sb_local_cache', CATS: 'sb_custom_cats', MEMBERS:
 // v91：旧版本把成员名存成了单字（文/龙），云端已批量修复为文文/龙龙；这里兜底归一，防各设备本地缓存残留
 const MEMBER_ALIASES = { '文': '文文', '龙': '龙龙' };
 function normalizeMemberName(m) { return MEMBER_ALIASES[m] || m; }
+
+// v93：成员列表此前只存本机(localStorage)——新加成员其它设备看不到。
+// 改为「跟数据走」：从云端健康记录+身体事件的 member 字段自动合并成员。
+function syncMembersFromData() {
+  const known = new Set(familyMembers);
+  let added = false;
+  const consider = m => {
+    if (!m) return;
+    m = normalizeMemberName(m);
+    if (m === '未分类') return;
+    if (!known.has(m)) { familyMembers.push(m); known.add(m); added = true; }
+  };
+  records.forEach(r => consider(r.member));
+  bodyEvents.forEach(e => consider(e.member));
+  if (added) { saveMembers(); console.log('[sync] 从云端数据合并成员:', familyMembers.join('、')); }
+}
+
+// v93：自定义事件类型也只存本机——从云端身体事件的 category(cust_xxx)+payload.custom_name 自动重建。
+// 图标/颜色按名字哈希推导，两台设备对同一名字推导结果一致。
+function syncCustomTypesFromEvents() {
+  let added = false;
+  bodyEvents.forEach(e => {
+    const cat = e.category;
+    if (!cat || typeof cat !== 'string' || !cat.startsWith('cust_')) return;
+    if (customEventTypes.some(c => c.id === cat)) return;
+    const name = (e.payload && e.payload.custom_name) || '';
+    if (!name) return;
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+    customEventTypes.push({ id: cat, name, icon: CUSTOM_ICONS[h % CUSTOM_ICONS.length], color: CUSTOM_PALETTE[h % CUSTOM_PALETTE.length] });
+    added = true;
+  });
+  if (added) { saveCustomEventTypes(); console.log('[sync] 从云端事件重建自定义类型:', customEventTypes.map(c => c.name).join('、')); }
+}
 let records = [];
 let bodyEvents = [];
 try { bodyEvents = (JSON.parse(localStorage.getItem(STORAGE_KEYS.EVENTS)) || []).map(normalizeBodyEvent); }
@@ -1587,6 +1622,7 @@ function loadLocalCache() {
       if (m && r.category.icon === m[0]) r.category.icon = m[1];
     }
   });
+  syncMembersFromData();  // v93：本地缓存里的成员也合并（首次打开时云端数据未到的兜底）
 }
 function saveLocalCache() {
   try { localStorage.setItem(STORAGE_KEYS.CACHE, JSON.stringify(records)); } catch (e) {}
@@ -2039,6 +2075,7 @@ async function loadFromCloud() {
       customCategories[r.category.name] = { icon: r.category.icon || '📊', unit: r.category.unit || '' };
     }
   });
+  syncMembersFromData();  // v93：云端记录里的成员自动合并进成员列表
   saveCustomCategories();
   saveLocalCache();
 }
@@ -2072,6 +2109,7 @@ function setupRealtime() {
       const newRec = payload.new;
       if (!records.find(r => r.id === newRec.id)) {
         records.unshift(newRec);
+        syncMembersFromData();  // v93：其它设备新增的成员实时合并
         saveLocalCache();
         render();
         showToast(`🔔 新增：${newRec.category.icon} ${newRec.member} · ${newRec.values[0]?.value}${newRec.values[0]?.unit || ''}`);
@@ -2121,6 +2159,8 @@ async function loadBodyEventsFromCloud() {
     return;
   }
   bodyEvents = (data || []).map(normalizeBodyEvent);
+  syncMembersFromData();       // v93：云端事件里的成员自动合并
+  syncCustomTypesFromEvents(); // v93：云端事件里的自定义类型自动重建
   saveBodyEventsCache();
 }
 
@@ -2174,6 +2214,8 @@ function subscribeBodyEvents() {
       const newEv = normalizeBodyEvent(payload.new);
       if (!bodyEvents.find(e => e.id === newEv.id)) {
         bodyEvents.unshift(newEv);
+        syncMembersFromData();       // v93：其它设备新增的成员实时合并
+        syncCustomTypesFromEvents(); // v93：其它设备新建的自定义类型实时重建
         saveBodyEventsCache();
         renderEvents();
         const memberIcon = getMemberIcon(newEv.member);
@@ -4977,12 +5019,12 @@ function renderMenstrualCalendar() {
 
   // 图例（简化：颜色 + 文字标签）
   legendEl.innerHTML = `
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#C1716B,#9E544E);"></span>已记录月经期</div>
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#E8C9C4,#D9AEA7);box-shadow:inset 0 0 0 1px #C1716B;"></span>预测月经期</div>
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#E7DCB4;"></span>卵泡期</div>
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#EBCBA6;"></span>排卵期</div>
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#C67946,#A85A2E);box-shadow:0 0 0 2px #B06234;"></span>排卵日</div>
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#CBD6BC;"></span>黄体期</div>
+    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#F9C2CB,#F2A0AC);"></span>已记录月经期</div>
+    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#FBDCE1;box-shadow:inset 0 0 0 1px #F7B3BD;"></span>预测月经期</div>
+    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#FAEDBF;"></span>卵泡期</div>
+    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#FDD9B5;"></span>排卵期</div>
+    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#F5A96B;box-shadow:0 0 0 2px #E8873F;"></span>排卵日</div>
+    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#D6E8C8;"></span>黄体期</div>
     <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#fee2e2,#fecaca);box-shadow:inset 0 0 0 1px #ef4444;"></span>痛经日</div>
   `;
 }
