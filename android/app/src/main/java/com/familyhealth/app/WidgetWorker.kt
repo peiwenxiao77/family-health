@@ -85,12 +85,6 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             return if (raw in 1..99999999999L) raw * 1000 else raw
         }
 
-        private fun fmtDate(ms: Long): String {
-            val c = Calendar.getInstance()
-            c.timeInMillis = ms
-            return "${c.get(Calendar.MONTH) + 1}月${c.get(Calendar.DAY_OF_MONTH)}日"
-        }
-
         private fun refreshInternal(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val views = RemoteViews(context.packageName, R.layout.widget_menstrual)
@@ -102,14 +96,14 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             var pillText = "未配置"
             var pillBgRes = R.drawable.pill_gray
             var pillTextColorRes = R.color.w_text_main
-            var infoText = "打开APP设置→保存配置"
+            var infoText = "打开APP设置→保存配置" // v89：仅错误/空状态显示，正常时隐藏
             var preText = "距下次月经还有"
             var dayText = "—"
             var dayColorRes = R.color.w_text_main
-            var statusText = ""
-            var statusGreen = false
+            var statusText = "" // v89：只在经期将至/已推迟时显示，「周期规律」不再显示
             var ringCycle = 28
             var ringDay = 0 // 0 = 不高亮任何点
+            var ringPeriodDays = 5
 
             if (url.isNotBlank() && key.isNotBlank()) {
                 try {
@@ -124,23 +118,29 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                     conn.disconnect()
                     val arr = JSONArray(body)
 
-                    // 按成员分组收集月经起点，取「最近一次记录最新」的成员
-                    val byMember = HashMap<String, MutableList<Long>>()
+                    // 按成员分组收集月经起点 + 该次经期天数，取「最近一次记录最新」的成员
+                    val byMember = HashMap<String, MutableList<Pair<Long, Int>>>()
                     for (i in 0 until arr.length()) {
                         val o = arr.getJSONObject(i)
                         val p = o.optJSONObject("payload")
                         if (p != null && !p.optBoolean("is_period_start", true)) continue
                         val ts = normalizeTs(o.opt("ts")) ?: continue
                         val m = o.optString("member", "")
-                        byMember.getOrPut(m) { mutableListOf() }.add(ts)
+                        val dur = when (val d = p?.opt("duration_days")) {
+                            is Number -> d.toInt()
+                            is String -> d.toIntOrNull() ?: 5
+                            else -> 5
+                        }.coerceIn(1, 14)
+                        byMember.getOrPut(m) { mutableListOf() }.add(Pair(ts, dur))
                     }
 
                     if (byMember.isEmpty()) {
                         pillText = "暂无记录"
                         infoText = "在APP里记录一次月经"
                     } else {
-                        val latest = byMember.values.maxByOrNull { it.maxOrNull() ?: 0L }!!
-                        val sorted = latest.map { startOfDay(it) }.sorted()
+                        val latest = byMember.values.maxByOrNull { it.maxOfOrNull { p -> p.first } ?: 0L }!!
+                        val sorted = latest.map { startOfDay(it.first) }.sorted()
+                        val lastDur = latest.maxByOrNull { it.first }!!.second
                         // 与网页同步——剔除 15~45 天外离群周期 + 最近 6 个有效周期加权平均(6:5:4:3:2:1)
                         val allGaps = sorted.zipWithNext { a, b -> ((b - a) / DAY).toInt() }
                         val validGaps = allGaps.filter { it in 15..45 }
@@ -164,7 +164,7 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                         val daysLeft = ((next0 - today0) / DAY).toInt()
                         val ovu = avg - 14
                         val phase = when {
-                            dayIn <= 5 -> "月经期"
+                            dayIn <= lastDur -> "月经期"
                             dayIn in (ovu - 2)..(ovu + 2) -> "排卵期"
                             dayIn < ovu - 2 -> "卵泡期"
                             else -> "黄体期"
@@ -189,17 +189,15 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                             "排卵期" -> R.color.w_ovulation
                             else -> R.color.w_luteal
                         }
-                        infoText = "上次${fmtDate(last0)} · 周期约${avg}天"
+                        infoText = "" // v89：正常状态不再显示「上次·周期约」
                         preText = if (daysLeft < 0) "月经已推迟" else "距下次月经还有"
                         dayText = abs(daysLeft).toString()
                         ringCycle = avg
                         ringDay = dayIn
-                        // 底部状态药丸
-                        when {
-                            daysLeft < 0 -> { statusText = "该记录啦"; statusGreen = false }
-                            daysLeft <= 2 -> { statusText = "经期将至"; statusGreen = false }
-                            else -> { statusText = "周期规律"; statusGreen = true }
-                        }
+                        ringPeriodDays = lastDur
+                        // 底部药丸：v89 只保留警告态，「周期规律」绿色药丸移除
+                        if (daysLeft < 0) statusText = "该记录啦"
+                        else if (daysLeft <= 2) statusText = "经期将至"
                     }
                 } catch (e: Exception) {
                     pillText = "网络错误"
@@ -210,28 +208,27 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             views.setTextViewText(R.id.tv_date, pillText)
             views.setInt(R.id.tv_date, "setBackgroundResource", pillBgRes)
             views.setTextColor(R.id.tv_date, context.getColor(pillTextColorRes))
-            views.setTextViewText(R.id.tv_phase, infoText)
-            views.setTextColor(R.id.tv_phase, context.getColor(R.color.w_text_soft))
+            if (infoText.isNotEmpty()) {
+                views.setTextViewText(R.id.tv_phase, infoText)
+                views.setTextColor(R.id.tv_phase, context.getColor(R.color.w_text_soft))
+                views.setViewVisibility(R.id.tv_phase, View.VISIBLE)
+            } else {
+                views.setViewVisibility(R.id.tv_phase, View.GONE)
+            }
             views.setTextViewText(R.id.tv_pre, preText)
             views.setTextViewText(R.id.tv_days, dayText)
             views.setTextColor(R.id.tv_days, context.getColor(dayColorRes))
             if (statusText.isNotEmpty()) {
                 views.setTextViewText(R.id.tv_status, statusText)
-                views.setTextColor(
-                    R.id.tv_status,
-                    context.getColor(if (statusGreen) R.color.w_status_green_dark else android.R.color.white)
-                )
-                views.setInt(
-                    R.id.tv_status, "setBackgroundResource",
-                    if (statusGreen) R.drawable.pill_green else R.drawable.pill_red
-                )
+                views.setTextColor(R.id.tv_status, context.getColor(android.R.color.white))
+                views.setInt(R.id.tv_status, "setBackgroundResource", R.drawable.pill_red)
                 views.setViewVisibility(R.id.tv_status, View.VISIBLE)
             } else {
-                views.setViewVisibility(R.id.tv_status, View.INVISIBLE)
+                views.setViewVisibility(R.id.tv_status, View.GONE)
             }
             // 环形点阵单独兜底：即使绘制失败也不影响文字更新
             try {
-                views.setImageViewBitmap(R.id.iv_ring, buildRingBitmap(ringCycle, ringDay, pillText))
+                views.setImageViewBitmap(R.id.iv_ring, buildRingBitmap(ringCycle, ringDay, pillText, ringPeriodDays))
             } catch (_: Exception) {}
 
             // 点击小组件打开 APP
@@ -252,39 +249,44 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             views.setTextViewText(R.id.tv_date, msg)
             views.setInt(R.id.tv_date, "setBackgroundResource", R.drawable.pill_gray)
             views.setTextColor(R.id.tv_date, context.getColor(R.color.w_text_main))
-            views.setTextViewText(R.id.tv_phase, "")
+            views.setViewVisibility(R.id.tv_phase, View.GONE)
             views.setTextViewText(R.id.tv_pre, "")
             views.setTextViewText(R.id.tv_days, "—")
             views.setTextColor(R.id.tv_days, context.getColor(R.color.w_text_main))
-            views.setViewVisibility(R.id.tv_status, View.INVISIBLE)
+            views.setViewVisibility(R.id.tv_status, View.GONE)
             manager.updateAppWidget(ComponentName(context, MenstrualWidget::class.java), views)
         }
 
         /**
-         * 环形点阵 Bitmap：点数 = 周期天数（18~45 均匀排一圈，第1天从顶部顺时针），
-         * 颜色按时期分段，今天的位置放大高亮。
-         * 256px（≈256KB，远小于 Binder 1MB 限制——v79 的 480px 超限导致整次更新失败）
+         * 环形点阵 Bitmap（v89 重排）：
+         * - 点数 = 预计周期天数（加权平均，18~45）
+         * - 颜色按周期顺序分四段纯色：月经期粉 → 卵泡期紫 → 排卵期橙 → 黄体期青绿
+         *   （月经期天数取最近一次记录的实际经期天数，排卵窗口 = 排卵日±2，与顶部时期药丸同一套判定）
+         * - 今天的位置放大高亮
+         * - 圆环整体缩小（半径 0.46→0.40），点不再碰到边际
+         * 256px（≈256KB，远小于 Binder 1MB 限制）
          */
-        private fun buildRingBitmap(cycleLen: Int, today: Int, phase: String): Bitmap {
+        private fun buildRingBitmap(cycleLen: Int, today: Int, phase: String, periodDays: Int): Bitmap {
             val size = 256
             val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bmp)
             val cx = size / 2f
             val cy = size / 2f
-            val radius = size * 0.46f
+            val radius = size * 0.40f
             val n = cycleLen.coerceIn(18, 45)
-            val baseR = size * (if (n > 34) 0.019f else 0.023f)
+            val baseR = size * (if (n > 34) 0.017f else 0.021f)
+            val pDays = periodDays.coerceIn(1, 14)
             val ovuStart = n - 14
 
-            val mensColor = 0xFFF7A6C6.toInt()
-            val ovuColor = 0xFFF8B84E.toInt()
-            val follicle = intArrayOf(0xFF9FDD8C.toInt(), 0xFFC8E86E.toInt(), 0xFFF2E36B.toInt())
-            val luteal = intArrayOf(0xFFC9AFFB.toInt(), 0xFFEFB1EF.toInt(), 0xFFF9A8C0.toInt())
-            val todayColor = when {
-                phase.startsWith("月经期") -> 0xFFEC4899.toInt()
-                phase.startsWith("排卵期") -> 0xFFF59E0B.toInt()
-                phase.startsWith("卵泡期") -> 0xFF84CC16.toInt()
-                phase.startsWith("黄体期") -> 0xFFA855F7.toInt()
+            val mensColor = 0xFFF9A8C4.toInt()   // 月经期 粉
+            val follicleColor = 0xFFB9A8F5.toInt() // 卵泡期 紫
+            val ovuColor = 0xFFF8B84E.toInt()    // 排卵期 橙
+            val lutealColor = 0xFF5EEAD4.toInt() // 黄体期 青绿
+            val todayColor = when (phase) {
+                "月经期" -> 0xFFEC4899.toInt()
+                "排卵期" -> 0xFFF59E0B.toInt()
+                "卵泡期" -> 0xFF8B5CF6.toInt()
+                "黄体期" -> 0xFF14B8A6.toInt()
                 else -> 0xFFB9AFA7.toInt()
             }
             val highlight = if (today >= 1) ((today - 1) % n) + 1 else 0
@@ -304,10 +306,10 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                     canvas.drawCircle(x, y, baseR * 1.6f, p)
                 } else {
                     p.color = when {
-                        d <= 5 -> mensColor
+                        d <= pDays -> mensColor
                         d in (ovuStart - 2)..(ovuStart + 2) -> ovuColor
-                        d < ovuStart - 2 -> follicle[(d - 1) % follicle.size]
-                        else -> luteal[(d - 1) % luteal.size]
+                        d < ovuStart - 2 -> follicleColor
+                        else -> lutealColor
                     }
                     canvas.drawCircle(x, y, baseR, p)
                 }
