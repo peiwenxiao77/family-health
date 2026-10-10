@@ -163,8 +163,10 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                         val next0 = last0 + avg * DAY
                         val daysLeft = ((next0 - today0) / DAY).toInt()
                         val ovu = avg - 14
+                        // v91：排卵日单独显示（与网页日历一致），配色统一为莫兰迪
                         val phase = when {
                             dayIn <= lastDur -> "月经期"
+                            dayIn == ovu -> "排卵日"
                             dayIn in (ovu - 2)..(ovu + 2) -> "排卵期"
                             dayIn < ovu - 2 -> "卵泡期"
                             else -> "黄体期"
@@ -174,18 +176,21 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                         pillBgRes = when (phase) {
                             "月经期" -> R.drawable.pill_menstrual
                             "卵泡期" -> R.drawable.pill_follicular
+                            "排卵日" -> R.drawable.pill_ovulation_day
                             "排卵期" -> R.drawable.pill_ovulation
                             else -> R.drawable.pill_luteal
                         }
                         pillTextColorRes = when (phase) {
                             "月经期" -> R.color.w_menstrual_dark
                             "卵泡期" -> R.color.w_follicular_dark
+                            "排卵日" -> R.color.w_ovulation_day_dark
                             "排卵期" -> R.color.w_ovulation_dark
                             else -> R.color.w_luteal_dark
                         }
                         dayColorRes = when (phase) {
                             "月经期" -> R.color.w_menstrual
                             "卵泡期" -> R.color.w_follicular
+                            "排卵日" -> R.color.w_ovulation_day
                             "排卵期" -> R.color.w_ovulation
                             else -> R.color.w_luteal
                         }
@@ -258,12 +263,12 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         }
 
         /**
-         * 环形点阵 Bitmap（v89 重排）：
+         * 环形点阵 Bitmap（v91 配色统一）：
          * - 点数 = 预计周期天数（加权平均，18~45）
-         * - 颜色按周期顺序分四段纯色：月经期粉 → 卵泡期紫 → 排卵期橙 → 黄体期青绿
+         * - 颜色与网页身体日历统一为莫兰迪配色：月经期红 → 卵泡期黄 → 排卵期橙（排卵日当天深橙）→ 黄体期绿
          *   （月经期天数取最近一次记录的实际经期天数，排卵窗口 = 排卵日±2，与顶部时期药丸同一套判定）
          * - 今天的位置放大高亮
-         * - 圆环整体缩小（半径 0.46→0.40），点不再碰到边际
+         * - 圆环整体缩小（半径 0.40），点不再碰到边际
          * 256px（≈256KB，远小于 Binder 1MB 限制）
          */
         private fun buildRingBitmap(cycleLen: Int, today: Int, phase: String, periodDays: Int): Bitmap {
@@ -278,15 +283,18 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             val pDays = periodDays.coerceIn(1, 14)
             val ovuStart = n - 14
 
-            val mensColor = 0xFFF9A8C4.toInt()   // 月经期 粉
-            val follicleColor = 0xFFB9A8F5.toInt() // 卵泡期 紫
-            val ovuColor = 0xFFF8B84E.toInt()    // 排卵期 橙
-            val lutealColor = 0xFF5EEAD4.toInt() // 黄体期 青绿
+            // v91：莫兰迪配色（与网页 .menstrual-day 各时期一致）
+            val mensColor = 0xFFC1716B.toInt()     // 月经期 红
+            val follicleColor = 0xFFC0A45E.toInt() // 卵泡期 黄
+            val ovuColor = 0xFFD0925C.toInt()      // 排卵期 橙
+            val ovuDayColor = 0xFFB06234.toInt()   // 排卵日 深橙
+            val lutealColor = 0xFF8CA47E.toInt()   // 黄体期 绿
             val todayColor = when (phase) {
-                "月经期" -> 0xFFEC4899.toInt()
-                "排卵期" -> 0xFFF59E0B.toInt()
-                "卵泡期" -> 0xFF8B5CF6.toInt()
-                "黄体期" -> 0xFF14B8A6.toInt()
+                "月经期" -> 0xFF9E544E.toInt()
+                "排卵日" -> 0xFF8F4A20.toInt()
+                "排卵期" -> 0xFFA96A32.toInt()
+                "卵泡期" -> 0xFF8F7A3E.toInt()
+                "黄体期" -> 0xFF5F7850.toInt()
                 else -> 0xFFB9AFA7.toInt()
             }
             val highlight = if (today >= 1) ((today - 1) % n) + 1 else 0
@@ -307,6 +315,7 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                 } else {
                     p.color = when {
                         d <= pDays -> mensColor
+                        d == ovuStart -> ovuDayColor
                         d in (ovuStart - 2)..(ovuStart + 2) -> ovuColor
                         d < ovuStart - 2 -> follicleColor
                         else -> lutealColor
