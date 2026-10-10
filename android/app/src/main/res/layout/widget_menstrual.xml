@@ -34,7 +34,7 @@
             android:textColor="@color/w_menstrual_dark"
             android:background="@drawable/pill_menstrual" />
 
-        <!-- 上次月经日期 + 平均周期（自诊断） -->
+        <!-- v89：仅错误/空状态显示（正常时 GONE） -->
         <TextView
             android:id="@+id/tv_phase"
             android:layout_width="wrap_content"
@@ -42,6 +42,7 @@
             android:layout_marginTop="3dp"
             android:text=""
             android:textSize="10sp"
+            android:visibility="gone"
             android:textColor="@color/w_text_soft" />
 
         <!-- v82：小字「距下次月经还有」+ 大字天数 -->
@@ -81,6 +82,7 @@
                 android:layout_marginBottom="6dp" />
         </LinearLayout>
 
+        <!-- v89：仅经期将至/已推迟警告时显示 -->
         <TextView
             android:id="@+id/tv_status"
             android:layout_width="wrap_content"
@@ -93,7 +95,8 @@
             android:text=""
             android:textSize="11sp"
             android:textStyle="bold"
+            android:visibility="gone"
             android:textColor="#FFFFFF"
-            android:background="@drawable/pill_green" />
+            android:background="@drawable/pill_red" />
     </LinearLayout>
 </FrameLayout>
