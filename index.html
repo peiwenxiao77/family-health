@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v95: ①趋势图时间范围改为 全部/近一年/近一个月(默认全部) ②「还有N个类别」类别选择框移到所有趋势图表最上面 ③频闪根治(APP内禁用backdrop-filter+顶栏提升合成层+折叠改opacity/visibility不再display:none) ④成员主题色：文文粉/龙龙蓝/妈妈紫(修哈希撞色)，条目人名=深色文字+浅色底色药丸，身体页人名旁符号(👤)删去 -->
+<!-- v96: ①自定义项目AI生成1~3个记录字段(弹窗内可填写,缓存建议,存payload.ai_fields,全部记录第二行显示) ②趋势「显示中」行删除,整合进「点开选择/一键全显」面板 ③两页全部记录两行制:第一行=人名+项目名,第二行=记录内容 ④两页成员筛选按键一人一色 ⑤频闪+折叠终极修复:删除stickyFade蒙版,APP折叠恢复display:none(让出位置) -->
 <!-- v93: ①日历各时期+小组件圆点统一改为马卡龙配色(已向用户确认)：月经期草莓粉#F7B3BD/卵泡期奶黄#FAEDBF/排卵期杏桃#FDD9B5/排卵日深杏#F5A96B/黄体期开心果#D6E8C8 ②修复新成员不同步——成员列表此前只存本机，现从云端记录+身体事件自动合并 ③自定义事件类型同样从云端事件自动重建 -->
 <!-- v92: ①月经周期&来潮天数图去除每人最后一条记录(最新一次月经没有「下一次」算不出周期天数,整条不进图) ②身体频率图图例常显——单人有数据也显示成员名+次数,让「分人」一眼可见 -->
 <!-- v91: ①修复全部记录出现「文/龙」——早期版本存的单字名，云端已批量改为文文/龙龙(61+18条)，代码加 MEMBER_ALIASES 兜底归一 ②小组件圆点颜色与身体日历各时期统一为莫兰迪配色：月经期红/卵泡期黄/排卵期橙/排卵日深橙/黄体期绿 -->
@@ -97,7 +97,8 @@
   .clock .time .pulse { display: inline-block; width: 6px; height: 6px; background: var(--primary); border-radius: 50%; margin-right: 6px; animation: pulse 1.6s ease-in-out infinite; vertical-align: middle; }
   .clock .date { font-size: 11px; color: var(--text-3); margin-top: 0; }
   /* 顶栏收纳（v58）：下滑时右侧状态区整体释放空间，只留大标题+tabs */
-  .header-right { transition: opacity 0.2s ease; }
+  /* 顶栏收纳（v58）：下滑时右侧状态区整体释放空间，只留大标题+tabs */
+  /* v96：去掉 opacity 过渡（display:none 无过渡意义，过渡反而在部分 WebView 引发闪烁） */
   .header-right.header-collapsed { display: none; }
 
   /* v74：APP 专属样式（html.in-app 仅在 APK WebView 中存在，网页版不受影响）
@@ -112,14 +113,8 @@
   /* v95：根治 WebView 吸顶频闪——backdrop-filter 模糊 + fixed 蒙版叠加在部分安卓 WebView
      上会导致 sticky 层反复重合成（整条顶栏闪烁）。APP 内禁用模糊并把顶栏提升为独立合成层 */
   html.in-app .topbar { backdrop-filter: none; -webkit-backdrop-filter: none; transform: translateZ(0); }
-  /* v95：APP 内折叠改为透明度隐藏——display:none 会改变布局高度引发抖动，opacity/visibility 只走合成器 */
-  html.in-app .header-right.header-collapsed { display: flex; opacity: 0; visibility: hidden; pointer-events: none; }
-  /* v84：APP 置顶卡片下方渐隐蒙版——内容滚动靠近吸顶栏时渐隐，不叠在固定内容下 */
-  html.in-app #stickyFade {
-    position: fixed; left: 0; right: 0; height: 42px; z-index: 49;
-    background: linear-gradient(180deg, #ffedd5 0%, rgba(255, 237, 213, 0) 100%);
-    pointer-events: none; opacity: 0; transition: opacity 0.15s linear;
-  }
+  /* v96：折叠恢复 display:none（让出位置）+ stickyFade 蒙版整体删除——
+     v95 的 opacity/visibility 方案没能根治频闪且折叠不再让位，实测蒙版才是频闪根源 */
   /* v94：APP 身体「全部记录」卡片——编辑/删除按钮垂直居中（与桌面端一致），不再压在卡片底部 */
   html.in-app .event-card { padding: 8px 216px 8px 12px; }
   html.in-app .event-card-actions { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); justify-content: flex-start; margin-top: 0; width: auto; }
@@ -757,11 +752,9 @@
           <button class="tab" data-range="30">近一个月</button>
         </div>
       </div>
-      <!-- v95：类别选择框移到所有图表最上面 -->
+      <!-- v95：类别选择框移到所有图表最上面；v96：「显示中」行删除，整合进选择面板 -->
       <div style="margin-bottom:12px;" id="chartCatsWrap">
-        <div style="font-size:12px;color:var(--text-3);margin-bottom:6px;">👁 显示中：</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;" id="chartCatsShown"></div>
-        <button class="btn-secondary" id="chartMoreCatsBtn" style="margin-top:8px;font-size:12px;display:none;">还有更多类别，点开选择</button>
+        <button class="btn-secondary" id="chartMoreCatsBtn" style="font-size:12px;display:none;">☰ 点开选择 / 一键全显</button>
         <div id="chartMoreCatsPanel" style="margin-top:10px;display:none;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);">
           <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;">勾选要显示的类别：</div>
           <div id="chartAllCats" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
@@ -1027,6 +1020,8 @@
         <datalist id="customEventTypesList"></datalist>
         <div id="customTypesHint" style="font-size:11px;color:var(--text-3);margin-top:4px;">已添加的项目会显示在下拉里，点击 ➕ 添加按钮保存为新自定义项目</div>
       </div>
+      <!-- v96：AI 生成该项目的建议记录字段（1~3 个），可填写后一并保存 -->
+      <div id="aiFieldsWrap" style="margin-top:6px;"></div>
     </div>
 
     <!-- 通用：备注 -->
@@ -1362,34 +1357,8 @@ function pushConfigToNative() {
 }
 pushConfigToNative();
 
-// v84：APP 置顶卡片下方渐隐蒙版——吸顶后在其下缘铺一条渐变带，内容滚近时渐隐不叠在固定内容下
-// v94：修复频闪——display none/block 一刀切改为 opacity 过渡 + 迟滞阈值 + rAF 节流 + top 只在变化时写入
-if (IN_APP) {
-  const fade = document.createElement('div');
-  fade.id = 'stickyFade';
-  document.body.appendChild(fade);
-  const topbarEl = document.querySelector('.topbar');
-  let shown = false, lastTop = -1, ticking = false;
-  const syncFade = () => {
-    ticking = false;
-    if (!topbarEl) return;
-    const y = window.scrollY;
-    const want = shown ? y > 6 : y > 24;  // 迟滞：>24 显示、<6 隐藏，临界点不横跳
-    if (want !== shown) {
-      shown = want;
-      fade.style.opacity = shown ? '1' : '0';
-    }
-    if (shown) {
-      const t = Math.round(topbarEl.getBoundingClientRect().bottom);
-      if (t !== lastTop) { lastTop = t; fade.style.top = t + 'px'; }
-    }
-  };
-  window.addEventListener('scroll', () => {
-    if (!ticking) { ticking = true; requestAnimationFrame(syncFade); }
-  }, { passive: true });
-  window.addEventListener('resize', syncFade);
-  syncFade();
-}
+// v96：stickyFade 渐隐蒙版整体删除——实测它是 APP 吸顶频闪的根源（fixed 层+滚动同步在
+// 部分 WebView 反复重合成），且被用户反馈频闪始终存在。删除后顶栏收纳恢复 v58 原始 display:none。
 
 // 支持 ?url=...&key=... 一键配置
 (function checkUrlConfig() {
@@ -3315,9 +3284,12 @@ function renderStats() {
 
 function renderMemberFilter() {
   const members = ['all', ...familyMembers];
-  document.getElementById('memberFilter').innerHTML = members.map(m =>
-    `<span class="member-chip ${currentMemberFilter === m ? 'active' : ''}" data-m="${escapeHtml(m)}">${m === 'all' ? '全部' : escapeHtml(m)}</span>`
-  ).join('');
+  // v96：成员筛选按键一人一色（与记录条目/图表同一主题色）
+  document.getElementById('memberFilter').innerHTML = members.map(m => {
+    if (m === 'all') return `<span class="member-chip ${currentMemberFilter === m ? 'active' : ''}" data-m="all">全部</span>`;
+    const st = getMemberTheme(m);
+    return `<span class="member-chip ${currentMemberFilter === m ? 'active' : ''}" data-m="${escapeHtml(m)}" style="color:${st.text};background:${st.bg};${currentMemberFilter === m ? '' : 'opacity:.5;'}">${escapeHtml(m)}</span>`;
+  }).join('');
   document.querySelectorAll('#memberFilter .member-chip').forEach(c => {
     c.onclick = () => { currentMemberFilter = c.dataset.m; renderHistory(); renderMemberFilter(); };
   });
@@ -3470,21 +3442,10 @@ function renderChartCats() {
     chartVisibleCats = chartVisibleCats.filter(n => existing.has(n));
   }
 
-  // 显示中的
-  document.getElementById('chartCatsShown').innerHTML = chartVisibleCats.map(name => {
-    const s = allStats.find(([n]) => n === name)?.[1];
-    return `<span class="chip chip-selected" data-cat="${escapeHtml(name)}" title="点击隐藏">${s?.icon || '📋'} ${escapeHtml(name)} ✕</span>`;
-  }).join('');
-
-  // 更多类别按钮：只在还有未显示类别时显示
-  const moreCats = allStats.filter(([n]) => !chartVisibleCats.includes(n));
+  // v96：「显示中」行已删除，只保留选择面板按钮（常显）
   const moreBtn = document.getElementById('chartMoreCatsBtn');
-  if (moreCats.length > 0) {
-    moreBtn.style.display = '';
-    moreBtn.textContent = `还有 ${moreCats.length} 个类别，点开选择 / 一键全显`;
-  } else {
-    moreBtn.style.display = 'none';
-  }
+  moreBtn.style.display = '';
+  moreBtn.textContent = `☰ 点开选择 / 一键全显（已选 ${chartVisibleCats.length}/${allStats.length}）`;
 
   // 渲染可选类别（已折叠，未显示在面板中）
   document.getElementById('chartAllCats').innerHTML = `
@@ -3507,13 +3468,6 @@ function renderChartCats() {
   };
 
   // 绑定事件
-  document.querySelectorAll('#chartCatsShown .chip-selected').forEach(el => {
-    el.onclick = () => {
-      chartVisibleCats = chartVisibleCats.filter(n => n !== el.dataset.cat);
-      localStorage.setItem('chartVisibleCats', JSON.stringify(chartVisibleCats));
-      renderChart();
-    };
-  });
   document.querySelectorAll('#chartAllCats .cat-toggle-chip').forEach(el => {
     el.onclick = () => {
       const name = el.dataset.cat;
@@ -3779,9 +3733,9 @@ function renderHistory() {
           <div class="h-line1">
             <span class="member" style="${memberPillStyle(r.member)}">${escapeHtml(r.member)}</span>
             <span>${escapeHtml(r.category.name)}</span>
-            <span class="values">${valuesText}</span>
           </div>
           <div class="h-line2">
+            <span class="values" style="color:var(--text);font-size:12px;font-weight:600;">${valuesText}</span>
             ${rangeInfo}
             <span>${formatDateTime(r.ts)}</span>
             ${r.note ? `<span class="h-note">📝 ${escapeHtml(r.note)}</span>` : ''}
@@ -3967,9 +3921,9 @@ function openTimeRecordsModal(range) {
             <div class="h-line1">
               <span class="member" style="${memberPillStyle(r.member)}">${escapeHtml(r.member)}</span>
               <span>${escapeHtml(r.category.name)}</span>
-              <span class="values">${valuesText}</span>
             </div>
             <div class="h-line2">
+              <span class="values" style="color:var(--text);font-size:12px;font-weight:600;">${valuesText}</span>
               <span>${formatDateTime(r.ts)}</span>
               ${status}
               ${r.note ? `<span class="h-note">📝 ${escapeHtml(r.note)}</span>` : ''}
@@ -4810,9 +4764,11 @@ function initEventsView() {
 function renderEventsMemberFilter() {
   const wrap = document.getElementById('eventsMemberFilter');
   if (!wrap) return;
+  // v96：成员筛选按键一人一色（与记录条目/图表同一主题色）
   const html = [`<span class="member-chip ${currentEventsMemberFilter === 'all' ? 'on' : ''}" data-m="all">全家</span>`];
   familyMembers.forEach(m => {
-    html.push(`<span class="member-chip ${currentEventsMemberFilter === m ? 'on' : ''}" data-m="${escapeHtml(m)}">${escapeHtml(m)}</span>`);
+    const st = getMemberTheme(m);
+    html.push(`<span class="member-chip ${currentEventsMemberFilter === m ? 'on' : ''}" data-m="${escapeHtml(m)}" style="color:${st.text};background:${st.bg};${currentEventsMemberFilter === m ? '' : 'opacity:.5;'}">${escapeHtml(m)}</span>`);
   });
   wrap.innerHTML = html.join('');
 }
@@ -5427,7 +5383,101 @@ function setEventType(type) {
   currentEventType = norm;
   document.querySelectorAll('.event-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === norm));
   document.querySelectorAll('.event-fields').forEach(f => f.classList.toggle('event-fields-hidden', f.dataset.for !== norm));
+  // v96：切到自定义项目时，AI 建议区初始化
+  if (norm === 'custom') {
+    const nm = document.getElementById('eventCustomName').value.trim();
+    renderAISuggestedFields(nm, null);
+  } else {
+    const wrap = document.getElementById('aiFieldsWrap');
+    if (wrap) wrap.innerHTML = '';
+  }
 }
+
+/* ============================================================
+   v96：AI 生成自定义项目的建议记录字段（1~3 个，选填）
+   - 按项目名缓存建议到 localStorage，同一项目下次秒显不再调 AI
+   - 填写后保存进 payload.ai_fields = [{label, value}]，全部记录第二行显示
+   ============================================================ */
+const AI_FIELD_CACHE_KEY = 'aiFieldSuggestions';
+let aiFieldsToken = 0;  // 防竞态：连续改名时只采纳最后一次
+function getAIFieldCache() {
+  try { return JSON.parse(localStorage.getItem(AI_FIELD_CACHE_KEY) || '{}'); } catch (e) { return {}; }
+}
+function cacheAIFields(name, fields) {
+  try { const c = getAIFieldCache(); c[name] = fields; localStorage.setItem(AI_FIELD_CACHE_KEY, JSON.stringify(c)); } catch (e) {}
+}
+
+async function fetchAISuggestedFields(name) {
+  const cfg = aiConfig;
+  if (!cfg || !cfg.apiKey || !name) throw new Error('AI 未配置');
+  const body = {
+    model: cfg.model,
+    messages: [
+      { role: 'system', content: '你是家庭健康记录助手。用户添加了一个自定义记录项目，请给出记录该项目时最有价值的1~3个信息字段名（简短中文，例如"发作部位""疼痛等级""用药"）。只返回JSON字符串数组，不要任何解释。' },
+      { role: 'user', content: `自定义项目名称：${name}` },
+    ],
+    temperature: 0.2,
+  };
+  if (cfg.provider === 'dashscope' && /qwen3|3\.6|qwen-flash/i.test(cfg.model || '')) body.enable_thinking = false;
+  const resp = await fetch(cfg.baseUrl.replace(/\/$/, '') + '/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  const data = await resp.json();
+  let content = (data.choices?.[0]?.message?.content || '').replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+  let arr;
+  try { arr = JSON.parse(content); } catch (e) {
+    const m = content.match(/\[[\s\S]*?\]/);
+    if (!m) throw new Error('AI 返回格式错误');
+    arr = JSON.parse(m[0]);
+  }
+  const fields = (Array.isArray(arr) ? arr : []).map(s => String(s).trim()).filter(Boolean).slice(0, 3);
+  if (!fields.length) throw new Error('AI 未返回字段');
+  return fields;
+}
+
+function renderAISuggestedFields(name, existing) {
+  const wrap = document.getElementById('aiFieldsWrap');
+  if (!wrap) return;
+  const tok = ++aiFieldsToken;
+  if (!name) {
+    wrap.innerHTML = '<div style="font-size:11px;color:var(--text-3);">填写项目名后，AI 会建议该项目要记录哪些信息</div>';
+    return;
+  }
+  const renderInputs = (fields) => {
+    if (tok !== aiFieldsToken) return;
+    wrap.innerHTML = `<div style="font-size:11px;color:var(--text-3);margin-bottom:4px;">🤖 AI 建议记录（选填）：</div>` + fields.map(f => {
+      const prev = (existing || []).find(x => x.label === f);
+      return `<div class="preview-row"><label>${escapeHtml(f)}</label><input type="text" class="preview-input ai-field-input" data-label="${escapeHtml(f)}" value="${escapeHtml((prev && prev.value) || '')}" placeholder="选填"></div>`;
+    }).join('');
+  };
+  const cached = getAIFieldCache()[name];
+  if (cached && cached.length) { renderInputs(cached); return; }
+  wrap.innerHTML = '<div style="font-size:11px;color:var(--text-3);">🤖 AI 正在思考该项目要记录哪些信息…</div>';
+  fetchAISuggestedFields(name).then(fields => {
+    if (tok !== aiFieldsToken) return;
+    cacheAIFields(name, fields);
+    renderInputs(fields);
+  }).catch(() => {
+    if (tok !== aiFieldsToken) return;
+    wrap.innerHTML = '<div style="font-size:11px;color:var(--text-3);">AI 建议暂不可用，可直接写在备注里</div>';
+  });
+}
+
+// 项目名输入（防抖 900ms）→ 拉取 AI 建议
+(function () {
+  const inp = document.getElementById('eventCustomName');
+  if (!inp) return;
+  let t = null;
+  inp.addEventListener('input', () => {
+    clearTimeout(t);
+    t = setTimeout(() => {
+      if (currentEventType === 'custom') renderAISuggestedFields(inp.value.trim(), null);
+    }, 900);
+  });
+})();
 
 function setDefaultEventTimes() {
   const now = new Date();
@@ -5510,6 +5560,10 @@ function openEventModal(ev) {
   }
   // ➕ 等通用入口：保证类型格可见（日历入口已在上一步隐藏，这里恢复 v60）
   document.getElementById('eventTypeGrid').style.display = '';
+  // v96：自定义项目 → 渲染 AI 建议字段（编辑时回填已存值）
+  if (currentEventType === 'custom') {
+    renderAISuggestedFields(document.getElementById('eventCustomName').value.trim(), (ev && ev.payload && ev.payload.ai_fields) || null);
+  }
   showModal('eventModalMask');
 }
 
@@ -5614,6 +5668,11 @@ function saveEventFromForm() {
       custom_name: name,
       custom_id: matched ? matched.id : null,
     };
+    // v96：AI 建议字段（填写了才存，最多 3 个）
+    const aiFields = Array.from(document.querySelectorAll('#aiFieldsWrap .ai-field-input'))
+      .map(el => ({ label: el.dataset.label, value: el.value.trim() }))
+      .filter(f => f.value);
+    if (aiFields.length) payload.ai_fields = aiFields;
   }
 
   // 自定义事件 category 优先用关联的 cust_xxx id，否则保留 'custom'
@@ -5834,12 +5893,11 @@ function renderEventsList() {
 function renderEventCard(ev) {
   const meta = getEventCategoryMeta(ev.category);
   const dur = getEventDurationStr(ev);
+  // v96：两行制——第一行 = 人名 + 项目名；第二行 = 其它记录内容（时长/位置/痛感/用药/AI字段等）
+  const isCustom = ev.category === 'custom' || (ev.category && ev.category.startsWith && ev.category.startsWith('cust_'));
+  const projectName = isCustom ? ((ev.payload && ev.payload.custom_name) || meta.label) : meta.label;
   const chips = [];
-  // v95：人名不加符号，直接用成员主题色药丸（文字深色+底色浅色）
-  chips.push(`<span class="event-meta-chip" style="${memberPillStyle(ev.member)}">${escapeHtml(ev.member)}</span>`);
-  // 强度字段已删除，不再在 chip 中显示
   if (dur) chips.push(`<span class="event-meta-chip">⏱ ${dur}</span>`);
-  // 痛风"仍在持续"状态已移除（不再有"标记结束"按钮，end_ts 仅用于持续时长显示）
   if (ev.category === 'menstrual') {
     if (ev.payload.dysmenorrhea_dates && ev.payload.dysmenorrhea_dates.length) {
       chips.push(`<span class="event-meta-chip" style="background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b;">🔥 痛经 ${ev.payload.dysmenorrhea_dates.length} 天</span>`);
@@ -5859,21 +5917,19 @@ function renderEventCard(ev) {
     if (ev.payload.anomaly_type) chips.push(`<span class="event-meta-chip">${escapeHtml(ev.payload.anomaly_type)}</span>`);
     if (ev.payload.treatment) chips.push(`<span class="event-meta-chip tag">${escapeHtml(ev.payload.treatment)}</span>`);
   }
-  if ((ev.category === 'custom' || (ev.category && ev.category.startsWith && ev.category.startsWith('cust_'))) && ev.payload.custom_name) {
-    chips.push(`<span class="event-meta-chip">${escapeHtml(ev.payload.custom_name)}</span>`);
+  if (ev.payload.ai_fields && ev.payload.ai_fields.length) {
+    ev.payload.ai_fields.forEach(f => {
+      chips.push(`<span class="event-meta-chip tag">${escapeHtml(f.label)} ${escapeHtml(f.value)}</span>`);
+    });
   }
-
-  // ❤️ 记录的标题就是图标本身，卡片上不再重复显示文字标题
-  const rawTitle = ev.title || meta.label;
-  const displayTitle = rawTitle === meta.icon ? '' : escapeHtml(rawTitle);
 
   return `
     <div class="event-card event-cat-${escapeHtml(ev.category)}">
       <div class="event-card-head">
         <div class="event-card-icon">${meta.icon}</div>
-        <div class="event-card-title">${displayTitle}</div>
+        <div class="event-card-title"><span class="event-meta-chip" style="${memberPillStyle(ev.member)}">${escapeHtml(ev.member)}</span> <span style="font-weight:700;">${escapeHtml(projectName)}</span></div>
       </div>
-      <div class="event-card-meta">${chips.join('')}</div>
+      ${chips.length ? `<div class="event-card-meta">${chips.join('')}</div>` : ''}
       ${ev.note ? `<div style="font-size:12px;color:var(--text-3);margin-top:4px;line-height:1.5;">${escapeHtml(ev.note)}</div>` : ''}
       <div class="event-card-actions">
         <div class="event-card-time">${formatEventDateTime(ev.ts)}</div>
