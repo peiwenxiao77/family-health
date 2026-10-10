@@ -13,4 +13,5 @@
     <color name="w_ovulation_dark">#B45309</color>
     <color name="w_luteal">#14B8A6</color>
     <color name="w_luteal_dark">#0F766E</color>
+    <color name="w_status_green_dark">#166534</color>
 </resources>
