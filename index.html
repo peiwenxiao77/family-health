@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v98: ①删除确认弹窗被管理弹窗挡住——uiConfirmMask 提 z-index 到 10060(原 9999 同层按 DOM 顺序被压在下面) ②频闪终极修复 v2：取消顶栏滚动收纳(v58 功能，display:none 切换在 sticky 顶栏内触发布局抖动=网页/APP 频闪共同嫌疑)+删除顶栏两个无限 pulse 动画(常驻重绘源)，右侧状态区改为常显(顺带修复滑回顶部按键不恢复) ③AI 建议时机前移：新建项目时立刻预生成记录字段(缓存)，之后点日历记录秒显 ④弹窗重构：自定义项目像内置项目一样成为独立类型按钮，选中后进弹窗即默认该项目；事件名输入框/➕添加按钮/提示文字全部删除(项目名由系统内部维护，不再需要确认) -->
 <!-- v97: ①AI建议升级:返回字段+每个字段可选选项(点击填入)+项目图标;修复首次不显示/沿用上次项目的时序bug(setEventType不再用残留值渲染) ②顶栏重影/频闪终极修复:sticky+半透明+backdrop-filter重绘bug,改不透明实色并删blur(网页+APP全局) ③自定义类型按钮去掉内嵌删除键(非法HTML嵌套button导致图标/标题/删除键分离),删除/换图标移入「管理」弹窗 ④「➕添加」改「⚙管理」:管理所有项目(新建/换图标/删除),删除带防云端复活标记 ⑤小组件圆点恢复明亮配色(浅马卡龙在浅底上看不见) -->
 <!-- v93: ①日历各时期+小组件圆点统一改为马卡龙配色(已向用户确认)：月经期草莓粉#F7B3BD/卵泡期奶黄#FAEDBF/排卵期杏桃#FDD9B5/排卵日深杏#F5A96B/黄体期开心果#D6E8C8 ②修复新成员不同步——成员列表此前只存本机，现从云端记录+身体事件自动合并 ③自定义事件类型同样从云端事件自动重建 -->
 <!-- v92: ①月经周期&来潮天数图去除每人最后一条记录(最新一次月经没有「下一次」算不出周期天数,整条不进图) ②身体频率图图例常显——单人有数据也显示成员名+次数,让「分人」一眼可见 -->
@@ -82,24 +83,24 @@
   .sync-indicator { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; background: #fff7ed; color: #9a3412; }
   .sync-indicator .dot { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; }
   .sync-indicator.synced { background: #ecfdf5; color: #166534; }
-  .sync-indicator.synced .dot { background: #10b981; animation: pulse 1.6s ease-in-out infinite; }
+  /* v98：删除顶栏两个无限 pulse 动画（同步点/时钟点）——常驻动画让吸顶栏每帧重绘，
+     是网页/APP 频闪的共同嫌疑源之一；改为静态圆点，颜色仍区分同步状态 */
+  .sync-indicator.synced .dot { background: #10b981; }
   .sync-indicator.syncing { background: #fef3c7; color: #92400e; }
-  .sync-indicator.syncing .dot { background: #f59e0b; animation: pulse 0.8s ease-in-out infinite; }
+  .sync-indicator.syncing .dot { background: #f59e0b; }
   .sync-indicator.offline { background: #fee2e2; color: #991b1b; }
   .sync-indicator.offline .dot { background: #ef4444; }
   .sync-indicator.local { background: #fef3c7; color: #92400e; }
   .sync-indicator.local .dot { background: #f59e0b; }
-  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:.5;transform:scale(1.3);} }
   .settings-btn { width: 36px; height: 36px; border-radius: 12px; border: 1px solid var(--border); background: white; color: var(--text-2); cursor: pointer; font-size: 16px; transition: all 0.2s; }
   .settings-btn:hover { border-color: var(--primary); color: var(--primary); background: #fff7ed; }
   .clock { background: linear-gradient(135deg, #fff7ed, #ffedd5); padding: 8px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); text-align: right; }
   .clock .time { font-size: 20px; font-weight: 700; color: #9a3412; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; }
-  .clock .time .pulse { display: inline-block; width: 6px; height: 6px; background: var(--primary); border-radius: 50%; margin-right: 6px; animation: pulse 1.6s ease-in-out infinite; vertical-align: middle; }
+  .clock .time .pulse { display: inline-block; width: 6px; height: 6px; background: var(--primary); border-radius: 50%; margin-right: 6px; vertical-align: middle; }
   .clock .date { font-size: 11px; color: var(--text-3); margin-top: 0; }
-  /* 顶栏收纳（v58）：下滑时右侧状态区整体释放空间，只留大标题+tabs */
-  /* 顶栏收纳（v58）：下滑时右侧状态区整体释放空间，只留大标题+tabs */
-  /* v96：去掉 opacity 过渡（display:none 无过渡意义，过渡反而在部分 WebView 引发闪烁） */
-  .header-right.header-collapsed { display: none; }
+  /* v98：顶栏滚动收纳（v58）整体下线——display:none 切换发生在 sticky 顶栏内部，
+     每次跨越阈值都触发整页布局抖动（网页/APP 频闪共同嫌疑），且 APP 滑回顶部
+     存在按键不恢复的问题。右侧状态区（同步状态/时间/设置）改为常显 */
 
   /* v74：APP 专属样式（html.in-app 仅在 APK WebView 中存在，网页版不受影响）
      ①健康页四张统计卡（本周/今年/类别/成员）固定 2 行 2 列
@@ -148,6 +149,9 @@
   .modal-mask { position: fixed; inset: 0; background: rgba(67, 20, 7, 0.45); display: none; align-items: center; justify-content: center; z-index: 9999; padding: 20px; animation: fadeIn 0.2s; backdrop-filter: blur(2px); }
   /* promptModal 必须盖在所有其他 modal 之上（点"添加新成员"时 previewMask 还在显示） */
   .modal-mask#promptModalMask { z-index: 10050; }
+  /* v98：删除确认弹窗曾被「管理项目」弹窗挡住——两者 z-index 同为 9999，按 DOM 顺序
+     typesMgrMask 在后画在上面。uiConfirm 提到最高层（含 promptModalMask 之上） */
+  .modal-mask#uiConfirmMask { z-index: 10060; }
   .modal-mask.show { display: flex; }
   .modal { background: white; border-radius: 20px; padding: 24px; max-width: 460px; width: 100%; box-shadow: 0 25px 50px -12px rgba(120, 53, 15, 0.4); max-height: 90vh; overflow-y: auto; position: relative; z-index: 10000; animation: slideUp 0.25s; overflow-x: hidden; }
   /* v75：弹窗美化——顶部渐变色条 + 确认弹窗主题化 */
@@ -933,12 +937,13 @@
     <div class="modal-sub">按类型记录，可补充细节，后续可编辑</div>
 
     <!-- 类型选择 -->
+    <!-- v98：自定义项目不再是笼统的「自定义」按钮，而是像痛风一样成为独立类型按钮
+         （由 renderEventTypeGrid() 动态插入），选中后默认保存类型就是该项目 -->
     <div class="event-type-grid" id="eventTypeGrid">
       <button class="event-type-btn active" data-type="menstrual"><div class="event-type-icon">🌷</div><div class="event-type-name">月经</div></button>
       <button class="event-type-btn" data-type="gout"><div class="event-type-icon">🦴</div><div class="event-type-name">痛风发作</div></button>
       <button class="event-type-btn" data-type="anomaly"><div class="event-type-icon">😖</div><div class="event-type-name">异常情况</div></button>
       <button class="event-type-btn" data-type="intercourse"><div class="event-type-icon">❤️</div><div class="event-type-name"></div></button>
-      <button class="event-type-btn" data-type="custom"><div class="event-type-icon">🖍️</div><div class="event-type-name">自定义</div></button>
     </div>
 
     <div class="preview-row"><label>成员</label>
@@ -1016,16 +1021,12 @@
     </div>
 
     <!-- 自定义专属字段 -->
+    <!-- v98：事件名输入框/➕添加按钮/提示文字整体删除——项目在身体页选中后进弹窗
+         即默认该项目，名字由系统内部维护（隐藏 input 兼容旧记录编辑），不再需要
+         在弹窗里再次选择或确认。AI 字段在新建项目时已预生成，进来即显示 -->
     <div class="event-fields event-fields-hidden" data-for="custom">
-      <div class="preview-row"><label>事件名</label>
-        <div style="display:flex;gap:6px;">
-          <input type="text" id="eventCustomName" class="preview-input" list="customEventTypesList" placeholder="比如：睡眠质量/情绪波动/运动">
-          <button type="button" id="btnAddCustomTypeInline" class="btn-secondary" style="font-size:12px;padding:6px 10px;flex-shrink:0;">➕ 添加</button>
-        </div>
-        <datalist id="customEventTypesList"></datalist>
-        <div id="customTypesHint" style="font-size:11px;color:var(--text-3);margin-top:4px;">已添加的项目会显示在下拉里，点击 ➕ 添加按钮保存为新自定义项目</div>
-      </div>
-      <!-- v96：AI 生成该项目的建议记录字段（1~3 个），可填写后一并保存 -->
+      <input type="hidden" id="eventCustomName">
+      <!-- AI 生成该项目的建议记录字段（可填写后一并保存） -->
       <div id="aiFieldsWrap" style="margin-top:6px;"></div>
     </div>
 
@@ -1512,6 +1513,7 @@ let realtimeEventsChannel = null;
 let currentParsed = null;
 let currentView = 'health';  // 'health' | 'events'
 let currentEventType = 'menstrual';
+let currentCustomTypeId = null;  // v98：currentEventType==='custom' 时具体选中的自定义项目 id（cust_xxx），null=旧记录未关联
 let currentEditingEventId = null;
 let eventPainLevel = 5;      // 0-9 (代表 1-10)
 let eventGoutTriggers = [];
@@ -2464,6 +2466,8 @@ function renderBodyTypeSelector() {
   /* v97：内嵌删除键已删除——button 嵌套 button 是非法 HTML，浏览器解析时拆散导致
      APP 里图标/标题/删除键分离错位。删除/换图标统一移到「⚙ 管理」弹窗 */
   grid.innerHTML = fixedStart + fixedGout + fixedAnomaly + fixedMood + customs + addBtn;
+  // v98：弹窗类型格同步插入自定义项目按钮（像内置项目一样的独立按钮）
+  renderEventTypeGrid();
   // 重新激活当前选中的
   const target = currentBodyType ? `[data-type="${currentBodyType}"]` : null;
   if (target) {
@@ -2522,6 +2526,9 @@ async function promptAddCustomEventType() {
     renderBodyTypeSelector();
     updateBtsHint();
     showToast(`✓ 已添加「${item.name}」`);
+    // v98：新建项目后立刻让 AI 预生成记录字段+图标（结果进缓存），
+    // 之后点击日历记录该项目时秒显，不再等「AI 正在思考」
+    prefetchAISuggestion(name);
   }
 }
 
@@ -3205,28 +3212,8 @@ function bindClick(id, handler, label) {
 bindClick('settingsBtn', openConfig, '⚙ 设置按钮');
 bindClick('bannerConfigBtn', openConfig, '横幅配置按钮');
 
-// 顶栏收纳（v58）：滚动超过阈值隐藏「本地模式/时间/设置」，回到顶部恢复
-// v94：修复频闪——原来 >60 一刀切，滚动停在阈值附近时折叠/展开来回横跳；
-// 现加迟滞（>80 才折叠、<40 才展开）+ rAF 节流
-(function () {
-  const headerRight = document.querySelector('.topbar .header-right');
-  if (!headerRight) return;
-  let collapsed = false, ticking = false;
-  const apply = shouldCollapse => {
-    if (shouldCollapse !== collapsed) {
-      collapsed = shouldCollapse;
-      headerRight.classList.toggle('header-collapsed', collapsed);
-    }
-  };
-  const onScroll = () => {
-    const y = window.scrollY;
-    apply(collapsed ? y < 40 : y > 80);
-    ticking = false;
-  };
-  window.addEventListener('scroll', () => {
-    if (!ticking) { ticking = true; requestAnimationFrame(onScroll); }
-  }, { passive: true });
-})();
+// v98：顶栏滚动收纳（v58）JS 已整体删除——display:none 切换在 sticky 顶栏内触发布局
+// 抖动（网页/APP 频闪共同嫌疑），且 APP 上滑回顶部时折叠态不恢复。右侧状态区常显。
 
 function openConfig() {
   document.getElementById('cfgUrl').value = SUPABASE_URL || '';
@@ -4827,23 +4814,7 @@ function initEventsView() {
   // 保存按钮
   document.getElementById('btnSaveEvent').addEventListener('click', saveEventFromForm);
 
-  // 弹窗内：自定义项目 inline 添加
-  document.getElementById('btnAddCustomTypeInline').addEventListener('click', () => {
-    const inp = document.getElementById('eventCustomName');
-    const v = inp.value.trim();
-    if (!v) { showToast('请先输入项目名', 'warning'); inp.focus(); return; }
-    const item = addCustomEventType(v);
-    if (item) {
-      inp.value = item.name;
-      renderCustomTypesDatalist();
-      autoFillEventTitle();
-      // 同步选中这个新项目
-      currentBodyType = item.id;
-      renderBodyTypeSelector();
-      updateBtsHint();
-      showToast(`✓ 已添加「${item.name}」到自定义项目列表`);
-    }
-  });
+  // v98：弹窗内「事件名+➕添加」已删除（项目在身体页/类型格选中即默认，无需再确认）
 
   // 初始化渲染自定义项目
   renderBodyTypeSelector();
@@ -5354,15 +5325,9 @@ async function onMenstrualDayClick(ts, el) {
     // 从月历进入也要应用"上次选择"的默认值（➕ 按钮以外的入口）
     applyFormDefaults(currentType);
   } else if (currentType && currentType.startsWith('cust_')) {
-    // 自定义项目：弹 custom 字段 + 预填名称
-    if (currentEventType !== 'custom') {
-      document.querySelectorAll('.event-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'custom'));
-      setEventType('custom');
-    }
-    const ct = getCustomEventType(currentType);
-    if (ct) {
-      document.getElementById('eventCustomName').value = ct.name;
-    }
+    // v98：自定义项目——像痛风一样直接固定为该项目，AI 建议字段由 setEventType
+    // 用缓存渲染（新建项目时已预生成，秒显）
+    setEventType('custom', currentType);
   }
   const label = (currentType.startsWith('cust_') && getCustomEventType(currentType)) ? getCustomEventType(currentType).name : getEventCategoryMeta(currentType).label;
   showToast(`已选 ${k} · ${label}，补充信息后点保存`);
@@ -5472,21 +5437,40 @@ function renderTags() {
   if (typeof renderGoutMedications === 'function') renderGoutMedications();
 }
 
-function setEventType(type) {
+function setEventType(type, customId) {
   // 自定义项目 cust_xxx 视为 'custom' 类型，弹窗里使用 custom 字段
   // v39 历史键 'mood'（曾短暂表示心情）→ 归一为 'intercourse'（同房）
   const norm = (type && type.startsWith && type.startsWith('cust_')) ? 'custom' : (type === 'mood' ? 'intercourse' : type);
   currentEventType = norm;
-  document.querySelectorAll('.event-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === norm));
+  // v98：custom 时记住具体项目（入参优先，传 cust_xxx 字符串也可）
+  currentCustomTypeId = norm === 'custom'
+    ? (customId || (type && type.startsWith && type.startsWith('cust_') ? type : null))
+    : null;
+  document.querySelectorAll('.event-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === (currentCustomTypeId || norm)));
   document.querySelectorAll('.event-fields').forEach(f => f.classList.toggle('event-fields-hidden', f.dataset.for !== norm));
-  // v97：AI 建议区只做清空/空态——不再用 DOM 残留值渲染（上次项目的残留名字会导致
-  // 「新项目沿用上次建议」，正式渲染统一由 openEventModal 末尾/输入防抖用最终名字触发）
+  // v98：选中具体自定义项目 → 直接用缓存/AI 渲染该项目的建议字段（新建项目时已预生成，通常秒显）
   const wrap = document.getElementById('aiFieldsWrap');
   if (wrap) {
-    wrap.innerHTML = (norm === 'custom')
-      ? '<div style="font-size:11px;color:var(--text-3);">填写项目名后，AI 会建议要记录哪些信息</div>'
-      : '';
+    const ct = currentCustomTypeId ? getCustomEventType(currentCustomTypeId) : null;
+    if (norm === 'custom' && ct) {
+      renderAISuggestedFields(ct.name, null);
+    } else if (norm === 'custom') {
+      wrap.innerHTML = '';  // 旧记录未关联项目：等 openEventModal 末尾按隐藏的名字渲染
+    } else {
+      wrap.innerHTML = '';
+    }
   }
+}
+
+// v98：弹窗类型格动态渲染——自定义项目像内置项目一样成为独立按钮（data-type=cust_xxx）
+function renderEventTypeGrid() {
+  const grid = document.getElementById('eventTypeGrid');
+  if (!grid) return;
+  grid.querySelectorAll('.event-type-btn[data-custom-btn]').forEach(b => b.remove());
+  const customs = customEventTypes.map(c => `
+    <button class="event-type-btn" data-type="${escapeHtml(c.id)}" data-custom-btn="1"><div class="event-type-icon">${escapeHtml(c.icon)}</div><div class="event-type-name">${escapeHtml(c.name)}</div></button>
+  `).join('');
+  grid.insertAdjacentHTML('beforeend', customs);
 }
 
 /* ============================================================
@@ -5553,12 +5537,35 @@ async function fetchAISuggestedFields(name) {
   return { icon, fields };
 }
 
+// v98：新建项目时立刻预生成 AI 建议（字段+图标进缓存），记录该项目时秒显
+async function prefetchAISuggestion(name) {
+  const n = String(name || '').trim();
+  if (!n) return;
+  const cached = getAIFieldCache()[n];
+  if (cached && cached.fields && cached.fields.length) return;  // 已有缓存
+  try {
+    const sug = await fetchAISuggestedFields(n);
+    cacheAISuggestion(n, sug);
+    if (sug.icon) {
+      setAIIconSuggestion(n, sug.icon);
+      // 新建时图标若只是按序兜底，AI 图标一到就替换
+      const item = customEventTypes.find(c => c.name === n);
+      if (item && item.icon !== sug.icon) {
+        item.icon = sug.icon;
+        saveCustomEventTypes();
+        renderBodyTypeSelector();
+      }
+    }
+    showToast(`🤖 已为「${n}」生成记录字段建议`);
+  } catch (e) { /* AI 不可用时静默，记录时兜底再试 */ }
+}
+
 function renderAISuggestedFields(name, existing) {
   const wrap = document.getElementById('aiFieldsWrap');
   if (!wrap) return;
   const tok = ++aiFieldsToken;
   if (!name) {
-    wrap.innerHTML = '<div style="font-size:11px;color:var(--text-3);">填写项目名后，AI 会建议该项目要记录哪些信息</div>';
+    wrap.innerHTML = '';  // v98：事件名输入框已删除，无名字的旧记录不显示占位
     return;
   }
   const renderInputs = (sug) => {
@@ -5594,18 +5601,8 @@ function renderAISuggestedFields(name, existing) {
   });
 }
 
-// 项目名输入（防抖 400ms）→ 拉取 AI 建议
-(function () {
-  const inp = document.getElementById('eventCustomName');
-  if (!inp) return;
-  let t = null;
-  inp.addEventListener('input', () => {
-    clearTimeout(t);
-    t = setTimeout(() => {
-      if (currentEventType === 'custom') renderAISuggestedFields(inp.value.trim(), null);
-    }, 400);
-  });
-})();
+// v98：项目名输入防抖已删除——事件名输入框移除，AI 建议改为新建项目时预生成
+// + 选中项目时（setEventType）直接渲染
 
 function setDefaultEventTimes() {
   const now = new Date();
@@ -5650,6 +5647,10 @@ function openEventModal(ev) {
     }
     if (ev.category === 'custom' || (ev.category && ev.category.startsWith && ev.category.startsWith('cust_'))) {
       document.getElementById('eventCustomName').value = ev.payload.custom_name || '';
+      // v98：旧记录可能 category='custom' 但 payload 里带 custom_id，编辑时恢复到具体项目
+      if (ev.payload && ev.payload.custom_id && getCustomEventType(ev.payload.custom_id)) {
+        setEventType('custom', ev.payload.custom_id);
+      }
     }
     currentEditingEventId = ev.id;
     renderTags();
@@ -5688,9 +5689,13 @@ function openEventModal(ev) {
   }
   // ➕ 等通用入口：保证类型格可见（日历入口已在上一步隐藏，这里恢复 v60）
   document.getElementById('eventTypeGrid').style.display = '';
-  // v96：自定义项目 → 渲染 AI 建议字段（编辑时回填已存值）
+  // v96/v98：自定义项目 → 渲染 AI 建议字段（编辑时回填已存值；新记录由 setEventType 渲染过，这里再兜底一次）
   if (currentEventType === 'custom') {
-    renderAISuggestedFields(document.getElementById('eventCustomName').value.trim(), (ev && ev.payload && ev.payload.ai_fields) || null);
+    const ct = currentCustomTypeId ? getCustomEventType(currentCustomTypeId) : null;
+    renderAISuggestedFields(
+      ct ? ct.name : document.getElementById('eventCustomName').value.trim(),
+      (ev && ev.payload && ev.payload.ai_fields) || null
+    );
   }
   showModal('eventModalMask');
 }
@@ -5789,9 +5794,11 @@ function saveEventFromForm() {
     // 同房：仅日期 + 成员 + 备注，无专属字段
     payload = {};
   } else if (currentEventType === 'custom') {
-    const name = document.getElementById('eventCustomName').value.trim();
+    // v98：项目名不再来自输入框——选中了具体项目就用它；旧记录未关联时回退隐藏 input（兼容编辑）
+    const ct = currentCustomTypeId ? getCustomEventType(currentCustomTypeId) : null;
+    const name = ct ? ct.name : document.getElementById('eventCustomName').value.trim();
     // 如果用户输入/选择了已添加的自定义项目，自动关联
-    const matched = customEventTypes.find(c => c.name === name);
+    const matched = ct || customEventTypes.find(c => c.name === name);
     payload = {
       custom_name: name,
       custom_id: matched ? matched.id : null,
