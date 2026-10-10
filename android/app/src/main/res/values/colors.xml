@@ -5,13 +5,15 @@
     <color name="w_text_soft">#9A8F86</color>
     <color name="w_phase_text">#9A8F86</color>
     <color name="w_title_pink">#EC4899</color>
-    <color name="w_menstrual">#F43F5E</color>
-    <color name="w_menstrual_dark">#BE123C</color>
-    <color name="w_follicular">#8B5CF6</color>
-    <color name="w_follicular_dark">#6D28D9</color>
-    <color name="w_ovulation">#F59E0B</color>
-    <color name="w_ovulation_dark">#B45309</color>
-    <color name="w_luteal">#14B8A6</color>
-    <color name="w_luteal_dark">#0F766E</color>
+    <color name="w_menstrual">#B05F58</color>
+    <color name="w_menstrual_dark">#8A443E</color>
+    <color name="w_follicular">#8F7A3E</color>
+    <color name="w_follicular_dark">#77631F</color>
+    <color name="w_ovulation">#A96A32</color>
+    <color name="w_ovulation_day">#8F4A20</color>
+    <color name="w_ovulation_day_dark">#FFFFFF</color>
+    <color name="w_ovulation_dark">#7E4E1E</color>
+    <color name="w_luteal">#5F7850</color>
+    <color name="w_luteal_dark">#475C36</color>
     <color name="w_status_green_dark">#166534</color>
 </resources>
