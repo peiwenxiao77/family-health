@@ -21,6 +21,9 @@ class MainActivity : Activity() {
         web.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
+            // v82：每次打开都拉最新页面——排除 WebView 缓存旧版页面导致
+            // pushConfigToNative 等新逻辑不生效的变量
+            cacheMode = android.webkit.WebSettings.LOAD_NO_CACHE
         }
         web.webViewClient = WebViewClient()
         // v67：必须设置 WebChromeClient 并实现 onJsAlert/onJsConfirm，
