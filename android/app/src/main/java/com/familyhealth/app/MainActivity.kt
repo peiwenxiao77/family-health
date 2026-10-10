@@ -62,6 +62,12 @@ class MainActivity : Activity() {
                 .putString("url", url)
                 .putString("key", key)
                 .apply()
+            // v81：直接后台线程刷新小组件——部分国产 ROM 限制 WorkManager，
+            // scheduleNow 可能永远不执行，导致「APP 里填了配置小组件却一直未配置」。
+            // 每次 APP 加载/保存配置都会调用本方法 → 顺带保证小组件数据新鲜度
+            try {
+                Thread { WidgetWorker.refresh(this@MainActivity) }.start()
+            } catch (_: Exception) {}
             WidgetWorker.scheduleNow(this@MainActivity)
         }
     }
