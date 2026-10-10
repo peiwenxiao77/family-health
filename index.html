@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v94: ①所有图表同人恒同色(getMemberColor:文文=粉/龙龙=蓝,按名字稳定哈希) ②日历排卵日去外框只留底色;当日格加蓝色外框#7B68EE ③hero记录时间行删除 ④两页全部记录加排序(实际时间/填写时间×升降序,记录新增filled_at,云端回退created_at) ⑤条目只显示一个时间(去relativeTime) ⑥条目成员名专属颜色 ⑦页脚文案改「要记得偶尔导出备份一下数据哦」 ⑧APP身体卡编辑/删除按钮垂直居中 ⑨修复APP吸顶频闪(折叠阈值加迟滞+rAF节流,渐隐蒙版改opacity过渡) -->
+<!-- v95: ①趋势图时间范围改为 全部/近一年/近一个月(默认全部) ②「还有N个类别」类别选择框移到所有趋势图表最上面 ③频闪根治(APP内禁用backdrop-filter+顶栏提升合成层+折叠改opacity/visibility不再display:none) ④成员主题色：文文粉/龙龙蓝/妈妈紫(修哈希撞色)，条目人名=深色文字+浅色底色药丸，身体页人名旁符号(👤)删去 -->
 <!-- v93: ①日历各时期+小组件圆点统一改为马卡龙配色(已向用户确认)：月经期草莓粉#F7B3BD/卵泡期奶黄#FAEDBF/排卵期杏桃#FDD9B5/排卵日深杏#F5A96B/黄体期开心果#D6E8C8 ②修复新成员不同步——成员列表此前只存本机，现从云端记录+身体事件自动合并 ③自定义事件类型同样从云端事件自动重建 -->
 <!-- v92: ①月经周期&来潮天数图去除每人最后一条记录(最新一次月经没有「下一次」算不出周期天数,整条不进图) ②身体频率图图例常显——单人有数据也显示成员名+次数,让「分人」一眼可见 -->
 <!-- v91: ①修复全部记录出现「文/龙」——早期版本存的单字名，云端已批量改为文文/龙龙(61+18条)，代码加 MEMBER_ALIASES 兜底归一 ②小组件圆点颜色与身体日历各时期统一为莫兰迪配色：月经期红/卵泡期黄/排卵期橙/排卵日深橙/黄体期绿 -->
@@ -109,6 +109,11 @@
   html.in-app .topbar > header > .header-right { margin-left: auto; }
   /* v84：APP 身体页容器收窄边距——所有框框加宽，仍比健康页（总内边距20px）窄一点点 */
   html.in-app #eventsPageWrap { margin: 16px 4px 0 !important; }
+  /* v95：根治 WebView 吸顶频闪——backdrop-filter 模糊 + fixed 蒙版叠加在部分安卓 WebView
+     上会导致 sticky 层反复重合成（整条顶栏闪烁）。APP 内禁用模糊并把顶栏提升为独立合成层 */
+  html.in-app .topbar { backdrop-filter: none; -webkit-backdrop-filter: none; transform: translateZ(0); }
+  /* v95：APP 内折叠改为透明度隐藏——display:none 会改变布局高度引发抖动，opacity/visibility 只走合成器 */
+  html.in-app .header-right.header-collapsed { display: flex; opacity: 0; visibility: hidden; pointer-events: none; }
   /* v84：APP 置顶卡片下方渐隐蒙版——内容滚动靠近吸顶栏时渐隐，不叠在固定内容下 */
   html.in-app #stickyFade {
     position: fixed; left: 0; right: 0; height: 42px; z-index: 49;
@@ -281,7 +286,7 @@
   .h-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white; flex-shrink: 0; }
   .h-info { flex: 1; min-width: 0; }
   .h-line1 { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; margin-bottom: 2px; flex-wrap: wrap; }
-  .h-line1 .member { background: linear-gradient(135deg, #fce7f3, #fbcfe8); color: #be185d; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .h-line1 .member { padding: 2px 8px; border-radius: 999px; font-size: 11px; }  /* v95：底色/文字色改由成员主题内联指定 */
   .h-line1 .values { color: var(--text); }
   .h-line2 { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-3); flex-wrap: wrap; }
   .h-status { padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; border: none; cursor: default; }
@@ -743,17 +748,17 @@
 
     <div class="card">
       <div class="card-header">
-        <div class="card-title">🎢 各项趋势 <span class="badge" id="chartBadge">最近 100 条</span>
+        <div class="card-title">🎢 各项趋势 <span class="badge" id="chartBadge">全部</span>
           <button class="btn-secondary" id="btnToggleCharts" style="font-size:11px;padding:4px 10px;margin-left:8px;">⇕ 收起</button>
         </div>
         <div class="tabs" id="chartTabs">
-          <button class="tab active" data-range="30">最近 100 条</button>
-          <button class="tab" data-range="7">近 7 天</button>
-          <button class="tab" data-range="all">全部</button>
+          <button class="tab active" data-range="all">全部</button>
+          <button class="tab" data-range="365">近一年</button>
+          <button class="tab" data-range="30">近一个月</button>
         </div>
       </div>
-      <div class="mini-charts-grid" id="miniChartsGrid"></div>
-      <div style="margin-top:12px;" id="chartCatsWrap">
+      <!-- v95：类别选择框移到所有图表最上面 -->
+      <div style="margin-bottom:12px;" id="chartCatsWrap">
         <div style="font-size:12px;color:var(--text-3);margin-bottom:6px;">👁 显示中：</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;" id="chartCatsShown"></div>
         <button class="btn-secondary" id="chartMoreCatsBtn" style="margin-top:8px;font-size:12px;display:none;">还有更多类别，点开选择</button>
@@ -762,6 +767,7 @@
           <div id="chartAllCats" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
         </div>
       </div>
+      <div class="mini-charts-grid" id="miniChartsGrid"></div>
     </div>
 
     <div class="card">
@@ -1500,7 +1506,7 @@ let currentEventsMemberFilter = 'all';
 let currentEventsCategoryFilter = '';
 let currentEventsSearch = '';
 let currentTimeFilter = 'all';   // 'all' | 'today' | 'week'
-let currentChartRange = '30';
+let currentChartRange = 'all';  // v95：默认全部（选项改为 全部/近一年/近一个月）
 let historySearch = '';
 
 // 月经月历状态
@@ -1521,15 +1527,30 @@ let eventGoutMedications = [];
 let eventCharts = {};
 // v90：分人多折线的成员配色（文文=粉、龙龙=蓝，其余按序轮换）
 const MEMBER_CHART_COLORS = ['#ec4899', '#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4', '#ef4444', '#f97316'];
-// v94：成员专属颜色——同一个人在所有图表和记录条目中永远同一种颜色
-// 文文=粉色、龙龙=蓝色（用户指定）；其他成员按名字稳定哈希取色，跨图表/跨设备一致
-const MEMBER_COLOR_MAP = { '文文': '#ec4899', '龙龙': '#3b82f6' };
-function getMemberColor(name) {
+// v95：成员专属配色（主题化）——main=图表线色，text=条目文字深色，bg=条目底色浅色
+// 文文=粉、龙龙=蓝、妈妈=紫（用户指定文文/龙龙；妈妈原哈希撞粉色，固定为紫色）
+const MEMBER_COLOR_MAP = {
+  '文文': { main: '#ec4899', text: '#be185d', bg: '#fce7f3' },
+  '龙龙': { main: '#3b82f6', text: '#1d4ed8', bg: '#dbeafe' },
+  '妈妈': { main: '#8b5cf6', text: '#6d28d9', bg: '#ede9fe' },
+};
+function getMemberTheme(name) {
   const n = String(name || '');
   if (MEMBER_COLOR_MAP[n]) return MEMBER_COLOR_MAP[n];
+  // 未预设成员：按名字稳定哈希取色，避开已占用主色，保证不同人不同色
+  const used = new Set(Object.values(MEMBER_COLOR_MAP).map(t => t.main));
+  const pool = MEMBER_CHART_COLORS.filter(c => !used.has(c));
   let h = 0;
   for (const ch of n) h = (h * 31 + ch.codePointAt(0)) >>> 0;
-  return MEMBER_CHART_COLORS[h % MEMBER_CHART_COLORS.length];
+  const p = pool.length ? pool : MEMBER_CHART_COLORS;
+  const main = p[h % p.length];
+  return { main, text: main, bg: main + '1f' };
+}
+function getMemberColor(name) { return getMemberTheme(name).main; }
+// v95：条目里人名药丸的统一样式（文字深色+底色浅色）
+function memberPillStyle(name) {
+  const t = getMemberTheme(name);
+  return `color:${t.text};background:${t.bg};font-weight:700;`;
 }
 // v94：记录的「填写时间」——本地 filled_at 优先，云端记录回退 created_at（入库时间），再兜底 ts
 function getFillTs(r) {
@@ -3525,8 +3546,9 @@ function renderChart() {
 
   // 过滤范围
   let data = records.slice();
-  if (currentChartRange === '7') data = data.filter(r => r.ts >= Date.now() - 7 * 86400000);
-  else if (currentChartRange === '30') data = data.slice(0, 100);
+  // v95：时间范围改为 全部/近一年/近一个月（原来是 最近100条/近7天/全部）
+  if (currentChartRange === '30') data = data.filter(r => r.ts >= Date.now() - 30 * 86400000);
+  else if (currentChartRange === '365') data = data.filter(r => r.ts >= Date.now() - 365 * 86400000);
 
   // 收集所有有数值数据的类别
   const byCat = {};
@@ -3692,7 +3714,7 @@ function renderChart() {
     miniCharts[c.name] = chart;
   });
 
-  document.getElementById('chartBadge').textContent = { '30': '最近 100 条', '7': '近 7 天', 'all': '全部' }[currentChartRange];
+  document.getElementById('chartBadge').textContent = { '30': '近一个月', '365': '近一年', 'all': '全部' }[currentChartRange];
   renderChartCats();
 }
 
@@ -3755,7 +3777,7 @@ function renderHistory() {
         <div class="h-icon" style="background:${getCategoryColor(r.category.name)}">${r.category.icon}</div>
         <div class="h-info">
           <div class="h-line1">
-            <span class="member" style="color:${getMemberColor(r.member)};font-weight:700;">${escapeHtml(r.member)}</span>
+            <span class="member" style="${memberPillStyle(r.member)}">${escapeHtml(r.member)}</span>
             <span>${escapeHtml(r.category.name)}</span>
             <span class="values">${valuesText}</span>
           </div>
@@ -3943,7 +3965,7 @@ function openTimeRecordsModal(range) {
           <div class="h-icon" style="background:${getCategoryColor(r.category.name)};width:32px;height:32px;font-size:16px;">${r.category.icon}</div>
           <div class="h-info">
             <div class="h-line1">
-              <span class="member" style="color:${getMemberColor(r.member)};font-weight:700;">${escapeHtml(r.member)}</span>
+              <span class="member" style="${memberPillStyle(r.member)}">${escapeHtml(r.member)}</span>
               <span>${escapeHtml(r.category.name)}</span>
               <span class="values">${valuesText}</span>
             </div>
@@ -5813,7 +5835,8 @@ function renderEventCard(ev) {
   const meta = getEventCategoryMeta(ev.category);
   const dur = getEventDurationStr(ev);
   const chips = [];
-  chips.push(`<span class="event-meta-chip" style="color:${getMemberColor(ev.member)};font-weight:700;">👤 ${escapeHtml(ev.member)}</span>`);
+  // v95：人名不加符号，直接用成员主题色药丸（文字深色+底色浅色）
+  chips.push(`<span class="event-meta-chip" style="${memberPillStyle(ev.member)}">${escapeHtml(ev.member)}</span>`);
   // 强度字段已删除，不再在 chip 中显示
   if (dur) chips.push(`<span class="event-meta-chip">⏱ ${dur}</span>`);
   // 痛风"仍在持续"状态已移除（不再有"标记结束"按钮，end_ts 仅用于持续时长显示）
