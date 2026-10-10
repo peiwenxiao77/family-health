@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v96: ①自定义项目AI生成1~3个记录字段(弹窗内可填写,缓存建议,存payload.ai_fields,全部记录第二行显示) ②趋势「显示中」行删除,整合进「点开选择/一键全显」面板 ③两页全部记录两行制:第一行=人名+项目名,第二行=记录内容 ④两页成员筛选按键一人一色 ⑤频闪+折叠终极修复:删除stickyFade蒙版,APP折叠恢复display:none(让出位置) -->
+<!-- v97: ①AI建议升级:返回字段+每个字段可选选项(点击填入)+项目图标;修复首次不显示/沿用上次项目的时序bug(setEventType不再用残留值渲染) ②顶栏重影/频闪终极修复:sticky+半透明+backdrop-filter重绘bug,改不透明实色并删blur(网页+APP全局) ③自定义类型按钮去掉内嵌删除键(非法HTML嵌套button导致图标/标题/删除键分离),删除/换图标移入「管理」弹窗 ④「➕添加」改「⚙管理」:管理所有项目(新建/换图标/删除),删除带防云端复活标记 ⑤小组件圆点恢复明亮配色(浅马卡龙在浅底上看不见) -->
 <!-- v93: ①日历各时期+小组件圆点统一改为马卡龙配色(已向用户确认)：月经期草莓粉#F7B3BD/卵泡期奶黄#FAEDBF/排卵期杏桃#FDD9B5/排卵日深杏#F5A96B/黄体期开心果#D6E8C8 ②修复新成员不同步——成员列表此前只存本机，现从云端记录+身体事件自动合并 ③自定义事件类型同样从云端事件自动重建 -->
 <!-- v92: ①月经周期&来潮天数图去除每人最后一条记录(最新一次月经没有「下一次」算不出周期天数,整条不进图) ②身体频率图图例常显——单人有数据也显示成员名+次数,让「分人」一眼可见 -->
 <!-- v91: ①修复全部记录出现「文/龙」——早期版本存的单字名，云端已批量改为文文/龙龙(61+18条)，代码加 MEMBER_ALIASES 兜底归一 ②小组件圆点颜色与身体日历各时期统一为莫兰迪配色：月经期红/卵泡期黄/排卵期橙/排卵日深橙/黄体期绿 -->
@@ -110,9 +110,7 @@
   html.in-app .topbar > header > .header-right { margin-left: auto; }
   /* v84：APP 身体页容器收窄边距——所有框框加宽，仍比健康页（总内边距20px）窄一点点 */
   html.in-app #eventsPageWrap { margin: 16px 4px 0 !important; }
-  /* v95：根治 WebView 吸顶频闪——backdrop-filter 模糊 + fixed 蒙版叠加在部分安卓 WebView
-     上会导致 sticky 层反复重合成（整条顶栏闪烁）。APP 内禁用模糊并把顶栏提升为独立合成层 */
-  html.in-app .topbar { backdrop-filter: none; -webkit-backdrop-filter: none; transform: translateZ(0); }
+  /* v97：topbar 已全局改不透明+删 blur（重影/频闪同根源），此 hack 不再需要 */
   /* v96：折叠恢复 display:none（让出位置）+ stickyFade 蒙版整体删除——
      v95 的 opacity/visibility 方案没能根治频闪且折叠不再让位，实测蒙版才是频闪根源 */
   /* v94：APP 身体「全部记录」卡片——编辑/删除按钮垂直居中（与桌面端一致），不再压在卡片底部 */
@@ -284,6 +282,9 @@
   .h-line1 .member { padding: 2px 8px; border-radius: 999px; font-size: 11px; }  /* v95：底色/文字色改由成员主题内联指定 */
   .h-line1 .values { color: var(--text); }
   .h-line2 { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-3); flex-wrap: wrap; }
+  /* v97：AI 建议字段的快速选项 chip（点击填入输入框） */
+  .ai-opt-chip { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px; background: #ede9fe; color: #5b21b6; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; border: 1px solid #ddd6fe; }
+  .ai-opt-chip:hover { background: #ddd6fe; }
   .h-status { padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; border: none; cursor: default; }
   .h-status.normal { background: #ecfdf5; color: #166534; }
   .h-status.abnormal { background: #fee2e2; color: #991b1b; }
@@ -399,15 +400,15 @@
   }
 
   /* 顶部栏 sticky：龙龙＆文文の小家 + tab 一起吸顶 */
+  /* v97：重影/频闪终极修复——sticky+半透明背景+backdrop-filter 滚动重绘 bug（网页重影/APP 频闪同根源）。
+     改为完全不透明实色渐变并删除 blur，吸顶层不再触发重合成 */
   .topbar {
     display: flex;
     flex-direction: column;
     position: sticky;
     top: 0;
     z-index: 50;
-    background: linear-gradient(180deg, #fff8f0 0%, rgba(255, 237, 213, 0.95) 100%);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    background: linear-gradient(180deg, #fff8f0 0%, #ffedd5 100%);
     border-radius: 12px;
     box-shadow: 0 4px 14px rgba(245, 158, 11, 0.08);
     overflow: hidden;
@@ -597,8 +598,12 @@
   .body-type-selector .bts-btn[data-custom].active { border-color: #8b5cf6; color: #6d28d9; background: #f5f3ff; }
   .body-type-selector .bts-btn.bts-btn-add { background: repeating-linear-gradient(45deg, #ffffff 0 8px, #f8fafc 8px 16px); color: var(--text-2); border-style: dashed; }
   .body-type-selector .bts-btn.bts-btn-add:hover { background: linear-gradient(135deg, #ede9fe, #ddd6fe); color: #5b21b6; border-color: #8b5cf6; }
-  .body-type-selector .bts-btn.bts-del { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; border-radius: 50%; background: #ef4444; color: white; font-size: 10px; line-height: 1; cursor: pointer; border: none; opacity: 0; transition: opacity 0.15s; padding: 0; }
-  .body-type-selector .bts-btn:hover .bts-del { opacity: 1; }
+  /* v97：内嵌 .bts-del 删除键已移除（非法 HTML 嵌套导致图标/标题/删除键分离），样式一并清理 */
+  /* v97：管理弹窗的图标/删除按钮 */
+  .mgr-icon-btn { width: 32px; height: 32px; font-size: 19px; border: 1px solid var(--border); background: #faf5ff; border-radius: 10px; cursor: pointer; transition: all 0.15s; }
+  .mgr-icon-btn:hover { background: #ede9fe; transform: scale(1.08); }
+  .mgr-del-btn { width: 30px; height: 30px; font-size: 14px; border: none; background: transparent; border-radius: 8px; cursor: pointer; opacity: 0.55; transition: all 0.15s; }
+  .mgr-del-btn:hover { background: #fee2e2; opacity: 1; }
   .body-type-selector .bts-icon { font-size: 20px; line-height: 1; }
   .body-type-selector .bts-text { font-size: 11px; }
   .body-type-selector .bts-hint { margin-top: 8px; font-size: 11px; color: var(--text-3); text-align: center; }
@@ -800,7 +805,7 @@
       <div class="card-header">
         <div class="card-title">🌸 身体情况 <span class="badge" id="eventsCount">0 条</span></div>
         <div class="actions">
-          <button class="btn-primary" id="btnAddEvent">➕ 添加</button>
+          <button class="btn-primary" id="btnAddEvent" title="管理所有项目（新建/换图标/删除）">⚙ 管理</button>
         </div>
       </div>
 
@@ -1032,6 +1037,20 @@
     <div class="modal-actions">
       <button class="btn-secondary" data-close="eventModalMask">取消</button>
       <button class="btn-primary" id="btnSaveEvent">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== v97：项目管理弹窗（新建/换图标/删除所有项目） ===== -->
+<div class="modal-mask" id="typesMgrMask">
+  <div class="modal" style="max-width:480px;">
+    <button class="modal-close" data-close="typesMgrMask" title="关闭">×</button>
+    <h3>⚙ 管理项目</h3>
+    <div class="modal-sub">新建项目 · 点图标可更换 · 删除自定义项目（内置项目不可删）</div>
+    <div id="typesMgrList" style="max-height:52vh;overflow-y:auto;"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" data-close="typesMgrMask">关闭</button>
+      <button class="btn-primary" id="btnMgrAdd">➕ 新建项目</button>
     </div>
   </div>
 </div>
@@ -1422,12 +1441,16 @@ function syncMembersFromData() {
 
 // v93：自定义事件类型也只存本机——从云端身体事件的 category(cust_xxx)+payload.custom_name 自动重建。
 // 图标/颜色按名字哈希推导，两台设备对同一名字推导结果一致。
+// v97：删除过的类型记入 deleted_custom_types，防止云端旧记录把已删项目"复活"
 function syncCustomTypesFromEvents() {
+  let deleted = {};
+  try { deleted = JSON.parse(localStorage.getItem('deleted_custom_types') || '{}'); } catch (e) {}
   let added = false;
   bodyEvents.forEach(e => {
     const cat = e.category;
     if (!cat || typeof cat !== 'string' || !cat.startsWith('cust_')) return;
     if (customEventTypes.some(c => c.id === cat)) return;
+    if (deleted[cat]) return;  // 用户已删除，不复活
     const name = (e.payload && e.payload.custom_name) || '';
     if (!name) return;
     let h = 0;
@@ -2404,7 +2427,8 @@ function addCustomEventType(name) {
   const item = {
     id: 'cust_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     name: trimmed,
-    icon: CUSTOM_ICONS[customEventTypes.length % CUSTOM_ICONS.length],
+    // v97：优先用 AI 为该项目生成的图标（弹窗里拉取建议时已暂存），无则按序取内置图标
+    icon: getAIIconSuggestion(trimmed) || CUSTOM_ICONS[customEventTypes.length % CUSTOM_ICONS.length],
     color: CUSTOM_PALETTE[customEventTypes.length % CUSTOM_PALETTE.length],
   };
   customEventTypes.push(item);
@@ -2432,12 +2456,13 @@ function renderBodyTypeSelector() {
   const fixedMood = grid.querySelector('[data-type="intercourse"]') ? grid.querySelector('[data-type="intercourse"]').outerHTML : '';
   const addBtn = grid.querySelector('[data-action="add-custom"]').outerHTML;
   const customs = customEventTypes.map(c => `
-    <button class="bts-btn" data-type="${escapeHtml(c.id)}" data-custom="${escapeHtml(c.id)}" data-color="${escapeHtml(c.color)}" title="悬停删除">
-      <button class="bts-del" data-id="${escapeHtml(c.id)}" title="删除该项目">×</button>
+    <button class="bts-btn" data-type="${escapeHtml(c.id)}" data-custom="${escapeHtml(c.id)}" data-color="${escapeHtml(c.color)}" title="记录「${escapeHtml(c.name)}」">
       <span class="bts-icon">${escapeHtml(c.icon)}</span>
       <span class="bts-text">${escapeHtml(c.name)}</span>
     </button>
   `).join('');
+  /* v97：内嵌删除键已删除——button 嵌套 button 是非法 HTML，浏览器解析时拆散导致
+     APP 里图标/标题/删除键分离错位。删除/换图标统一移到「⚙ 管理」弹窗 */
   grid.innerHTML = fixedStart + fixedGout + fixedAnomaly + fixedMood + customs + addBtn;
   // 重新激活当前选中的
   const target = currentBodyType ? `[data-type="${currentBodyType}"]` : null;
@@ -2498,6 +2523,118 @@ async function promptAddCustomEventType() {
     updateBtsHint();
     showToast(`✓ 已添加「${item.name}」`);
   }
+}
+
+/* ============================================================
+   v97：项目管理弹窗（「⚙ 管理」）——新建 / 换图标 / 删除
+   内置项目只读展示；自定义项目可换图标（点击弹 emoji 行）与删除；
+   删除的类型记入 deleted_custom_types，防止云端旧记录复活
+   ============================================================ */
+const MGR_ICONS = [...CUSTOM_ICONS, '🌙', '🩺', '💉', '🦷', '🚽', '🏊', '🚴', '⛹', '🥤', '🍎', '😌', '😤', '🤧', '🤢', '🔥', '⚡', '📏', '⚖️'];
+function openTypesManager() {
+  renderTypesMgrList();
+  showModal('typesMgrMask');
+}
+function renderTypesMgrList() {
+  const wrap = document.getElementById('typesMgrList');
+  if (!wrap) return;
+  const builtin = [
+    { icon: '🌷', name: '月经' }, { icon: '🦴', name: '痛风' }, { icon: '😖', name: '异常' }, { icon: '❤️', name: '同房' },
+  ].map(p => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--border);">
+      <span style="font-size:20px;width:28px;text-align:center;">${p.icon}</span>
+      <span style="flex:1;font-size:13px;font-weight:600;">${p.name}</span>
+      <span style="font-size:10px;color:var(--text-3);background:#f1f5f9;padding:2px 8px;border-radius:999px;">内置</span>
+    </div>
+  `).join('');
+  const customs = customEventTypes.map(c => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--border);">
+      <button class="mgr-icon-btn" data-id="${escapeHtml(c.id)}" title="点击更换图标">${escapeHtml(c.icon)}</button>
+      <span style="flex:1;font-size:13px;font-weight:600;">${escapeHtml(c.name)}</span>
+      <button class="mgr-del-btn" data-id="${escapeHtml(c.id)}" title="删除该项目">🗑</button>
+    </div>
+  `).join('');
+  wrap.innerHTML = builtin + (customEventTypes.length ? customs : '<div style="padding:14px;text-align:center;color:var(--text-3);font-size:12px;">还没有自定义项目</div>');
+
+  // 换图标：点击展开 emoji 行
+  wrap.querySelectorAll('.mgr-icon-btn').forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.dataset.id;
+      const item = customEventTypes.find(c => c.id === id);
+      if (!item) return;
+      const existing = wrap.querySelector('.mgr-icon-panel');
+      if (existing && existing.dataset.id === id) { existing.remove(); return; }
+      wrap.querySelectorAll('.mgr-icon-panel').forEach(p => p.remove());
+      const panel = document.createElement('div');
+      panel.className = 'mgr-icon-panel';
+      panel.dataset.id = id;
+      panel.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;padding:10px;background:#faf5ff;border-radius:10px;margin:6px 0;';
+      panel.innerHTML = MGR_ICONS.map(ic => `<span class="mgr-icon-pick" data-ic="${ic}" style="font-size:20px;cursor:pointer;padding:4px 6px;border-radius:8px;">${ic}</span>`).join('');
+      btn.closest('div').after(panel);
+      panel.querySelectorAll('.mgr-icon-pick').forEach(pick => {
+        pick.onmouseenter = () => pick.style.background = '#ede9fe';
+        pick.onmouseleave = () => pick.style.background = '';
+        pick.onclick = () => {
+          item.icon = pick.dataset.ic;
+          saveCustomEventTypes();
+          renderBodyTypeSelector();
+          renderTypesMgrList();
+          showToast(`✓ 图标已更换`);
+        };
+      });
+    };
+  });
+  // 删除
+  wrap.querySelectorAll('.mgr-del-btn').forEach(btn => {
+    btn.onclick = () => deleteCustomEventTypeFlow(btn.dataset.id, () => renderTypesMgrList());
+  });
+}
+async function deleteCustomEventTypeFlow(id, after) {
+  const item = customEventTypes.find(c => c.id === id);
+  if (!item) return;
+  // 兼容两种保存方式：category 直接是 cust_xxx（旧/未关联）或 category='custom' 且 payload.custom_id 等
+  const refEvents = bodyEvents.filter(ev =>
+    ev.category === id ||
+    (ev.category === 'custom' && ev.payload && ev.payload.custom_id === id)
+  );
+  const msg = refEvents.length
+    ? `「${item.name}」已被 ${refEvents.length} 条记录引用，删除该项目将把这些记录改为「未分类自定义」`
+    : `删除自定义项目「${item.name}」？`;
+  if (!(await uiConfirm({ title: '删除自定义项目？', message: msg, icon: '🖍️' }))) return;
+  if (refEvents.length) {
+    // 关联的记录把 custom_name 保留，category/cust_id 置空
+    refEvents.forEach(ev => {
+      if (ev.category === id) {
+        ev.category = 'custom';
+        ev.payload = ev.payload || {};
+        ev.payload.custom_id = null;
+        ev.payload._orphaned_from = item.name;
+      } else if (ev.category === 'custom' && ev.payload && ev.payload.custom_id === id) {
+        ev.payload.custom_id = null;
+        ev.payload._orphaned_from = item.name;
+      }
+    });
+    saveBodyEventsCache();
+    // 同步删除云端记录的分类（异步不阻塞）
+    refEvents.forEach(ev => { if (dbClient && ev.id && !ev.id.startsWith('pending-')) { try { dbClient.from('body_events').update({ category: 'custom', payload: ev.payload }).eq('id', ev.id).then(() => {}, () => {}); } catch (e) {} } });
+  }
+  customEventTypes = customEventTypes.filter(c => c.id !== id);
+  saveCustomEventTypes();
+  // v97：记录删除标记，防止云端旧记录把已删项目"复活"
+  try {
+    const del = JSON.parse(localStorage.getItem('deleted_custom_types') || '{}');
+    del[id] = Date.now();
+    localStorage.setItem('deleted_custom_types', JSON.stringify(del));
+  } catch (e) {}
+  renderBodyTypeSelector();
+  syncEventsCategoryFilter();
+  if (currentBodyType === id) {
+    currentBodyType = 'menstrual';
+    document.querySelectorAll('#bodyTypeSelector .bts-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'menstrual'));
+    updateBtsHint();
+  }
+  showToast(`✓ 已删除「${item.name}」`);
+  if (after) after();
 }
 
 function genBodyEventId() {
@@ -4633,58 +4770,17 @@ function initEventsView() {
     renderEventsList();
   });
 
-  // 添加按钮
-  document.getElementById('btnAddEvent').addEventListener('click', () => openEventModal());
+  // v97：「⚙ 管理」按钮 → 项目管理弹窗（新建/换图标/删除）
+  document.getElementById('btnAddEvent').addEventListener('click', () => openTypesManager());
+  // 管理弹窗里的「➕ 新建项目」
+  document.getElementById('btnMgrAdd').addEventListener('click', async () => {
+    await promptAddCustomEventType();
+    renderTypesMgrList();  // 新建后刷新管理列表
+  });
 
   // 身体类型选择器（月经/痛风/异常/自定义项目）
+  // v97：内嵌删除键已移除（非法 HTML 嵌套），删除统一走「⚙ 管理」弹窗的 deleteCustomEventTypeFlow
   document.getElementById('bodyTypeSelector').addEventListener('click', async e => {
-    // 优先处理删除按钮
-    const delBtn = e.target.closest('.bts-del');
-    if (delBtn) {
-      e.stopPropagation();
-      const id = delBtn.dataset.id;
-      const item = customEventTypes.find(c => c.id === id);
-      if (!item) return;
-      // 兼容两种保存方式：category 直接是 cust_xxx（旧/未关联）或 category='custom' 且 payload.custom_id 等
-      const used = bodyEvents.some(ev =>
-        ev.category === id ||
-        (ev.category === 'custom' && ev.payload && ev.payload.custom_id === id)
-      );
-      const refCount = bodyEvents.filter(ev =>
-        ev.category === id ||
-        (ev.category === 'custom' && ev.payload && ev.payload.custom_id === id)
-      ).length;
-      const msg = used
-        ? `「${item.name}」已被 ${refCount} 条记录引用，删除该项目将把这些记录改为「未分类自定义」`
-        : `删除自定义项目「${item.name}」？`;
-      if (await uiConfirm({ title: '删除自定义项目？', message: msg, icon: '🖍️' })) {
-        if (used) {
-          // 关联的记录把 custom_name 保留，category/cust_id 置空
-          bodyEvents.forEach(ev => {
-            if (ev.category === id) {
-              ev.category = 'custom';
-              ev.payload = ev.payload || {};
-              ev.payload.custom_id = null;
-              ev.payload._orphaned_from = item.name;
-            } else if (ev.category === 'custom' && ev.payload && ev.payload.custom_id === id) {
-              ev.payload.custom_id = null;
-              ev.payload._orphaned_from = item.name;
-            }
-          });
-          saveBodyEventsCache();
-        }
-        customEventTypes = customEventTypes.filter(c => c.id !== id);
-        saveCustomEventTypes();
-        renderBodyTypeSelector();
-        if (currentBodyType === id) {
-          currentBodyType = 'menstrual';
-          document.querySelectorAll('#bodyTypeSelector .bts-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'menstrual'));
-          updateBtsHint();
-        }
-        showToast(`✓ 已删除「${item.name}」`);
-      }
-      return;
-    }
     const btn = e.target.closest('.bts-btn');
     if (!btn) return;
     // 「＋添加项目」按钮 → 弹出添加弹窗
@@ -5383,28 +5479,37 @@ function setEventType(type) {
   currentEventType = norm;
   document.querySelectorAll('.event-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === norm));
   document.querySelectorAll('.event-fields').forEach(f => f.classList.toggle('event-fields-hidden', f.dataset.for !== norm));
-  // v96：切到自定义项目时，AI 建议区初始化
-  if (norm === 'custom') {
-    const nm = document.getElementById('eventCustomName').value.trim();
-    renderAISuggestedFields(nm, null);
-  } else {
-    const wrap = document.getElementById('aiFieldsWrap');
-    if (wrap) wrap.innerHTML = '';
+  // v97：AI 建议区只做清空/空态——不再用 DOM 残留值渲染（上次项目的残留名字会导致
+  // 「新项目沿用上次建议」，正式渲染统一由 openEventModal 末尾/输入防抖用最终名字触发）
+  const wrap = document.getElementById('aiFieldsWrap');
+  if (wrap) {
+    wrap.innerHTML = (norm === 'custom')
+      ? '<div style="font-size:11px;color:var(--text-3);">填写项目名后，AI 会建议要记录哪些信息</div>'
+      : '';
   }
 }
 
 /* ============================================================
-   v96：AI 生成自定义项目的建议记录字段（1~3 个，选填）
-   - 按项目名缓存建议到 localStorage，同一项目下次秒显不再调 AI
+   v97：AI 生成自定义项目的建议（图标 + 1~3 个记录字段，每字段带可选选项）
+   - 返回 { icon, fields: [{ label, options: [] }] }，字段选项可点击填入
+   - 按项目名缓存到 localStorage，同一项目下次秒显不再调 AI
    - 填写后保存进 payload.ai_fields = [{label, value}]，全部记录第二行显示
+   - AI 建议的图标在「添加项目」时自动采用（aiIconSuggestion 全局暂存）
    ============================================================ */
 const AI_FIELD_CACHE_KEY = 'aiFieldSuggestions';
+const AI_ICON_SUGGEST_KEY = 'aiIconSuggestions';
 let aiFieldsToken = 0;  // 防竞态：连续改名时只采纳最后一次
 function getAIFieldCache() {
   try { return JSON.parse(localStorage.getItem(AI_FIELD_CACHE_KEY) || '{}'); } catch (e) { return {}; }
 }
-function cacheAIFields(name, fields) {
-  try { const c = getAIFieldCache(); c[name] = fields; localStorage.setItem(AI_FIELD_CACHE_KEY, JSON.stringify(c)); } catch (e) {}
+function cacheAISuggestion(name, sug) {
+  try { const c = getAIFieldCache(); c[name] = sug; localStorage.setItem(AI_FIELD_CACHE_KEY, JSON.stringify(c)); } catch (e) {}
+}
+function getAIIconSuggestion(name) {
+  try { return JSON.parse(localStorage.getItem(AI_ICON_SUGGEST_KEY) || '{}')[name] || null; } catch (e) { return null; }
+}
+function setAIIconSuggestion(name, icon) {
+  try { const c = JSON.parse(localStorage.getItem(AI_ICON_SUGGEST_KEY) || '{}'); c[name] = icon; localStorage.setItem(AI_ICON_SUGGEST_KEY, JSON.stringify(c)); } catch (e) {}
 }
 
 async function fetchAISuggestedFields(name) {
@@ -5413,7 +5518,7 @@ async function fetchAISuggestedFields(name) {
   const body = {
     model: cfg.model,
     messages: [
-      { role: 'system', content: '你是家庭健康记录助手。用户添加了一个自定义记录项目，请给出记录该项目时最有价值的1~3个信息字段名（简短中文，例如"发作部位""疼痛等级""用药"）。只返回JSON字符串数组，不要任何解释。' },
+      { role: 'system', content: '你是家庭健康记录助手。用户添加了一个自定义健康记录项目。请返回JSON对象（不要任何解释）：{"icon":"一个最贴切的emoji图标","fields":[{"label":"字段名","options":["常见选项1","选项2"]}]}。要求：fields 为记录该项目时最有价值的1~3个信息字段（简短中文，如"发作部位""疼痛等级""用药"）；每个字段给2~6个常见可选选项（没有合适选项就给空数组[]）。' },
       { role: 'user', content: `自定义项目名称：${name}` },
     ],
     temperature: 0.2,
@@ -5427,15 +5532,25 @@ async function fetchAISuggestedFields(name) {
   if (!resp.ok) throw new Error('HTTP ' + resp.status);
   const data = await resp.json();
   let content = (data.choices?.[0]?.message?.content || '').replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
-  let arr;
-  try { arr = JSON.parse(content); } catch (e) {
-    const m = content.match(/\[[\s\S]*?\]/);
+  let obj;
+  try { obj = JSON.parse(content); } catch (e) {
+    const m = content.match(/\{[\s\S]*\}/);
     if (!m) throw new Error('AI 返回格式错误');
-    arr = JSON.parse(m[0]);
+    obj = JSON.parse(m[0]);
   }
-  const fields = (Array.isArray(arr) ? arr : []).map(s => String(s).trim()).filter(Boolean).slice(0, 3);
+  let fields = [];
+  if (Array.isArray(obj)) {
+    // 兼容旧格式（纯字段名数组）
+    fields = obj.map(s => ({ label: String(s), options: [] }));
+  } else if (obj && Array.isArray(obj.fields)) {
+    fields = obj.fields
+      .map(f => typeof f === 'string' ? { label: f, options: [] } : { label: String(f.label || '').trim(), options: (f.options || []).map(s => String(s)).filter(Boolean).slice(0, 6) })
+      .filter(f => f.label)
+      .slice(0, 3);
+  }
   if (!fields.length) throw new Error('AI 未返回字段');
-  return fields;
+  const icon = (obj && typeof obj.icon === 'string' && obj.icon && obj.icon.length <= 4) ? obj.icon : null;
+  return { icon, fields };
 }
 
 function renderAISuggestedFields(name, existing) {
@@ -5446,27 +5561,40 @@ function renderAISuggestedFields(name, existing) {
     wrap.innerHTML = '<div style="font-size:11px;color:var(--text-3);">填写项目名后，AI 会建议该项目要记录哪些信息</div>';
     return;
   }
-  const renderInputs = (fields) => {
+  const renderInputs = (sug) => {
     if (tok !== aiFieldsToken) return;
-    wrap.innerHTML = `<div style="font-size:11px;color:var(--text-3);margin-bottom:4px;">🤖 AI 建议记录（选填）：</div>` + fields.map(f => {
-      const prev = (existing || []).find(x => x.label === f);
-      return `<div class="preview-row"><label>${escapeHtml(f)}</label><input type="text" class="preview-input ai-field-input" data-label="${escapeHtml(f)}" value="${escapeHtml((prev && prev.value) || '')}" placeholder="选填"></div>`;
+    if (sug.icon) setAIIconSuggestion(name, sug.icon);
+    wrap.innerHTML = `<div style="font-size:11px;color:var(--text-3);margin-bottom:4px;">🤖 AI 建议记录（选填，点选项可快速填入）：</div>` + sug.fields.map(f => {
+      const prev = (existing || []).find(x => x.label === f.label);
+      const optChips = (f.options || []).map(o =>
+        `<span class="ai-opt-chip" data-val="${escapeHtml(o)}" title="点击填入">${escapeHtml(o)}</span>`
+      ).join('');
+      return `<div class="preview-row"><label>${escapeHtml(f.label)}</label>
+        <input type="text" class="preview-input ai-field-input" data-label="${escapeHtml(f.label)}" value="${escapeHtml((prev && prev.value) || '')}" placeholder="选填">
+        ${optChips ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${optChips}</div>` : ''}
+      </div>`;
     }).join('');
+    wrap.querySelectorAll('.ai-opt-chip').forEach(chip => {
+      chip.onclick = () => {
+        const inp = chip.closest('.preview-row').querySelector('.ai-field-input');
+        if (inp) inp.value = chip.dataset.val;
+      };
+    });
   };
   const cached = getAIFieldCache()[name];
-  if (cached && cached.length) { renderInputs(cached); return; }
+  if (cached && cached.fields && cached.fields.length) { renderInputs(cached); return; }
   wrap.innerHTML = '<div style="font-size:11px;color:var(--text-3);">🤖 AI 正在思考该项目要记录哪些信息…</div>';
-  fetchAISuggestedFields(name).then(fields => {
+  fetchAISuggestedFields(name).then(sug => {
     if (tok !== aiFieldsToken) return;
-    cacheAIFields(name, fields);
-    renderInputs(fields);
+    cacheAISuggestion(name, sug);
+    renderInputs(sug);
   }).catch(() => {
     if (tok !== aiFieldsToken) return;
     wrap.innerHTML = '<div style="font-size:11px;color:var(--text-3);">AI 建议暂不可用，可直接写在备注里</div>';
   });
 }
 
-// 项目名输入（防抖 900ms）→ 拉取 AI 建议
+// 项目名输入（防抖 400ms）→ 拉取 AI 建议
 (function () {
   const inp = document.getElementById('eventCustomName');
   if (!inp) return;
@@ -5475,7 +5603,7 @@ function renderAISuggestedFields(name, existing) {
     clearTimeout(t);
     t = setTimeout(() => {
       if (currentEventType === 'custom') renderAISuggestedFields(inp.value.trim(), null);
-    }, 900);
+    }, 400);
   });
 })();
 
