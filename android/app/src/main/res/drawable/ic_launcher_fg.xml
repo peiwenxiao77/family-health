@@ -1,10 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- v84：桌面图标改为 🏠 房子（emoji 风格）：橙红屋顶 + 奶油墙体 + 烟囱 + 拱门 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- 墙体 -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,74 C54,74 34,61 34,46 C34,38.3 40.3,33 47,33 C50.4,33 53,34.7 54,37 C55,34.7 57.6,33 61,33 C67.7,33 74,38.3 74,46 C74,61 54,74 54,74 Z" />
+        android:fillColor="#FFF3E0"
+        android:pathData="M33,56 L75,56 L75,78 Q75,80 73,80 L35,80 Q33,80 33,78 Z" />
+    <!-- 烟囱（在屋顶后面） -->
+    <path
+        android:fillColor="#C1552F"
+        android:pathData="M67,34 L76,34 L76,50 L67,50 Z" />
+    <!-- 屋顶 -->
+    <path
+        android:fillColor="#E8602C"
+        android:pathData="M54,27 L86,57 Q87.5,58.5 86,60 L22,60 Q20.5,58.5 22,57 Z" />
+    <!-- 屋顶下的檐口阴影线 -->
+    <path
+        android:fillColor="#D14E1F"
+        android:pathData="M25.5,60 L82.5,60 L82.5,63 L25.5,63 Z" />
+    <!-- 拱形门 -->
+    <path
+        android:fillColor="#7B4B2A"
+        android:pathData="M48,80 L48,68 Q48,61 54,61 Q60,61 60,68 L60,80 Z" />
+    <!-- 门把手 -->
+    <path
+        android:fillColor="#FFE0B2"
+        android:pathData="M57.2,71.2 A1.4,1.4 0 1 1 57.2,71.3 Z" />
 </vector>
