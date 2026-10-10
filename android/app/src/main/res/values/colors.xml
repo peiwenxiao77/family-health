@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_bg">#D9CFC4</color>
+    <color name="ic_bg">#FFE9C7</color>
     <color name="w_text_main">#57504B</color>
     <color name="w_text_soft">#9A8F86</color>
     <color name="w_phase_text">#9A8F86</color>
