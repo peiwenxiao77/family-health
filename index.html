@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v105b: ①修复计数跳增(第1、4、6、8次…)：v105 首版插入云端后只 unshift 整条替换、没删本地临时 id 残留条目→每次点击净增2条——恢复原地替换+清同云端id重复；并加内容级去重(category|member|ts 完全相同=同一次点击的成对残留，id 不同 id 级去重清不掉) ②历史日期多次记录的 ts 加已有条数偏移(21:00+N分钟)保证唯一，避免被内容去重误合并 ③小组件双击修复：窗口600ms→1500ms(广播投递延迟)+@Synchronized 串行化+进程内存态判定(防并发读写竞态) -->
 <!-- v105: ①修复「点击一次记录61次」：v104 编辑意外留下的重复嵌套 forEach 绑定(一次点击触发两次记录)+本地缓存/实时回显竞态无去重(计数虚高)——修复绑定+saveBodyEventsCache/载入处统一按 id 去重+插入回云端记录时整条替换并清同 id 重复 ②日历角标不再显示 ×N：当日几条记录就画几个符号(❤️❤️)，总数超过 3 个自动缩小(compact)，1~3 个正常大小 ③小组件改双击确认记录(600ms 窗口，第一击亮「再点一次」提示文字，第二击记录到当前时间点)，名称改「爱心图案」 -->
 <!-- v104: ①日历删除改长按500ms(pointer实现+震动反馈)，点击不再触发删除 ②同一天可保存多次相同数据(如两次同房点击即新增)，日历同类角标显示数量 ❤️×N ③事件弹窗删「结束时间」行(转hidden兼容月经范围保存)、「开始」改「时间」 ④新增自定义日期时间选择弹窗(年月日时分下拉+「确认」按钮，替代原生picker的不可改「设置」文案) ⑤身体全部记录第一行末尾显示含年份时间(与项目名flex隔开) -->
 <!-- v102: 顶栏收纳修复——v101「跳动后稳定显示/折叠失败」真凶=浏览器滚动锚定(scroll anchoring)：收纳动画收缩页面顶部高度时浏览器自动回拉 scrollY 补偿→低于展开阈值→立即弹回展开→震荡。修复=html overflow-anchor:none + 阈值提高(>140折叠/<60展开) + 过渡期350ms状态锁 -->
@@ -1564,12 +1565,17 @@ function syncCustomTypesFromEvents() {
 let records = [];
 let bodyEvents = [];
 // v105：按 id 去重（与 saveBodyEventsCache 同规则）——清掉历史缓存里已存在的重复条目
+// v105b：追加内容级去重（category|member|ts 完全相同 = 同一次点击的成对残留），
+// 双击绑定时代产生的重复记录 ts 完全一致，id 却不同，仅按 id 去重清不掉
 function dedupeBodyEvents() {
-  const seen = new Set();
+  const seenId = new Set(), seenKey = new Set();
   bodyEvents = bodyEvents.filter(e => {
-    const id = e && e.id;
-    if (!id || seen.has(id)) return false;
-    seen.add(id);
+    if (!e) return false;
+    const id = e.id;
+    const key = `${e.category}|${e.member}|${e.ts}`;
+    if ((id && seenId.has(id)) || seenKey.has(key)) return false;
+    if (id) seenId.add(id);
+    seenKey.add(key);
     return true;
   });
 }
@@ -2410,15 +2416,10 @@ function subscribeBodyEvents() {
 // 本地新建记录先用本地 id 入列，REST 成功后替换为云端 id；若 realtime INSERT 回显
 // 抢在 REST 响应前到达（云端 id 本地还查不到），就会 unshift 一条重复记录并被持久化。
 // 在此统一去重（保留先出现的），任何路径产生的重复都会在下次落盘时被清掉
+// 在此统一去重（按 id + 内容键 category|member|ts，保留先出现的），任何路径产生的重复都会被清掉
 function saveBodyEventsCache() {
   try {
-    const seen = new Set();
-    bodyEvents = bodyEvents.filter(e => {
-      const id = e && e.id;
-      if (!id || seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    });
+    dedupeBodyEvents();
     localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(bodyEvents));
   } catch (e) { console.warn('localStorage save body events failed', e); }
 }
@@ -2801,9 +2802,13 @@ async function saveBodyEvent(event) {
       try {
         const inserted = await pushBodyEventToCloud(event);
         if (inserted) {
-          // v105：整条替换为云端记录，并清掉 realtime 回显竞态可能产生的同 id 重复
-          bodyEvents = bodyEvents.filter(e => e.id !== inserted.id);
-          bodyEvents.unshift(inserted);
+          // v105b：原地替换本地记录（保留位置），并清掉 realtime 回显竞态产生的
+          // 同云端 id 重复——v105 首版只 unshift 不替换，导致本地临时 id 那条残留，
+          // 每次点击净增 2 条（计数 1、4、6、8…跳增的根因）
+          const idx = bodyEvents.findIndex(e => e.id === event.id);
+          bodyEvents = bodyEvents.filter(e => e.id === event.id || e.id !== inserted.id);
+          if (idx >= 0) bodyEvents[idx] = inserted;
+          else bodyEvents.unshift(inserted);
           saveBodyEventsCache();
         }
       } catch (e) {
@@ -5497,9 +5502,12 @@ async function onMenstrualDayClick(ts, el) {
 
   // === ❤️（同房）：点击即新增一条（v104：同一天可记录多次，长按删除） ===
   if (currentType === 'intercourse' || currentType === 'mood') {
-    // 时间取值：今天 = 当前时刻；历史日期 = 当天 21:00
+    // 时间取值：今天 = 当前时刻；历史日期 = 当天 21:00 + 已有条数偏移（v105b：
+    // 每条错开 1 分钟，保证 ts 唯一——否则会被内容级去重合并成一条）
     const nowD = new Date();
-    const tsLove = dateKey(nowD) === k ? nowD.getTime() : new Date(`${k}T21:00:00`).getTime();
+    const priorCount = bodyEvents.filter(e => (e.category === 'intercourse' || e.category === 'mood') &&
+      e.member === memberName && startOfDay(e.ts).getTime() === day.getTime()).length;
+    const tsLove = dateKey(nowD) === k ? nowD.getTime() : new Date(`${k}T21:00:00`).getTime() + priorCount * 60000;
     saveFormDefaults({ event_member: memberName, last_event_type: 'intercourse' });
     await saveBodyEvent({
       id: null, ts: tsLove, end_ts: null,
