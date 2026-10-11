@@ -1,0 +1,25 @@
+name: Monthly Health Report + WeChat
+
+# P3 月报 + 微信推送：每月 1 日（北京 08:23）生成上月家庭健康月报，
+# 完整报告（正文 + 当月全部数据合并为一个 JSON 文档）存入 backups 表，
+# 摘要经 Server酱 推送到微信。
+# 微信推送开通：https://sct.ftqq.com 微信扫码登录 → 复制 SendKey →
+# 填到本仓库 Settings → Secrets and variables → Actions → New repository secret，
+# 名字填 SERVERCHAN_KEY，之后每月自动推送；未配置时只存备份、不推微信。
+
+on:
+  schedule:
+    - cron: '23 0 1 * *'   # 每月 1 日 UTC 00:23 = 北京 08:23
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build monthly report + backup + WeChat push
+        env:
+          SERVERCHAN_KEY: ${{ secrets.SERVERCHAN_KEY }}
+        run: node scripts/monthly_report.js
