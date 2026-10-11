@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v103: 收纳行为收敛——只有翻到最顶部(≤8px)才出现,离开顶部(>30px)立即收起,中间任何位置上翻下翻都保持折叠(v102 的 <60/>140 阈值太宽松=顶部附近140px区间内部件可见,观感「出现一下再消失」);过渡加速(0.2s/0.14s) -->
 <!-- v102: 顶栏收纳修复——v101「跳动后稳定显示/折叠失败」真凶=浏览器滚动锚定(scroll anchoring)：收纳动画收缩页面顶部高度时浏览器自动回拉 scrollY 补偿→低于展开阈值→立即弹回展开→震荡。修复=html overflow-anchor:none + 阈值提高(>140折叠/<60展开) + 过渡期350ms状态锁 -->
 <!-- v101: 顶栏滚动收纳回归(实时同步中/时间/设置下滑收纳、回顶展开)——v97 已铲频闪真根因(半透明+blur)+v98 删常驻动画后重绘环境干净；本次不用 display:none 瞬跳(整页 reflow 抖动源)，改 max-height+opacity 平滑过渡+迟滞(>80折叠/<40展开)+rAF 节流 -->
 <!-- v100: ①设置弹窗新增「云端备份恢复」：列出最近 8 份每周自动备份(时间+条数)，点击按 id 合并补缺恢复(不删除现有记录)，双确认防误触；每周备份同时存一份到 GitHub 私有仓库 family-health-backups(第二落点，防 Supabase 单点故障) -->
@@ -114,7 +115,7 @@
     max-height: 96px;
     opacity: 1;
     overflow: hidden;
-    transition: max-height 0.28s ease, opacity 0.22s ease;
+    transition: max-height 0.2s ease, opacity 0.14s ease;
   }
   .topbar > header > .header-right.header-collapsed {
     max-height: 0;
@@ -3293,10 +3294,10 @@ bindClick('bannerConfigBtn', openConfig, '横幅配置按钮');
 // v98：顶栏滚动收纳（v58）JS 已整体删除——display:none 切换在 sticky 顶栏内触发布局
 // 抖动（网页/APP 频闪共同嫌疑），且 APP 上滑回顶部时折叠态不恢复。右侧状态区常显。
 
-// v102：顶栏收纳修复——①阈值提高（>140 折叠 / <60 展开），远离顶部浅滚区，
-// 收纳本身会让页面变矮，太贴近顶部时 scrollY 容易被卷进震荡；
-// ②过渡期间 350ms 锁定状态切换，任何残余的 scrollY 波动都不会反向触发；
-// ③html overflow-anchor:none 已禁滚动锚定（见 CSS 注释，v101 失败真凶）
+// v103：收纳行为按用户需求收敛——只有翻到最顶部（≤8px）才展开，
+// 离开顶部（>30px）立即收起，中间任何位置上翻下翻都保持折叠不闪现。
+// （v102 的 <60/>140 阈值太宽松：顶部附近 140px 滑动区间内部件都可见，
+// 观感=「先出现一下再消失」。迟滞区间收到 8~30px，锚定已禁+锁仍在，不会震荡）
 (function () {
   const headerRight = document.querySelector('.topbar > header > .header-right');
   if (!headerRight) return;
@@ -3304,12 +3305,12 @@ bindClick('bannerConfigBtn', openConfig, '横幅配置按钮');
   const apply = shouldCollapse => {
     if (shouldCollapse !== collapsed && Date.now() > lockUntil) {
       collapsed = shouldCollapse;
-      lockUntil = Date.now() + 350;  // 覆盖 0.28s 过渡期
+      lockUntil = Date.now() + 250;  // 覆盖过渡期，防 8~30px 区间内来回
       headerRight.classList.toggle('header-collapsed', collapsed);
     }
   };
   const onScroll = () => {
-    apply(collapsed ? window.scrollY < 60 : window.scrollY > 140);
+    apply(collapsed ? window.scrollY > 30 : window.scrollY > 8);
     ticking = false;
   };
   window.addEventListener('scroll', () => {
