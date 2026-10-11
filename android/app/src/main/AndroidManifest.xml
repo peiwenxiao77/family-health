@@ -27,11 +27,11 @@
                 android:resource="@xml/menstrual_widget_info" />
         </receiver>
 
-        <!-- v105：1×1 爱心小组件（双击记录当日一次同房，记录到当前时间点） -->
+        <!-- v105c：1×1 爱心小组件（双击记录当日一次同房，记录到当前时间点） -->
         <receiver
             android:name=".IntercourseWidget"
             android:exported="false"
-            android:label="爱心图案">
+            android:label="❤️点击记录">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.familyhealth.app.ACTION_RECORD_INTERCOURSE" />
