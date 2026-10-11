@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v99: ①设备密码锁：首次打开需输入访问密码(固定 000717)，通过后本设备 localStorage 记住不再询问；锁屏为全屏遮罩，未解锁时不渲染数据(防闪现)。注意：此为前端门锁，挡"打开网址看数据"，不挡"直接调云端API"——网址请勿外传 ②月经预测提醒：用已有 v66 周期预测算法(computeCyclePrediction)，预测开始日=今天/明天时在身体页顶部显示提醒横幅(该成员月经进行中则跳过) ③配套云端自动化：每周日自动全量备份两张表到 backups 表(保留8周)+每月1日生成健康月报存备份并经 Server酱 推送微信摘要(SERVERCHAN_KEY secret 未配置时只存不推) -->
 <!-- v98: ①删除确认弹窗被管理弹窗挡住——uiConfirmMask 提 z-index 到 10060(原 9999 同层按 DOM 顺序被压在下面) ②频闪终极修复 v2：取消顶栏滚动收纳(v58 功能，display:none 切换在 sticky 顶栏内触发布局抖动=网页/APP 频闪共同嫌疑)+删除顶栏两个无限 pulse 动画(常驻重绘源)，右侧状态区改为常显(顺带修复滑回顶部按键不恢复) ③AI 建议时机前移：新建项目时立刻预生成记录字段(缓存)，之后点日历记录秒显 ④弹窗重构：自定义项目像内置项目一样成为独立类型按钮，选中后进弹窗即默认该项目；事件名输入框/➕添加按钮/提示文字全部删除(项目名由系统内部维护，不再需要确认) -->
 <!-- v97: ①AI建议升级:返回字段+每个字段可选选项(点击填入)+项目图标;修复首次不显示/沿用上次项目的时序bug(setEventType不再用残留值渲染) ②顶栏重影/频闪终极修复:sticky+半透明+backdrop-filter重绘bug,改不透明实色并删blur(网页+APP全局) ③自定义类型按钮去掉内嵌删除键(非法HTML嵌套button导致图标/标题/删除键分离),删除/换图标移入「管理」弹窗 ④「➕添加」改「⚙管理」:管理所有项目(新建/换图标/删除),删除带防云端复活标记 ⑤小组件圆点恢复明亮配色(浅马卡龙在浅底上看不见) -->
 <!-- v93: ①日历各时期+小组件圆点统一改为马卡龙配色(已向用户确认)：月经期草莓粉#F7B3BD/卵泡期奶黄#FAEDBF/排卵期杏桃#FDD9B5/排卵日深杏#F5A96B/黄体期开心果#D6E8C8 ②修复新成员不同步——成员列表此前只存本机，现从云端记录+身体事件自动合并 ③自定义事件类型同样从云端事件自动重建 -->
@@ -640,9 +641,58 @@
   /* 隐藏 */
   .view-hidden { display: none !important; }
   .event-fields-hidden { display: none !important; }
+
+  /* v99：设备密码锁——首屏遮罩，默认可见（防止数据闪现），通过后加 .fh-unlocked 隐藏 */
+  #lockMask { position: fixed; inset: 0; z-index: 20000; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, #fff7ed, #ffedd5 60%, #fecaca); }
+  #lockMask.fh-unlocked { display: none; }
+  .lock-card { background: white; border-radius: 20px; padding: 28px 26px; max-width: 320px; width: 86%; text-align: center; box-shadow: 0 25px 50px -12px rgba(120, 53, 15, 0.4); }
+  .lock-icon { font-size: 40px; margin-bottom: 6px; }
+  .lock-title { font-size: 17px; font-weight: 800; color: #9a3412; }
+  .lock-sub { font-size: 12px; color: var(--text-3); margin: 6px 0 16px; line-height: 1.5; }
+  .lock-input { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 2px solid var(--border); border-radius: 12px; font-size: 18px; text-align: center; letter-spacing: 6px; outline: none; }
+  .lock-input:focus { border-color: var(--primary); }
+  .lock-btn { margin-top: 12px; width: 100%; padding: 12px; border: none; border-radius: 12px; background: var(--primary); color: white; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .lock-err { font-size: 12px; color: #dc2626; margin-top: 8px; min-height: 16px; }
 </style>
 </head>
 <body>
+
+<!-- v99：设备密码锁（未解锁时全屏遮罩，输入正确密码后本设备记住） -->
+<div id="lockMask">
+  <div class="lock-card">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-title">龙龙＆文文の小家</div>
+    <div class="lock-sub">请输入访问密码<br>本设备验证一次后不再询问（清除浏览器数据可重置）</div>
+    <input type="password" id="lockPass" class="lock-input" inputmode="numeric" placeholder="····" autocomplete="off">
+    <button id="lockBtn" class="lock-btn">进入</button>
+    <div class="lock-err" id="lockErr"></div>
+  </div>
+</div>
+<script>
+/* v99：锁屏逻辑放最前——已解锁设备秒隐藏遮罩；未解锁时后续数据脚本延后到解锁后启动 */
+(function () {
+  const LOCK_PASS = '000717';
+  const KEY = 'fh_lock_ok';
+  const mask = document.getElementById('lockMask');
+  if (!mask) return;
+  let ok = false;
+  try { ok = localStorage.getItem(KEY) === '1'; } catch (e) {}
+  if (ok) { mask.classList.add('fh-unlocked'); return; }
+  const inp = document.getElementById('lockPass');
+  const tryUnlock = () => {
+    if (inp.value === LOCK_PASS) {
+      try { localStorage.setItem(KEY, '1'); } catch (e) {}
+      mask.classList.add('fh-unlocked');
+    } else {
+      document.getElementById('lockErr').textContent = '密码不对，再试试';
+      inp.value = ''; inp.focus();
+    }
+  };
+  document.getElementById('lockBtn').addEventListener('click', tryUnlock);
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
+  setTimeout(() => { try { inp.focus(); } catch (e) {} }, 300);
+})();
+</script>
 
 <div class="layout">
 
@@ -5875,8 +5925,40 @@ function saveEventFromForm() {
   });
 }
 
+// v99：月经预测提醒——预测开始日为今天/明天时，身体页顶部显示横幅（月经进行中的成员跳过）
+function renderPeriodReminder() {
+  const anchor = document.getElementById('eventsPageWrap');
+  if (!anchor) return;
+  let wrap = document.getElementById('periodReminder');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'periodReminder';
+    anchor.parentNode.insertBefore(wrap, anchor);
+  }
+  const today = startOfDay(Date.now());
+  const msgs = [];
+  (familyMembers || []).forEach(m => {
+    if (m === 'all') return;
+    const starts = getMenstrualStarts(m);
+    if (starts.length < 2) return;
+    // 该成员月经正在进行中（今天仍处于某次月经期内）→ 不提醒"即将开始"
+    const ongoing = bodyEvents.some(e => e.category === 'menstrual' && e.member === m && expandEventToDateKeys(e).has(dateKey(today)));
+    if (ongoing) return;
+    const pred = computeCyclePrediction(starts);
+    if (!pred || !pred.nextStart) return;
+    const diff = Math.round((startOfDay(pred.nextStart.getTime()) - today) / 86400000);
+    if (diff === 0) msgs.push(`🌷 预测 <b>${escapeHtml(m)}</b> 的月经<b>今天</b>开始（平均周期 ${pred.avgCycle} 天）`);
+    else if (diff === 1) msgs.push(`🌷 预测 <b>${escapeHtml(m)}</b> 的月经<b>明天</b>开始（平均周期 ${pred.avgCycle} 天），记得提前准备`);
+  });
+  wrap.innerHTML = msgs.length ? msgs.map(t => `
+    <div style="background:linear-gradient(135deg,#fff1f2,#fce7f3);border:1px solid #fbcfe8;border-radius:12px;padding:10px 14px;margin:0 0 10px;font-size:13px;color:#9d174d;display:flex;align-items:center;gap:8px;">
+      <span style="font-size:16px;">🔔</span><span style="flex:1;">${t}</span>
+    </div>`).join('') : '';
+}
+
 function renderEvents() {
   document.getElementById('eventsCount').textContent = bodyEvents.length + ' 条';
+  renderPeriodReminder();
   renderMenstrualCalendar();
   renderEventsOverview();
   renderEventsCharts();
