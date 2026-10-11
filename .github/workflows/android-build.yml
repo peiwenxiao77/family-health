@@ -10,6 +10,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # v107：需要推送 releases/ 到仓库（随 GitHub Pages 同步发布）
     steps:
       - uses: actions/checkout@v4
 
@@ -34,3 +36,34 @@ jobs:
         with:
           name: family-health-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      # v107：把 APK + 版本信息发布到 releases/（随 GitHub Pages 上线）。
+      # APP 内 UpdateChecker 读取 version.json 对比 versionCode，
+      # 有新版则弹窗/通知，从同域下载 latest.apk 自动安装。
+      - name: Publish release to Pages
+        run: |
+          VN=$(grep -oP 'versionName "\K[^"]+' android/app/build.gradle)
+          VC=$(grep -oP 'versionCode \K[0-9]+' android/app/build.gradle)
+          NOTES=$(git log -1 --pretty=%s)
+          NOW=$(date -u +%FT%TZ)
+          echo "version: v$VN (versionCode $VC)"
+          mkdir -p releases
+          cp android/app/build/outputs/apk/debug/app-debug.apk releases/latest.apk
+          VN="$VN" VC="$VC" NOTES="$NOTES" NOW="$NOW" python3 - <<'PYEOF'
+          import json, os
+          data = {
+              "version_code": int(os.environ["VC"]),
+              "version_name": os.environ["VN"],
+              "apk_url": "https://peiwenxiao77.github.io/family-health/releases/latest.apk",
+              "notes": os.environ["NOTES"],
+              "updated_at": os.environ["NOW"],
+          }
+          with open("releases/version.json", "w", encoding="utf-8") as f:
+              json.dump(data, f, ensure_ascii=False, indent=2)
+          print("version.json:", json.dumps(data, ensure_ascii=False))
+          PYEOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add releases/latest.apk releases/version.json
+          git commit -m "release: v$VN (versionCode $VC)" || echo "no changes to release"
+          git push

@@ -30,6 +30,8 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
 
     override suspend fun doWork(): Result {
         refresh(applicationContext)
+        // v107：顺带检查 APP 新版本，发现则发系统通知（同版本只提醒一次）
+        UpdateChecker.checkAndNotify(applicationContext)
         return Result.success()
     }
 

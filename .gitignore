@@ -22,6 +22,9 @@ _tmp*.js
 _*.zip
 *.apk
 app-v*.zip
+# v107：releases/ 下的发布产物由 CI 提交，必须保留
+!releases/
+!releases/latest.apk
 
 # 本地对比调试目录（含完整浏览器 Profile，体积巨大）
 _对比/

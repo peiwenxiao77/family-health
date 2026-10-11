@@ -52,6 +52,16 @@ class MainActivity : Activity() {
         web.loadUrl("https://peiwenxiao77.github.io/family-health/")
         // 打开 APP 时顺手刷新一次小组件
         WidgetWorker.scheduleNow(this)
+        // v107：Android 13+ 通知权限运行时申请（更新推送通知需要）
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            try {
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 101)
+            } catch (_: Exception) {}
+        }
+        // v107：启动 2.5 秒后检查更新（让页面先加载，弹窗不打断首屏）
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            if (!isFinishing) UpdateChecker.checkAsync(this, false)
+        }, 2500)
     }
 
     override fun onBackPressed() {
