@@ -33,12 +33,12 @@ const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
   const startISO = start.toISOString();
   const endISO = end.toISOString();
   // 预测需要更早的月经数据 → 多拉 120 天身体事件；健康测量多拉一个月（环比用）
-  const longISO = new Date(start.getTime() - 120 * DAY).toISOString();
   const hrLongISO = prevStart.toISOString();
 
   const [hrAll, beAll] = await Promise.all([
-    rest(`/health_records?select=*&ts=gte.${hrLongISO}&ts=lt.${endISO}&limit=5000`),
-    rest(`/body_events?select=*&ts=gte.${longISO}&ts=lt.${endISO}&order=ts.asc&limit=5000`),
+    // 注意：ts 列是毫秒时间戳(bigint)，过滤必须传数字，传 ISO 字符串会 400
+    rest(`/health_records?select=*&ts=gte.${prevStart.getTime()}&ts=lt.${end.getTime()}&limit=5000`),
+    rest(`/body_events?select=*&ts=gte.${new Date(start.getTime() - 120 * DAY).getTime()}&ts=lt.${end.getTime()}&order=ts.asc&limit=5000`),
   ]);
   const hr = hrAll.filter(r => r.ts >= start.getTime());
   const hrPrev = hrAll.filter(r => r.ts >= prevStart.getTime() && r.ts < start.getTime());
