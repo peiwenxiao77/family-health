@@ -1,7 +1,7 @@
 {
-  "version_code": 2,
-  "version_name": "1.1",
+  "version_code": 3,
+  "version_name": "1.2",
   "apk_url": "https://peiwenxiao77.github.io/family-health/releases/latest.apk",
-  "notes": "v107fix: UpdateChecker 改用 PackageManager 读本地版本号(AGP8默认无BuildConfig)",
-  "updated_at": "2026-10-11T15:17:33Z"
+  "notes": "v108: 项目管理隐藏「同房」字样; 全部记录改版(健康三行制+按钮左列,身体同); 日历符号缩小1/4; 修复月经趋势倒数第二条周期丢失(v92剔尾bug); APK信封圆角化+内缩1/5, versionCode 3(v1.2)",
+  "updated_at": "2026-10-11T15:48:21Z"
 }
