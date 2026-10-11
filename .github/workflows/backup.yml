@@ -48,4 +48,32 @@ jobs:
 
           CUT=$(node -e 'console.log(new Date(Date.now() - 56 * 86400000).toISOString())')
           curl -sS -X DELETE "${AUTH[@]}" "$BASE/backups?created_at=lt.$CUT" -o /dev/null -w "cleanup HTTP %{http_code}\n"
-          echo "✓ 备份完成（8 周滚动保留）"
+
+          # —— 第二落点（v100）：同时存一份到 GitHub 私有仓库，防止 Supabase 单点故障 ——
+          node -e '
+            const fs = require("fs");
+            const p = JSON.parse(fs.readFileSync("payload.json", "utf8")).payload;
+            fs.writeFileSync("backup-file.json", JSON.stringify(p, null, 1));
+          '
+          GH_TOKEN="${{ secrets.BACKUP_REPO_TOKEN }}"
+          BDATE=$(date -u +%Y-%m-%d)
+          BPATH="backup-$BDATE.json"
+          B64=$(base64 -w0 backup-file.json)
+          SHA=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" -H "User-Agent: family-health-backup" \
+            "https://api.github.com/repos/peiwenxiao77/family-health-backups/contents/$BPATH" \
+            | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{console.log(JSON.parse(d).sha||"")}catch(e){console.log("")}})')
+          BODY=$(node -e '
+            const [, bdate, b64, sha] = process.argv;
+            console.log(JSON.stringify({
+              message: "weekly backup " + bdate,
+              content: b64,
+              branch: "main",
+              ...(sha ? { sha } : {})
+            }));
+          ' "$BDATE" "$B64" "$SHA")
+          UCODE=$(curl -sS -X PUT -H "Authorization: Bearer $GH_TOKEN" -H "User-Agent: family-health-backup" \
+            -H "Content-Type: application/json" -d "$BODY" \
+            "https://api.github.com/repos/peiwenxiao77/family-health-backups/contents/$BPATH" -o ghresp.json -w "%{http_code}")
+          echo "github upload HTTP $UCODE"
+          if [ "$UCODE" != "200" ] && [ "$UCODE" != "201" ]; then echo "上传私有仓库失败:"; cat ghresp.json; exit 1; fi
+          echo "✓ 备份完成：Supabase backups 表（8 周滚动）+ 私有仓库 family-health-backups/$BPATH（永久保留）"
