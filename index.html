@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v108: ①项目管理弹窗❤️项目不再显示「同房」字样(标题空着,符号示意) ②全部记录改版：健康页「正常/删除」上下叠放收窄放最左侧高度居中+记录三行制(图标+人名+项目名+数值/正常值范围/时间)；身体页「编辑/删除」同样上下叠放收窄左侧居中,删除右侧216px预留让出整卡宽度 ③日历所有符号缩小1/4(角标18→13px,compact 8px,tiny 7px,标记6px) ④修复月经趋势图：v92 把最后一条经期整体剔出图导致倒数第二条(如8.30)算不出与9.24的周期——改为shown含最后一条,周期按「下一条来潮」计算,最后一条只显示来潮天数 ⑤配套APK v108：信封圆角化+内缩4dp(约小1/5)；versionCode 3(v1.2) -->
 <!-- v107: 新增 APP 更新推送——APK 构建后 CI 自动发布 releases/latest.apk+version.json 到 Pages；APP 启动 2.5s 后检查(有新版弹窗一键下载安装,经 FileProvider 拉起安装器)+WidgetWorker 每3h后台检查(发系统通知,同版本只提醒一次,Android13+运行时申请通知权限)；versionCode 递增到 2(v1.1)；网页功能无变化(微增部署) -->
 <!-- v106b: 小组件样式返工——组件整体即一枚信封(背景矢量图 intercourse_bg 铺满：纸身+上盖三角信封盖+盖尖红色爱心封章)，待确认状态整体切换 intercourse_bg_active(浅粉封章)，提示文字写在信封下部；网页无功能变化(微增部署) -->
 <!-- v106: ①日历角标分级按用户要求重调：1~2个正常大小、3~8个用原mini档(11px)、9个以上再缩一档(tiny 9px)——原4~6/7+两档阈值偏早偏挤 ②配套APK v106：小组件样式改「信封+爱心封章」(矢量图 ic_envelope，第一击待确认时爱心变浅粉 ic_envelope_active) -->
@@ -141,10 +142,10 @@
   /* v97：topbar 已全局改不透明+删 blur（重影/频闪同根源），此 hack 不再需要 */
   /* v96：折叠恢复 display:none（让出位置）+ stickyFade 蒙版整体删除——
      v95 的 opacity/visibility 方案没能根治频闪且折叠不再让位，实测蒙版才是频闪根源 */
-  /* v94：APP 身体「全部记录」卡片——编辑/删除按钮垂直居中（与桌面端一致），不再压在卡片底部 */
-  html.in-app .event-card { padding: 8px 216px 8px 12px; }
-  html.in-app .event-card-actions { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); justify-content: flex-start; margin-top: 0; width: auto; }
-  html.in-app .event-card-actions .event-card-time { margin-right: 26px; }
+  /* v94→v108：身体「全部记录」卡片——编辑/删除按钮改上下叠放、收窄，放最左侧高度居中，
+     删除 v94 的右侧 216px 预留（记录部分让出整卡宽度） */
+  html.in-app .event-card { padding: 8px 10px; }
+  html.in-app .event-card-actions { position: static; transform: none; }
 
   /* Hero (输入区) */
   .hero { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #fb923c 100%); border-radius: var(--radius); padding: 22px 22px; color: white; box-shadow: 0 20px 40px -8px rgba(245, 158, 11, 0.35), inset 0 1px 0 rgba(255,255,255,0.2); position: relative; overflow: hidden; margin-bottom: 16px; }
@@ -305,14 +306,19 @@
   .history-list { display: flex; flex-direction: column; gap: 6px; max-height: 540px; overflow-y: auto; padding-right: 4px; }
   .history-list::-webkit-scrollbar { width: 6px; }
   .history-list::-webkit-scrollbar-thumb { background: #fdba74; border-radius: 3px; }
-  .history-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: linear-gradient(135deg, #fffefb, #fffaf3); border-radius: var(--radius-sm); border: 1px solid var(--border); transition: all 0.2s; }
+  /* v108：健康页全部记录改版——「正常/删除」上下叠放变窄放最左侧高度居中；
+     记录三行制：第一行 图标+人名+项目名(+数值)、第二行 正常值范围、第三行 时间 */
+  .history-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: linear-gradient(135deg, #fffefb, #fffaf3); border-radius: var(--radius-sm); border: 1px solid var(--border); transition: all 0.2s; }
   .history-item:hover { background: linear-gradient(135deg, #fff7ed, #ffedd5); border-color: #fdba74; }
+  .h-btn-col { display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; }
   .h-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white; flex-shrink: 0; }
+  .h-icon-sm { font-size: 15px; line-height: 1; flex-shrink: 0; }  /* v108：行内小图标 */
   .h-info { flex: 1; min-width: 0; }
   .h-line1 { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; margin-bottom: 2px; flex-wrap: wrap; }
   .h-line1 .member { padding: 2px 8px; border-radius: 999px; font-size: 11px; }  /* v95：底色/文字色改由成员主题内联指定 */
   .h-line1 .values { color: var(--text); }
-  .h-line2 { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-3); flex-wrap: wrap; }
+  .h-line2, .h-line3 { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-3); flex-wrap: wrap; }
+  .h-line2 { margin-bottom: 1px; }
   /* v97：AI 建议字段的快速选项 chip（点击填入输入框） */
   .ai-opt-chip { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px; background: #ede9fe; color: #5b21b6; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; border: 1px solid #ddd6fe; }
   .ai-opt-chip:hover { background: #ddd6fe; }
@@ -326,9 +332,10 @@
   .h-range-info { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 500; background: #fff7ed; color: #92400e; border: 1px dashed #fdba74; }
   .h-pending { font-size: 10px; background: #fef3c7; color: #92400e; padding: 1px 6px; border-radius: 4px; }
   .h-note { background: white; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .h-delete { display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0 12px; height: 30px; border-radius: 8px; border: 1px solid #fecaca; background: white; color: var(--danger); cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; flex-shrink: 0; }
+  /* v108：按钮改窄（上下叠放在左侧按钮列里） */
+  .h-delete { display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 46px; padding: 0; height: 26px; border-radius: 7px; border: 1px solid #fecaca; background: white; color: var(--danger); cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s; flex-shrink: 0; }
   .h-delete:hover { background: var(--danger); color: white; border-color: var(--danger); }
-  .h-status-btn { display: inline-flex; align-items: center; justify-content: center; gap: 2px; padding: 0 12px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: white; color: var(--text-2); cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; flex-shrink: 0; min-width: 56px; }
+  .h-status-btn { display: inline-flex; align-items: center; justify-content: center; gap: 2px; width: 46px; padding: 0; height: 26px; border-radius: 7px; border: 1px solid var(--border); background: white; color: var(--text-2); cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s; flex-shrink: 0; }
   .h-status-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
   .h-status-btn.normal { border-color: #86efac; color: #166534; }
   .h-status-btn.normal:hover { background: #ecfdf5; }
@@ -494,8 +501,11 @@
   }
 
   /* 事件卡片 */
-  .event-card { background: white; border-radius: 10px; padding: 8px 216px 8px 12px; border: 1px solid var(--border); margin-bottom: 6px; transition: all 0.2s; position: relative; }
+  /* v108：卡片改 flex——[按钮列(编辑/删除上下叠放、收窄)] + [记录主体]，
+     删除右侧 216px 预留，记录部分让出整卡宽度 */
+  .event-card { background: white; border-radius: 10px; padding: 8px 10px; border: 1px solid var(--border); margin-bottom: 6px; transition: all 0.2s; position: relative; display: flex; align-items: center; gap: 8px; }
   .event-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  .event-card-body { flex: 1; min-width: 0; }
   .event-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
   .event-card-icon { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
   .event-card-title { font-weight: 700; font-size: 13px; color: var(--text); flex: 1; }
@@ -504,16 +514,12 @@
   .event-meta-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: #f1f5f9; border-radius: 999px; font-size: 11px; color: var(--text-2); font-weight: 600; }
   .event-meta-chip.severity { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #991b1b; }
   .event-meta-chip.tag { background: linear-gradient(135deg, #ede9fe, #ddd6fe); color: #5b21b6; }
-  .event-card-actions { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); display: flex; gap: 4px; align-items: center; }
+  .event-card-actions { display: flex; flex-direction: column; gap: 4px; align-items: center; flex-shrink: 0; }
   /* v104：第一行末尾的含年份时间（与项目名 flex 自动隔开 2~3 格） */
   .ev-head-time { margin-left: auto; font-size: 11px; color: var(--text-3); white-space: nowrap; font-weight: 400; flex-shrink: 0; }
-  .ev-mini-btn { background: #f8fafc; border: 1px solid var(--border); cursor: pointer; font-size: 18px; padding: 7px 9px; line-height: 1; border-radius: 8px; }
+  /* v108：按钮收窄（上下叠放在左侧按钮列里） */
+  .ev-mini-btn { background: #f8fafc; border: 1px solid var(--border); cursor: pointer; font-size: 14px; padding: 5px 0; width: 34px; line-height: 1; border-radius: 8px; }
   .ev-mini-btn:hover { background: #e2e8f0; transform: scale(1.06); }
-  /* 手机端：日期+按钮改为卡片底部一行，正文恢复全宽（v58/v60：按钮靠拢右侧） */
-  @media (max-width: 600px) {
-    .event-card { padding: 8px 12px; }
-    .event-card-actions { position: static; transform: none; justify-content: flex-end; margin-top: 6px; width: 100%; }
-  }
 
   /* 类型颜色 */
   .event-cat-menstrual { --accent: #ec4899; }
@@ -595,13 +601,14 @@
   .menstrual-day.selecting { background: linear-gradient(135deg, #fce7f3, #fbcfe8) !important; color: #9d174d !important; box-shadow: inset 0 0 0 2px #ec4899, 0 0 0 1px #ec4899; font-weight: 800; animation: mcPulse 1.2s ease-in-out infinite; }
   .menstrual-day.in-range { background: #fbcfe8 !important; color: #9d174d !important; }
   @keyframes mcPulse { 0%, 100% { box-shadow: inset 0 0 0 2px #ec4899, 0 0 0 0 rgba(236, 72, 153, 0.5); } 50% { box-shadow: inset 0 0 0 2px #ec4899, 0 0 0 4px rgba(236, 72, 153, 0); } }
-  .menstrual-day .marker { position: absolute; top: 1px; right: 2px; font-size: 8px; line-height: 1; }
+  .menstrual-day .marker { position: absolute; top: 1px; right: 2px; font-size: 6px; line-height: 1; }  /* v108：符号整体缩小 1/4 */
   .menstrual-day .other-marker-row { position: absolute; bottom: 1px; right: 2px; display: flex; flex-direction: row-reverse; gap: 1px; max-width: calc(100% - 4px); flex-wrap: wrap; justify-content: flex-end; }
-  .menstrual-day .other-marker-row.compact .other-marker { width: 11px; height: 11px; font-size: 9px; }
+  /* v108：符号整体再缩小 1/4（13.5→13px 基准档同理下调） */
+  .menstrual-day .other-marker-row.compact .other-marker { width: 8px; height: 8px; font-size: 7px; }
   /* v106：9 个以上再缩一档(tiny)，防溢出被裁剪 */
   .menstrual-day .other-marker-row.tiny { gap: 0; }
-  .menstrual-day .other-marker-row.tiny .other-marker { width: 9px; height: 9px; font-size: 7px; }
-  .menstrual-day .other-marker { font-size: 13px; line-height: 1; width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+  .menstrual-day .other-marker-row.tiny .other-marker { width: 7px; height: 7px; font-size: 5px; }
+  .menstrual-day .other-marker { font-size: 10px; line-height: 1; width: 13px; height: 13px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
 
   /* 月经选择操作条（更显眼的反馈） */
   .menstrual-select-bar { margin-top: 10px; padding: 10px 14px; border-radius: 10px; background: linear-gradient(135deg, #fce7f3, #fbcfe8); border: 2px dashed #ec4899; display: none; align-items: center; flex-wrap: wrap; gap: 10px; }
@@ -2676,7 +2683,7 @@ function renderTypesMgrList() {
   const wrap = document.getElementById('typesMgrList');
   if (!wrap) return;
   const builtin = [
-    { icon: '🌷', name: '月经' }, { icon: '🦴', name: '痛风' }, { icon: '😖', name: '异常' }, { icon: '❤️', name: '同房' },
+    { icon: '🌷', name: '月经' }, { icon: '🦴', name: '痛风' }, { icon: '😖', name: '异常' }, { icon: '❤️', name: '' },  // v108：❤️ 项目不显示「同房」字样，符号示意即可
   ].map(p => `
     <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--border);">
       <span style="font-size:20px;width:28px;text-align:center;">${p.icon}</span>
@@ -4096,24 +4103,28 @@ function renderHistory() {
       : '';
     // 状态按钮文字：去掉 ✓/⚠ emoji（按钮已经带颜色），更紧凑
     const btnLabel = st.cls === 'normal' ? '正常' : '异常';
+    // v108：按钮列（正常/删除上下叠放）放最左侧高度居中；记录三行制——
+    // 第一行 图标+人名+项目名(+数值)、第二行 正常值范围、第三行 时间(备注/徽章)
     return `
       <div class="history-item">
-        <div class="h-icon" style="background:${getCategoryColor(r.category.name)}">${r.category.icon}</div>
+        <div class="h-btn-col">
+          <button class="h-status-btn ${st.cls}" data-id="${r.id}" title="点击手动修正">${btnLabel}${manualTag}</button>
+          <button class="h-delete" data-id="${r.id}" title="删除这条记录">删除</button>
+        </div>
         <div class="h-info">
           <div class="h-line1">
+            <span class="h-icon-sm">${r.category.icon}</span>
             <span class="member" style="${memberPillStyle(r.member)}">${escapeHtml(r.member)}</span>
             <span>${escapeHtml(r.category.name)}</span>
-          </div>
-          <div class="h-line2">
             <span class="values" style="color:var(--text);font-size:12px;font-weight:600;">${valuesText}</span>
-            ${rangeInfo}
+          </div>
+          ${rangeInfo ? `<div class="h-line2">${rangeInfo}</div>` : ''}
+          <div class="h-line3">
             <span>${formatDateTime(r.ts)}</span>
             ${r.note ? `<span class="h-note">📝 ${escapeHtml(r.note)}</span>` : ''}
             ${pendingBadge}
           </div>
         </div>
-        <button class="h-status-btn ${st.cls}" data-id="${r.id}" title="点击手动修正">${btnLabel}${manualTag}</button>
-        <button class="h-delete" data-id="${r.id}" title="删除这条记录">删除</button>
       </div>
     `;
   }).join('');
@@ -5464,7 +5475,7 @@ function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, sel
     else if (isInRange) classes.push('in-range');
 
     // 痛风/异常/自定义事件的小角标（即使在月经期也显示）：当日几条记录就画几个符号，
-    // v106 分级：1~2 个正常、3~8 个缩小一档(compact 11px)、9 个以上再缩一档(tiny 9px)
+    // v108 分级：1~2 个正常、3~8 个缩小一档(compact 8px)、9 个以上再缩一档(tiny 7px)；符号整体较 v106 再小 1/4
     const others = otherMarkers && otherMarkers[k];
     if (others && others.length) {
       classes.push('has-other-event');
@@ -6439,16 +6450,18 @@ function renderEventCard(ev) {
 
   return `
     <div class="event-card event-cat-${escapeHtml(ev.category)}">
-      <div class="event-card-head">
-        <div class="event-card-icon">${meta.icon}</div>
-        <div class="event-card-title"><span class="event-meta-chip" style="${memberPillStyle(ev.member)}">${escapeHtml(ev.member)}</span> <span style="font-weight:700;">${escapeHtml(projectName)}</span></div>
-        ${headTime ? `<span class="ev-head-time">${headTime}</span>` : ''}
-      </div>
-      ${chips.length ? `<div class="event-card-meta">${chips.join('')}</div>` : ''}
-      ${ev.note ? `<div style="font-size:12px;color:var(--text-3);margin-top:4px;line-height:1.5;">${escapeHtml(ev.note)}</div>` : ''}
       <div class="event-card-actions">
         <button class="ev-mini-btn" data-ev-action="edit" data-ev-id="${escapeHtml(ev.id)}" title="编辑">✏️</button>
         <button class="ev-mini-btn" data-ev-action="delete" data-ev-id="${escapeHtml(ev.id)}" title="删除">🗑</button>
+      </div>
+      <div class="event-card-body">
+        <div class="event-card-head">
+          <div class="event-card-icon">${meta.icon}</div>
+          <div class="event-card-title"><span class="event-meta-chip" style="${memberPillStyle(ev.member)}">${escapeHtml(ev.member)}</span> <span style="font-weight:700;">${escapeHtml(projectName)}</span></div>
+          ${headTime ? `<span class="ev-head-time">${headTime}</span>` : ''}
+        </div>
+        ${chips.length ? `<div class="event-card-meta">${chips.join('')}</div>` : ''}
+        ${ev.note ? `<div style="font-size:12px;color:var(--text-3);margin-top:4px;line-height:1.5;">${escapeHtml(ev.note)}</div>` : ''}
       </div>
     </div>
   `;
@@ -6531,8 +6544,10 @@ function renderEventsCharts() {
     const allShownTs = [];
     menstrualByMember.forEach((list, m) => {
       const idxStart = list.length > CYCLES_CAP + 1 ? list.length - CYCLES_CAP - 1 : 0;
-      // v92：每人的最后一条记录没有「下一次来潮」→ 算不出周期天数，整条不进图（标签/来潮天数一并去掉）
-      const shown = list.slice(idxStart, Math.max(idxStart, list.length - 1));
+      // v108 修复：v92 把最后一条整体剔出图后，周期只在 shown 内部相邻计算——
+      // 导致倒数第二条（如 8.30）和最后一条（9.24）之间的周期丢失。
+      // 改为：shown 含最后一条，周期仍按「下一条来潮」算（最后一条本身无周期，只出来潮天数）
+      const shown = list.slice(idxStart);
       if (shown.length === 0) return;
       const cycleMap = {}, durMap = {};
       shown.forEach((s, i) => {

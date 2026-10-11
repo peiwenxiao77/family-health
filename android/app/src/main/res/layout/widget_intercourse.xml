@@ -1,21 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- v106b：小组件整体就是一枚信封（背景矢量图 intercourse_bg 直接画信封），
-     提示文字写在信封下部「收件人」区域 -->
+<!-- v108：小组件 = 内缩 4dp（约小 1/5）的圆角信封浮于组件中央，提示文字写在信封下部「收件人」区 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/intercourse_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@drawable/intercourse_bg">
+    android:layout_height="match_parent">
+
+    <!-- 圆角信封本体（四边内缩 4dp，约缩小 1/5） -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_margin="4dp"
+        android:background="@drawable/intercourse_bg" />
 
     <TextView
         android:id="@+id/tv_hint"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="8dp"
         android:gravity="center"
-        android:paddingBottom="4dp"
-        android:paddingLeft="3dp"
-        android:paddingRight="3dp"
+        android:paddingLeft="8dp"
+        android:paddingRight="8dp"
         android:text=""
         android:textSize="8sp"
         android:textColor="#9D174D"

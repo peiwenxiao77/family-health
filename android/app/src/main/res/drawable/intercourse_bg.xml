@@ -1,24 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- v106b：小组件整体即信封——纸身铺满组件、上盖三角信封盖、盖尖一枚红色爱心封章（就绪状态） -->
+<!-- v108：信封圆角化（纸身四角圆弧，盖沿内缩不溢出角），尺寸内缩 1/5（layout 层 margin 4dp） -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp"
     android:height="48dp"
     android:viewportWidth="48"
     android:viewportHeight="48">
 
-    <!-- 信封纸身（铺满整个组件） -->
+    <!-- 信封纸身（圆角矩形，铺满内缩后的组件区域） -->
     <path
         android:fillColor="#FFFBF5"
         android:strokeColor="#EC4899"
         android:strokeWidth="1.5"
-        android:pathData="M1.5,5 L46.5,5 L46.5,43 L1.5,43 Z" />
+        android:pathData="M6,5 L42,5 Q46.5,5 46.5,9.5 L46.5,38.5 Q46.5,43 42,43 L6,43 Q1.5,43 1.5,38.5 L1.5,9.5 Q1.5,5 6,5 Z" />
 
-    <!-- 盖下的信封盖（从顶边两角收到中缝盖尖 24,26） -->
+    <!-- 盖下的信封盖（填充，起点内缩避开圆角） -->
     <path
         android:fillColor="#FFE4EC"
+        android:pathData="M4,6 L24,26 L44,6 Z" />
+
+    <!-- 信封盖折线（只描边不填充，避免顶部重复描线） -->
+    <path
         android:strokeColor="#EC4899"
         android:strokeWidth="1.5"
-        android:pathData="M1.5,5 L24,26 L46.5,5" />
+        android:pathData="M4,6 L24,26 L44,6" />
 
     <!-- 爱心封章（盖在盖尖上，像火漆印） -->
     <path

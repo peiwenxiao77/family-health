@@ -1,24 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- v106b：待确认状态——同一枚信封，封章爱心变浅粉，提示用户再点一次 -->
+<!-- v108：待确认状态——同一枚圆角信封，封章爱心变浅粉 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp"
     android:height="48dp"
     android:viewportWidth="48"
     android:viewportHeight="48">
 
-    <!-- 信封纸身 -->
+    <!-- 信封纸身（圆角矩形） -->
     <path
         android:fillColor="#FFFBF5"
         android:strokeColor="#EC4899"
         android:strokeWidth="1.5"
-        android:pathData="M1.5,5 L46.5,5 L46.5,43 L1.5,43 Z" />
+        android:pathData="M6,5 L42,5 Q46.5,5 46.5,9.5 L46.5,38.5 Q46.5,43 42,43 L6,43 Q1.5,43 1.5,38.5 L1.5,9.5 Q1.5,5 6,5 Z" />
 
-    <!-- 盖下的信封盖 -->
+    <!-- 盖下的信封盖（填充） -->
     <path
         android:fillColor="#FFE4EC"
+        android:pathData="M4,6 L24,26 L44,6 Z" />
+
+    <!-- 信封盖折线（只描边） -->
+    <path
         android:strokeColor="#EC4899"
         android:strokeWidth="1.5"
-        android:pathData="M1.5,5 L24,26 L46.5,5" />
+        android:pathData="M4,6 L24,26 L44,6" />
 
     <!-- 爱心封章（浅粉=等待第二击） -->
     <path
