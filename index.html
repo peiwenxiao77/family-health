@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v102: 顶栏收纳修复——v101「跳动后稳定显示/折叠失败」真凶=浏览器滚动锚定(scroll anchoring)：收纳动画收缩页面顶部高度时浏览器自动回拉 scrollY 补偿→低于展开阈值→立即弹回展开→震荡。修复=html overflow-anchor:none + 阈值提高(>140折叠/<60展开) + 过渡期350ms状态锁 -->
 <!-- v101: 顶栏滚动收纳回归(实时同步中/时间/设置下滑收纳、回顶展开)——v97 已铲频闪真根因(半透明+blur)+v98 删常驻动画后重绘环境干净；本次不用 display:none 瞬跳(整页 reflow 抖动源)，改 max-height+opacity 平滑过渡+迟滞(>80折叠/<40展开)+rAF 节流 -->
 <!-- v100: ①设置弹窗新增「云端备份恢复」：列出最近 8 份每周自动备份(时间+条数)，点击按 id 合并补缺恢复(不删除现有记录)，双确认防误触；每周备份同时存一份到 GitHub 私有仓库 family-health-backups(第二落点，防 Supabase 单点故障) -->
 <!-- v99: ①设备密码锁：首次打开需输入访问密码(固定 000717)，通过后本设备 localStorage 记住不再询问；锁屏为全屏遮罩，未解锁时不渲染数据(防闪现)。注意：此为前端门锁，挡"打开网址看数据"，不挡"直接调云端API"——网址请勿外传 ②月经预测提醒：用已有 v66 周期预测算法(computeCyclePrediction)，预测开始日=今天/明天时在身体页顶部显示提醒横幅(该成员月经进行中则跳过) ③配套云端自动化：每周日自动全量备份两张表到 backups 表(保留8周)+每月1日生成健康月报存备份并经 Server酱 推送微信摘要(SERVERCHAN_KEY secret 未配置时只存不推) -->
@@ -101,6 +102,10 @@
   .clock .time { font-size: 20px; font-weight: 700; color: #9a3412; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; }
   .clock .time .pulse { display: inline-block; width: 6px; height: 6px; background: var(--primary); border-radius: 50%; margin-right: 6px; vertical-align: middle; }
   .clock .date { font-size: 11px; color: var(--text-3); margin-top: 0; }
+  /* v102：禁用浏览器滚动锚定——收纳动画让页面顶部内容高度收缩时，
+     scroll anchoring 会自动回拉 scrollY 补偿 → 回拉后低于展开阈值 → 立即展开
+     → 高度恢复 → 又折叠……震荡一轮后稳定在展开态（v101「跳动后稳定显示」真凶） */
+  html { overflow-anchor: none; }
   /* v101：顶栏滚动收纳回归 v2——v98 已铲掉频闪真根因（半透明+backdrop-filter blur）
      和常驻 pulse 动画，重绘环境干净，现在安全重启收纳功能。
      与旧版的关键区别：不用 display:none 瞬跳（瞬间高度跳变=整页 reflow 抖动源），
@@ -110,7 +115,6 @@
     opacity: 1;
     overflow: hidden;
     transition: max-height 0.28s ease, opacity 0.22s ease;
-    will-change: max-height, opacity;
   }
   .topbar > header > .header-right.header-collapsed {
     max-height: 0;
@@ -3289,21 +3293,23 @@ bindClick('bannerConfigBtn', openConfig, '横幅配置按钮');
 // v98：顶栏滚动收纳（v58）JS 已整体删除——display:none 切换在 sticky 顶栏内触发布局
 // 抖动（网页/APP 频闪共同嫌疑），且 APP 上滑回顶部时折叠态不恢复。右侧状态区常显。
 
-// v101：顶栏滚动收纳回归——迟滞（>80 折叠、<40 展开，防阈值附近来回横跳）+ rAF 节流。
-// 类切换只发生在跨越迟滞区间时，配合 CSS max-height/opacity 平滑过渡，
-// 不再有 v94 时代 display:none 的整页 reflow 抖动（那时频闪真凶是半透明+blur，已除）
+// v102：顶栏收纳修复——①阈值提高（>140 折叠 / <60 展开），远离顶部浅滚区，
+// 收纳本身会让页面变矮，太贴近顶部时 scrollY 容易被卷进震荡；
+// ②过渡期间 350ms 锁定状态切换，任何残余的 scrollY 波动都不会反向触发；
+// ③html overflow-anchor:none 已禁滚动锚定（见 CSS 注释，v101 失败真凶）
 (function () {
   const headerRight = document.querySelector('.topbar > header > .header-right');
   if (!headerRight) return;
-  let collapsed = false, ticking = false;
+  let collapsed = false, ticking = false, lockUntil = 0;
   const apply = shouldCollapse => {
-    if (shouldCollapse !== collapsed) {
+    if (shouldCollapse !== collapsed && Date.now() > lockUntil) {
       collapsed = shouldCollapse;
+      lockUntil = Date.now() + 350;  // 覆盖 0.28s 过渡期
       headerRight.classList.toggle('header-collapsed', collapsed);
     }
   };
   const onScroll = () => {
-    apply(collapsed ? window.scrollY < 40 : window.scrollY > 80);
+    apply(collapsed ? window.scrollY < 60 : window.scrollY > 140);
     ticking = false;
   };
   window.addEventListener('scroll', () => {
