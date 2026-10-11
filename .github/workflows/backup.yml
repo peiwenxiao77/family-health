@@ -1,0 +1,49 @@
+name: Supabase Auto Backup
+
+# P1 自动备份：每周日把 health_records + body_events 全量 dump 成一个 JSON，
+# 存到 Supabase 的 backups 表（一行 = 一份完整备份），保留最近 8 周（56 天自动清理）。
+# 恢复方式：从 backups 表下载对应 payload.json，即可重新导入。
+# 前置条件：需在 Supabase SQL Editor 执行一次建表 SQL（见交付说明）。
+
+on:
+  schedule:
+    - cron: '3 2 * * 0'   # 每周日 UTC 02:03 = 北京 10:03
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dump tables -> backups (keep 8 weeks)
+        run: |
+          BASE="https://dlnqhosjodkgyuojbyxo.supabase.co/rest/v1"
+          KEY="sb_publishable_WJ4NSoqO2LTfq6WUo728DQ_0eMnvABo"
+          AUTH=(-H "apikey: $KEY" -H "Authorization: Bearer $KEY" --max-time 25 --retry 3 --retry-delay 5)
+          set -e
+
+          curl -sS "${AUTH[@]}" "$BASE/health_records?select=*&limit=5000" -o hr.json
+          curl -sS "${AUTH[@]}" "$BASE/body_events?select=*&limit=5000" -o be.json
+
+          node -e '
+            const fs = require("fs");
+            const hr = JSON.parse(fs.readFileSync("hr.json", "utf8"));
+            const be = JSON.parse(fs.readFileSync("be.json", "utf8"));
+            if (!Array.isArray(hr) || !Array.isArray(be)) throw new Error("dump 失败: " + JSON.stringify({hr, be}).slice(0, 300));
+            const payload = {
+              exported_at: new Date().toISOString(),
+              counts: { health_records: hr.length, body_events: be.length },
+              health_records: hr,
+              body_events: be,
+            };
+            fs.writeFileSync("payload.json", JSON.stringify({ payload }));
+            console.log("dump ok:", hr.length, "条健康记录 +", be.length, "条身体事件");
+          '
+
+          curl -sS -X POST "${AUTH[@]}" -H "Content-Type: application/json" \
+            -d @payload.json "$BASE/backups" -o resp.json -w "insert HTTP %{http_code}\n"
+          grep -q '"id"' resp.json || { echo "插入 backups 失败（表存在？）: "; cat resp.json; exit 1; }
+
+          CUT=$(node -e 'console.log(new Date(Date.now() - 56 * 86400000).toISOString())')
+          curl -sS -X DELETE "${AUTH[@]}" "$BASE/backups?created_at=lt.$CUT" -o /dev/null -w "cleanup HTTP %{http_code}\n"
+          echo "✓ 备份完成（8 周滚动保留）"
