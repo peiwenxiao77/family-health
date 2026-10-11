@@ -134,24 +134,76 @@ const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
 
   summaryLines.push(`💊 以上为数据整理与简单解读，仅供参考，不能替代医生诊断；如有关注的指标请结合实际情况。`);
 
-  // —— 摘要 markdown（微信推送正文 = 基础数据 + 总结报告） ——
-  const summaryMd = [
-    `# 🏠 家庭健康月报（${period}）`,
-    '',
-    `📊 本月健康测量 **${hr.length}** 条 · 身体事件 **${be.length}** 条`,
-    '',
-    '## 📋 总结报告',
-    ...summaryLines.map(l => `- ${l}`),
-    '',
-    '## 👨‍👩‍👧 成员明细',
-    ...(memberLines.length ? memberLines : ['（本月无记录）']),
-    '',
-    '## 🌷 下次月经预测',
-    ...(predictions.length ? predictions.map(p => `**${p.member}**：预测 ${p.next}（平均周期 ${p.avg} 天）`) : ['（月经记录不足，暂无法预测）']),
-    '',
-    `> 完整月报（含当月全部数据）已存入云端备份，可随时导出查看`,
-    `> 生成时间：${now.toISOString().slice(0, 16).replace('T', ' ')} UTC`,
-  ].join('\n');
+  // —— 摘要 markdown（v100 格式改版：卡片式 + 红绿灯状态 + 倒计时，微信里一目了然） ——
+  const light = sd => sd < 3 ? '🟢 规律' : sd <= 5 ? '🟡 基本规律' : '🔴 波动较大';
+  const daysUntil = dstr => {
+    const [y, m, d] = dstr.split('-').map(Number);
+    return Math.round((new Date(y, m - 1, d, 12).getTime() - now.getTime()) / DAY);
+  };
+  const summaryMd = [];
+  // 头部：大标题 + 核心数字速览
+  summaryMd.push(`# 🏠 家庭健康月报 · ${Number(period.slice(5))} 月`);
+  summaryMd.push('');
+  summaryMd.push(`### 本月共 **${totalCur}** 条　${trend}`);
+  summaryMd.push('');
+  summaryMd.push(`健康测量 ${hr.length} 条 ｜ 身体事件 ${be.length} 条`);
+  summaryMd.push('');
+  summaryMd.push('---');
+  // 月经预测卡片（引用块 + 倒计时）
+  summaryMd.push('## 🌷 月经 & 下次预测');
+  if (predictions.length) {
+    predictions.forEach(p => {
+      const left = daysUntil(p.next);
+      const leftStr = left < 0 ? '预测日已过，以实际来潮为准' : left === 0 ? '**就是今天！**' : `还有 **${left}** 天`;
+      summaryMd.push(`> **${p.member}**　${light(p.sd)}`);
+      summaryMd.push(`> 平均周期 **${p.avg}** 天 ｜ 预测 **${p.next}**`);
+      summaryMd.push(`> ${leftStr}`);
+      summaryMd.push('');
+    });
+  } else {
+    summaryMd.push('> 月经记录不足两个周期，暂无法预测');
+    summaryMd.push('');
+  }
+  summaryMd.push('---');
+  // 痛风卡片（红绿灯：变频繁/持平/减少）
+  summaryMd.push('## 🦴 痛风');
+  if (goutCur.length === 0) {
+    summaryMd.push(goutPrev.length
+      ? `> 🟢 本月 **0** 次发作（上月 ${goutPrev.length} 次，有好转 ✅）`
+      : '> 🟢 本月 **0** 次发作，继续保持 ✅');
+  } else {
+    const lastGout = beRaw.filter(e => e.category === 'gout').sort((a, b) => b.ts - a.ts)[0];
+    const sinceDays = Math.round((now.getTime() - lastGout.ts) / DAY);
+    const locs = {};
+    goutCur.forEach(e => { const l = e.payload?.location || '未记录部位'; locs[l] = (locs[l] || 0) + 1; });
+    const topLoc = Object.entries(locs).sort((a, b) => b[1] - a[1])[0];
+    const freq = goutCur.length > goutPrev.length ? '🔴 比上月变频繁' : goutCur.length === goutPrev.length ? '🟡 与上月持平' : '🟢 比上月减少';
+    summaryMd.push(`> ${freq}　本月 **${goutCur.length}** 次（上月 ${goutPrev.length} 次）`);
+    summaryMd.push(`> 主要部位：**${topLoc[0]}** ｜ 距上次发作 **${sinceDays}** 天`);
+    if (goutCur.length >= 2) summaryMd.push('> ⚠️ 发作偏频繁：建议少海鲜/啤酒/内脏，考虑复查尿酸');
+  }
+  summaryMd.push('');
+  summaryMd.push('---');
+  // 异常情况卡片（仅在有时显示，≥3 次标红提醒）
+  if (anomalyCur.length) {
+    summaryMd.push('## 😖 异常情况');
+    const types = {};
+    anomalyCur.forEach(e => { const t = e.payload?.anomaly_type || '未分类'; types[t] = (types[t] || 0) + 1; });
+    Object.entries(types).sort((a, b) => b[1] - a[1]).forEach(([t, n]) => {
+      summaryMd.push(`> ${n >= 3 ? '🔴' : '🟡'} **${t}** × ${n}${n >= 3 ? '　⚠️ 反复出现，留意诱因' : ''}`);
+    });
+    summaryMd.push('');
+    summaryMd.push('---');
+  }
+  // 成员明细
+  summaryMd.push('## 👨‍👩‍👧 成员明细');
+  if (memberLines.length) memberLines.forEach(l => summaryMd.push('> ' + l));
+  else summaryMd.push('> （本月无记录）');
+  summaryMd.push('');
+  summaryMd.push('---');
+  summaryMd.push('📄 完整月报（含当月全部数据）已存云端备份');
+  summaryMd.push('💊 数据解读仅供参考，不能替代医生诊断');
+  summaryMd.push(`🕐 生成于 ${now.toISOString().slice(0, 16).replace('T', ' ')} UTC`);
 
   // —— 完整月报文档（报告 + 数据合并为一个 JSON 文件） ——
   const reportDoc = {
@@ -159,7 +211,7 @@ const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
     version: 2,
     period,
     generated_at: now.toISOString(),
-    summary_md: summaryMd,
+    summary_md: summaryMd.join('\n'),
     summary_lines: summaryLines,
     stats: { health_records: hr.length, body_events: be.length, members: allMembers },
     predictions,
@@ -178,7 +230,7 @@ const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
     console.log('⚠ SERVERCHAN_KEY 未配置，跳过微信推送（GitHub → Settings → Secrets and variables → Actions 添加后自动生效）');
     return;
   }
-  const body = new URLSearchParams({ title: `家庭健康月报 ${period}`, desp: summaryMd });
+  const body = new URLSearchParams({ title: `🏠 健康月报 ${Number(period.slice(5))}月 ｜ ${totalCur} 条记录`, desp: summaryMd.join('\n') });
   const sr = await fetch(`https://sctapi.ftqq.com/${sendKey}.send`, { method: 'POST', body });
   const rj = await sr.json().catch(() => ({}));
   if (rj && rj.code === 0) console.log('✓ 微信推送成功');
