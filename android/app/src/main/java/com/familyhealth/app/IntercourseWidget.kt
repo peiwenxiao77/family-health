@@ -13,8 +13,9 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * v106：1×1「❤️点击记录」小组件，样式改信封+爱心封章（ic_envelope 矢量图）
- * 双击确认：第一击 → 封章爱心变浅粉(ic_envelope_active)+亮「再点一次」；窗口内再点 → 记录当日一次同房
+ * v106b：1×1「❤️点击记录」小组件——组件整体就是一枚信封（背景矢量图 intercourse_bg：
+ * 信封纸身铺满 + 上盖三角信封盖 + 盖尖一枚红色爱心封章），提示文字写在信封下部。
+ * 双击确认：第一击 → 整体换成浅粉封章版信封(intercourse_bg_active)+亮「再点一次」；窗口内再点 → 记录当日一次同房
  * （category=intercourse，member=文文，ts=当前时刻）→ 数据实时同步到 APP 日历。
  *
  * v105c 起的稳定机制保留：双击状态用 SharedPreferences 持久化（进程回收不清零），
@@ -87,7 +88,8 @@ class IntercourseWidget : AppWidgetProvider() {
     }
 
     /** 提示直接改小组件（不依赖 Toast，部分 ROM 会静默吞掉后台 toast）。
-     *  v106：状态反馈从「❤️/💗文字」改为切换信封图（红心=就绪，浅粉心=等第二击）。
+     *  v106b：组件整体即信封，状态反馈改为 setInt setBackgroundResource 整体切换
+     *  信封背景图（红心封章=就绪，浅粉封章=等第二击），RemoteViews 支持该反射调用。
      *  v105c 关键修复保留：updateAppWidget 用全新 RemoteViews 会把点击事件一并清掉，
      *  这里必须重新 setOnClickPendingIntent */
     private fun setHint(context: Context, text: String) {
@@ -101,9 +103,9 @@ class IntercourseWidget : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.intercourse_root, pi)
             views.setTextViewText(R.id.tv_hint, text)
-            views.setImageViewResource(
-                R.id.iv_envelope,
-                if (text.isEmpty()) R.drawable.ic_envelope else R.drawable.ic_envelope_active
+            views.setInt(
+                R.id.intercourse_root, "setBackgroundResource",
+                if (text.isEmpty()) R.drawable.intercourse_bg else R.drawable.intercourse_bg_active
             )
             manager.updateAppWidget(ComponentName(context, IntercourseWidget::class.java), views)
         } catch (_: Exception) {}

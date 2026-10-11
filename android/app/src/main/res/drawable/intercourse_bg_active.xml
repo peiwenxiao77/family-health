@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- v106：第一击待确认状态——爱心变浅粉，提示用户继续点击 -->
+<!-- v106b：待确认状态——同一枚信封，封章爱心变浅粉，提示用户再点一次 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="40dp"
-    android:height="40dp"
+    android:width="48dp"
+    android:height="48dp"
     android:viewportWidth="48"
     android:viewportHeight="48">
 
@@ -10,20 +10,20 @@
     <path
         android:fillColor="#FFFBF5"
         android:strokeColor="#EC4899"
-        android:strokeWidth="1.6"
-        android:pathData="M4,12 L44,12 L44,39 L4,39 Z" />
+        android:strokeWidth="1.5"
+        android:pathData="M1.5,5 L46.5,5 L46.5,43 L1.5,43 Z" />
 
     <!-- 盖下的信封盖 -->
     <path
         android:fillColor="#FFE4EC"
         android:strokeColor="#EC4899"
-        android:strokeWidth="1.6"
-        android:pathData="M4,12 L24,28.5 L44,12" />
+        android:strokeWidth="1.5"
+        android:pathData="M1.5,5 L24,26 L46.5,5" />
 
     <!-- 爱心封章（浅粉=等待第二击） -->
     <path
         android:fillColor="#F9A8D4"
         android:strokeColor="#FFFFFF"
         android:strokeWidth="1"
-        android:pathData="M24,35 C24,35 15.5,29.8 15.5,24.8 C15.5,21.6 17.8,19.8 20,19.8 C21.8,19.8 23.3,20.9 24,22.4 C24.7,20.9 26.2,19.8 28,19.8 C30.2,19.8 32.5,21.6 32.5,24.8 C32.5,29.8 24,35 24,35 Z" />
+        android:pathData="M24,31 C24,31 16,26.2 16,21.6 C16,18.7 18.1,17 20.1,17 C21.8,17 23.2,18 24,19.4 C24.8,18 26.2,17 27.9,17 C29.9,17 32,18.7 32,21.6 C32,26.2 24,31 24,31 Z" />
 </vector>

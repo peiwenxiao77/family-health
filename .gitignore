@@ -13,3 +13,22 @@ Thumbs.db
 *.log
 .env
 .env.local
+
+# 临时脚本与产物（勿提交，部分含 token）
+_push_*.js
+_check_*.js
+_set_secret.js
+_tmp*.js
+_*.zip
+*.apk
+app-v*.zip
+
+# 本地对比调试目录（含完整浏览器 Profile，体积巨大）
+_对比/
+_旧版/
+
+# 本地构建缓存
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
