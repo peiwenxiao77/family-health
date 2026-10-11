@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v100: ①设置弹窗新增「云端备份恢复」：列出最近 8 份每周自动备份(时间+条数)，点击按 id 合并补缺恢复(不删除现有记录)，双确认防误触；每周备份同时存一份到 GitHub 私有仓库 family-health-backups(第二落点，防 Supabase 单点故障) -->
 <!-- v99: ①设备密码锁：首次打开需输入访问密码(固定 000717)，通过后本设备 localStorage 记住不再询问；锁屏为全屏遮罩，未解锁时不渲染数据(防闪现)。注意：此为前端门锁，挡"打开网址看数据"，不挡"直接调云端API"——网址请勿外传 ②月经预测提醒：用已有 v66 周期预测算法(computeCyclePrediction)，预测开始日=今天/明天时在身体页顶部显示提醒横幅(该成员月经进行中则跳过) ③配套云端自动化：每周日自动全量备份两张表到 backups 表(保留8周)+每月1日生成健康月报存备份并经 Server酱 推送微信摘要(SERVERCHAN_KEY secret 未配置时只存不推) -->
 <!-- v98: ①删除确认弹窗被管理弹窗挡住——uiConfirmMask 提 z-index 到 10060(原 9999 同层按 DOM 顺序被压在下面) ②频闪终极修复 v2：取消顶栏滚动收纳(v58 功能，display:none 切换在 sticky 顶栏内触发布局抖动=网页/APP 频闪共同嫌疑)+删除顶栏两个无限 pulse 动画(常驻重绘源)，右侧状态区改为常显(顺带修复滑回顶部按键不恢复) ③AI 建议时机前移：新建项目时立刻预生成记录字段(缓存)，之后点日历记录秒显 ④弹窗重构：自定义项目像内置项目一样成为独立类型按钮，选中后进弹窗即默认该项目；事件名输入框/➕添加按钮/提示文字全部删除(项目名由系统内部维护，不再需要确认) -->
 <!-- v97: ①AI建议升级:返回字段+每个字段可选选项(点击填入)+项目图标;修复首次不显示/沿用上次项目的时序bug(setEventType不再用残留值渲染) ②顶栏重影/频闪终极修复:sticky+半透明+backdrop-filter重绘bug,改不透明实色并删blur(网页+APP全局) ③自定义类型按钮去掉内嵌删除键(非法HTML嵌套button导致图标/标题/删除键分离),删除/换图标移入「管理」弹窗 ④「➕添加」改「⚙管理」:管理所有项目(新建/换图标/删除),删除带防云端复活标记 ⑤小组件圆点恢复明亮配色(浅马卡龙在浅底上看不见) -->
@@ -1323,6 +1324,15 @@ ALTER TABLE body_events ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public_all_body" ON body_events FOR ALL
   TO anon USING (true) WITH CHECK (true);
 ALTER PUBLICATION supabase_realtime ADD TABLE body_events;</pre>
+    </details>
+
+    <!-- v100：云端备份恢复 -->
+    <details id="restoreBox" style="margin: 0 0 12px;">
+      <summary style="cursor:pointer;color:#0891b2;font-size:13px;font-weight:600;">☁️ 云端备份恢复（每周自动备份 · 误删救急用）</summary>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;font-size:12px;color:#475569;margin-top:8px;line-height:1.7;">
+        <div id="restoreList">加载中…</div>
+        <div style="margin-top:8px;color:#94a3b8;">♻️ 恢复 = 把备份里本地缺少的记录按 id 补回来（<b>不会删除</b>现有记录，可放心点）</div>
+      </div>
     </details>
 
     <div class="cfg-actions-row">
@@ -3299,6 +3309,93 @@ bindClick('cfgSave', () => {
   showToast('✓ 已保存，正在刷新…');
   setTimeout(() => location.reload(), 800);
 });
+
+// ===== v100：云端备份恢复（设置弹窗 → ☁️ 云端备份恢复） =====
+async function sbGet(path) {
+  const resp = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
+    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} ${await resp.text().catch(() => '')}`);
+  return resp.json();
+}
+
+(function () {
+  const box = document.getElementById('restoreBox');
+  if (!box) return;
+  box.addEventListener('toggle', () => { if (box.open) loadBackupList(); });
+})();
+
+async function loadBackupList() {
+  const el = document.getElementById('restoreList');
+  if (!el) return;
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    el.innerHTML = '<span style="color:#dc2626;">未配置 Supabase（本地模式没有云端备份）</span>';
+    return;
+  }
+  el.textContent = '加载中…';
+  try {
+    // 只列每周全量备份（payload->>kind 为空的行；月报行 kind=monthly_report 不在列表）
+    const rows = await sbGet(`/backups?select=id,created_at,payload->counts&payload->>kind=is.null&order=created_at.desc&limit=8`);
+    if (!Array.isArray(rows) || !rows.length) {
+      el.textContent = '云端还没有备份（每周日 10:03 自动生成；备份也会同时存一份到 GitHub 私有仓库）';
+      return;
+    }
+    el.innerHTML = rows.map(r => {
+      const c = (r.counts && typeof r.counts === 'object') ? `${r.counts.health_records || 0} 条测量 + ${r.counts.body_events || 0} 条事件` : '—';
+      const t = String(r.created_at || '').slice(0, 16).replace('T', ' ');
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px dashed #d1fae5;">
+        <span style="min-width:0;">${t} UTC<br><span style="color:#64748b;font-size:11px;">${c}</span></span>
+        <button class="btn-secondary" data-restore="${r.id}" style="font-size:11px;padding:4px 10px;flex-shrink:0;">♻️ 恢复</button>
+      </div>`;
+    }).join('');
+    el.querySelectorAll('[data-restore]').forEach(btn => {
+      btn.addEventListener('click', () => restoreBackup(btn.dataset.restore));
+    });
+  } catch (e) {
+    el.innerHTML = `<span style="color:#dc2626;">加载失败：${e.message}</span><br><span style="color:#94a3b8;">若提示表不存在，需先在 Supabase SQL Editor 建 backups 表</span>`;
+  }
+}
+
+async function restoreBackup(id) {
+  if (!(await uiConfirm({
+    title: '从这份备份恢复？',
+    message: '将把备份里本地缺少的记录补回云端（按 id 合并，不删除任何现有记录）',
+    icon: '♻️', okText: '恢复',
+  }))) return;
+  showToast('正在恢复，请稍候…');
+  try {
+    const full = await sbGet(`/backups?select=payload&id=eq.${encodeURIComponent(id)}`);
+    const p = full && full[0] && full[0].payload;
+    if (!p || !Array.isArray(p.health_records)) throw new Error('备份数据为空或格式不对');
+    const [hrIds, beIds] = await Promise.all([
+      sbGet('/health_records?select=id&limit=5000'),
+      sbGet('/body_events?select=id&limit=5000'),
+    ]);
+    const haveHr = new Set(hrIds.map(r => r.id));
+    const haveBe = new Set(beIds.map(r => r.id));
+    const missHr = p.health_records.filter(r => r && r.id && !haveHr.has(r.id));
+    const missBe = (Array.isArray(p.body_events) ? p.body_events : []).filter(r => r && r.id && !haveBe.has(r.id));
+    const postRows = async (table, rows) => {
+      for (let i = 0; i < rows.length; i += 200) {
+        const resp = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates',
+          },
+          body: JSON.stringify(rows.slice(i, i + 200)),
+        });
+        if (!resp.ok) throw new Error(`${table} 写入失败 HTTP ${resp.status}`);
+      }
+    };
+    if (missHr.length) await postRows('health_records', missHr);
+    if (missBe.length) await postRows('body_events', missBe);
+    showToast(`✓ 恢复完成：补回测量 ${missHr.length} 条、事件 ${missBe.length} 条${(missHr.length + missBe.length) === 0 ? '（数据本就齐全）' : ''}`);
+    if (missHr.length + missBe.length > 0) setTimeout(() => location.reload(), 1200);
+  } catch (e) {
+    showToast('恢复失败：' + e.message, 'warning');
+  }
+}
 
 async function deleteRecord(id) {
   const rec = records.find(r => r.id === id);
