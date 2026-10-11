@@ -40,10 +40,15 @@ const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
     rest(`/health_records?select=*&ts=gte.${prevStart.getTime()}&ts=lt.${end.getTime()}&limit=5000`),
     rest(`/body_events?select=*&ts=gte.${new Date(start.getTime() - 120 * DAY).getTime()}&ts=lt.${end.getTime()}&order=ts.asc&limit=5000`),
   ]);
-  const hr = hrAll.filter(r => r.ts >= start.getTime());
-  const hrPrev = hrAll.filter(r => r.ts >= prevStart.getTime() && r.ts < start.getTime());
-  const be = beAll.filter(e => e.ts >= start.getTime());
-  const bePrev = beAll.filter(e => e.ts >= prevStart.getTime() && e.ts < start.getTime());
+  if (!Array.isArray(hrAll) || !Array.isArray(beAll)) throw new Error('数据拉取异常: ' + JSON.stringify({ hrAll, beAll }).slice(0, 300));
+  // 兜底：过滤掉空行，防止个别 null 元素炸统计
+  const clean = arr => arr.filter(Boolean);
+  const hrRaw = clean(hrAll);
+  const beRaw = clean(beAll);
+  const hr = hrRaw.filter(r => r.ts >= start.getTime());
+  const hrPrev = hrRaw.filter(r => r.ts >= prevStart.getTime() && r.ts < start.getTime());
+  const be = beRaw.filter(e => e.ts >= start.getTime());
+  const bePrev = beRaw.filter(e => e.ts >= prevStart.getTime() && e.ts < start.getTime());
   const allMembers = [...new Set([...hr.map(r => r.member).filter(Boolean), ...be.map(e => e.member).filter(Boolean)])].sort();
 
   // —— 基础统计 ——
@@ -62,7 +67,7 @@ const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
 
   // 月经预测（近几个有效周期加权平均，与网页版逻辑一致）
   const predictions = allMembers.map(m => {
-    const starts = beAll.filter(e => e.category === 'menstrual' && e.member === m && (e.payload?.is_period_start !== false)).sort((a, b) => a.ts - b.ts);
+    const starts = beRaw.filter(e => e.category === 'menstrual' && e.member === m && (e.payload?.is_period_start !== false)).sort((a, b) => a.ts - b.ts);
     if (starts.length < 2) return null;
     const gaps = [];
     for (let i = 1; i < starts.length; i++) {
@@ -104,7 +109,7 @@ const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
   if (goutCur.length === 0) {
     summaryLines.push(`🦴 **痛风**：本月 ${goutPrev.length ? `无发作（上月 ${goutPrev.length} 次，有好转 👍）` : '无发作，继续保持'}`);
   } else {
-    const lastGout = beAll.filter(e => e.category === 'gout').sort((a, b) => b.ts - a.ts)[0];
+    const lastGout = beRaw.filter(e => e.category === 'gout').sort((a, b) => b.ts - a.ts)[0];
     const sinceDays = Math.round((now.getTime() - lastGout.ts) / DAY);
     const locs = {};
     goutCur.forEach(e => { const l = e.payload?.location || '未记录部位'; locs[l] = (locs[l] || 0) + 1; });
@@ -178,4 +183,4 @@ const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
   const rj = await sr.json().catch(() => ({}));
   if (rj && rj.code === 0) console.log('✓ 微信推送成功');
   else { console.error('推送失败:', JSON.stringify(rj)); process.exit(1); }
-})().catch(e => { console.error('✗', e.message); process.exit(1); });
+})().catch(e => { console.error('✗', e.stack || e.message); process.exit(1); });
