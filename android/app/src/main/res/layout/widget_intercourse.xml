@@ -5,12 +5,29 @@
     android:layout_height="match_parent"
     android:background="@drawable/intercourse_bg">
 
-    <TextView
-        android:id="@+id/tv_heart"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:gravity="center"
-        android:text="❤️"
-        android:textSize="26sp" />
+        android:orientation="vertical"
+        android:gravity="center">
+
+        <TextView
+            android:id="@+id/tv_heart"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="❤️"
+            android:textSize="26sp" />
+
+        <TextView
+            android:id="@+id/tv_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text=""
+            android:textSize="9sp"
+            android:textColor="#9D174D"
+            android:maxLines="1" />
+    </LinearLayout>
 
 </FrameLayout>
