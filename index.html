@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v103: 收纳行为收敛——只有翻到最顶部(≤8px)才出现,离开顶部(>30px)立即收起,中间任何位置上翻下翻都保持折叠;过渡加速(0.2s/0.14s) -->
+<!-- v105: ①修复「点击一次记录61次」：v104 编辑意外留下的重复嵌套 forEach 绑定(一次点击触发两次记录)+本地缓存/实时回显竞态无去重(计数虚高)——修复绑定+saveBodyEventsCache/载入处统一按 id 去重+插入回云端记录时整条替换并清同 id 重复 ②日历角标不再显示 ×N：当日几条记录就画几个符号(❤️❤️)，总数超过 3 个自动缩小(compact)，1~3 个正常大小 ③小组件改双击确认记录(600ms 窗口，第一击亮「再点一次」提示文字，第二击记录到当前时间点)，名称改「爱心图案」 -->
 <!-- v104: ①日历删除改长按500ms(pointer实现+震动反馈)，点击不再触发删除 ②同一天可保存多次相同数据(如两次同房点击即新增)，日历同类角标显示数量 ❤️×N ③事件弹窗删「结束时间」行(转hidden兼容月经范围保存)、「开始」改「时间」 ④新增自定义日期时间选择弹窗(年月日时分下拉+「确认」按钮，替代原生picker的不可改「设置」文案) ⑤身体全部记录第一行末尾显示含年份时间(与项目名flex隔开) -->
 <!-- v102: 顶栏收纳修复——v101「跳动后稳定显示/折叠失败」真凶=浏览器滚动锚定(scroll anchoring)：收纳动画收缩页面顶部高度时浏览器自动回拉 scrollY 补偿→低于展开阈值→立即弹回展开→震荡。修复=html overflow-anchor:none + 阈值提高(>140折叠/<60展开) + 过渡期350ms状态锁 -->
 <!-- v101: 顶栏滚动收纳回归(实时同步中/时间/设置下滑收纳、回顶展开)——v97 已铲频闪真根因(半透明+blur)+v98 删常驻动画后重绘环境干净；本次不用 display:none 瞬跳(整页 reflow 抖动源)，改 max-height+opacity 平滑过渡+迟滞(>80折叠/<40展开)+rAF 节流 -->
@@ -1563,7 +1563,17 @@ function syncCustomTypesFromEvents() {
 }
 let records = [];
 let bodyEvents = [];
-try { bodyEvents = (JSON.parse(localStorage.getItem(STORAGE_KEYS.EVENTS)) || []).map(normalizeBodyEvent); }
+// v105：按 id 去重（与 saveBodyEventsCache 同规则）——清掉历史缓存里已存在的重复条目
+function dedupeBodyEvents() {
+  const seen = new Set();
+  bodyEvents = bodyEvents.filter(e => {
+    const id = e && e.id;
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+try { bodyEvents = (JSON.parse(localStorage.getItem(STORAGE_KEYS.EVENTS)) || []).map(normalizeBodyEvent); dedupeBodyEvents(); }
 catch (e) { console.warn('parse events cache failed', e); }
 let customCategories = JSON.parse(localStorage.getItem(STORAGE_KEYS.CATS) || '{}');
 // v42 萌化迁移：老数据里存的旧图标 → 新图标（仅在"类别名匹配且图标还是旧版"时替换，不覆盖用户自选）
@@ -2317,6 +2327,7 @@ async function loadBodyEventsFromCloud() {
     return;
   }
   bodyEvents = (data || []).map(normalizeBodyEvent);
+  dedupeBodyEvents();  // v105
   syncMembersFromData();       // v93：云端事件里的成员自动合并
   syncCustomTypesFromEvents(); // v93：云端事件里的自定义类型自动重建
   saveBodyEventsCache();
@@ -2395,8 +2406,19 @@ function subscribeBodyEvents() {
     .subscribe();
 }
 
+// v105：唯一写缓存入口——先按 id 去重再落盘。修复「点击一次显示记录 61 次」：
+// 本地新建记录先用本地 id 入列，REST 成功后替换为云端 id；若 realtime INSERT 回显
+// 抢在 REST 响应前到达（云端 id 本地还查不到），就会 unshift 一条重复记录并被持久化。
+// 在此统一去重（保留先出现的），任何路径产生的重复都会在下次落盘时被清掉
 function saveBodyEventsCache() {
   try {
+    const seen = new Set();
+    bodyEvents = bodyEvents.filter(e => {
+      const id = e && e.id;
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
     localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(bodyEvents));
   } catch (e) { console.warn('localStorage save body events failed', e); }
 }
@@ -2779,8 +2801,9 @@ async function saveBodyEvent(event) {
       try {
         const inserted = await pushBodyEventToCloud(event);
         if (inserted) {
-          const idx = bodyEvents.findIndex(e => e.id === event.id);
-          if (idx >= 0) bodyEvents[idx] = inserted;
+          // v105：整条替换为云端记录，并清掉 realtime 回显竞态可能产生的同 id 重复
+          bodyEvents = bodyEvents.filter(e => e.id !== inserted.id);
+          bodyEvents.unshift(inserted);
           saveBodyEventsCache();
         }
       } catch (e) {
@@ -5327,12 +5350,10 @@ function renderMenstrualCalendar() {
 
   wrap.innerHTML = [m1, m2].map(m => renderSingleMonth(m, recordedKeys, predictedKeys, todayKey, selectedStartKey, selectedEndKey, rangeKeys, dysmenorrheaKeys, otherMarkers)).join('');
 
-  // 绑定每个日期的点击
-  wrap.querySelectorAll('.menstrual-day[data-ts]').forEach(el => {
-  // v104：点击 = 记录/操作，长按 500ms = 删除（用户需求：日历删除改长按）
+  // 绑定每个日期的点击（v105：修复 v104 编辑时意外留下的重复嵌套 forEach——
+  // 同一格被绑定两次，一次点击触发两次记录）
   wrap.querySelectorAll('.menstrual-day[data-ts]').forEach(el => {
     bindDayCellActions(el, parseInt(el.dataset.ts, 10));
-  });
   });
 
   // 操作条显示
@@ -5430,12 +5451,17 @@ function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, sel
     else if (isSelectedEnd) { classes.push('selecting'); marker = '<span class="marker">🅱️</span>'; }
     else if (isInRange) classes.push('in-range');
 
-    // 痛风/异常/自定义事件的小角标（即使在月经期也显示）：v104 同类多条显示 ❤️×N
+    // 痛风/异常/自定义事件的小角标（即使在月经期也显示）：v105 当日几条记录就画几个符号，
+    // 总数超过 3 个自动缩小；不再显示 ×N 数字
     const others = otherMarkers && otherMarkers[k];
     if (others && others.length) {
       classes.push('has-other-event');
-      const sizeCls = others.length > 2 ? ' compact' : '';
-      marker += `<span class="other-marker-row${sizeCls}">` + others.map(o => `<span class="other-marker" title="${escapeHtml(o.label)}${o.count > 1 ? ' ×' + o.count : ''}">${o.icon}${o.count > 1 ? `<i style="font-style:normal;font-size:8px;font-weight:800;margin-left:1px;">×${o.count}</i>` : ''}</span>`).join('') + `</span>`;
+      const total = others.reduce((s, o) => s + o.count, 0);
+      const sizeCls = total > 3 ? ' compact' : '';
+      const iconSpans = others.map(o =>
+        Array(o.count).fill(o.icon).map(ic => `<span class="other-marker" title="${escapeHtml(o.label)}">${ic}</span>`).join('')
+      ).join('');
+      marker += `<span class="other-marker-row${sizeCls}">${iconSpans}</span>`;
     }
 
     html += `<div class="${classes.join(' ')}" data-ts="${ts}" title="${k}${isRecorded ? '（已记录）' : ''}${isDysmenorrhea ? '（痛经）' : ''}${others && others.length ? '（' + escapeHtml(others.map(o => o.label).join('·')) + '）' : ''}"><span class="day-num">${day}</span>${tagText ? `<span class="phase-tag">${tagText}</span>` : ''}${marker}</div>`;
