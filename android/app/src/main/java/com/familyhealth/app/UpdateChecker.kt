@@ -37,11 +37,12 @@ object UpdateChecker {
 
     /** APP 启动时检查（主线程调用，网络在后台线程） */
     fun checkAsync(activity: Activity, fromUser: Boolean) {
+        val localCode = localVersionCode(activity)
         Thread {
             val info = fetchRemoteVersion()
             Handler(Looper.getMainLooper()).post {
                 if (!activity.isFinishing) {
-                    if (info != null && info.optInt("version_code", 0) > BuildConfig.VERSION_CODE) {
+                    if (info != null && info.optInt("version_code", 0) > localCode) {
                         showUpdateDialog(activity, info)
                     } else if (fromUser) {
                         Toast.makeText(activity, "已是最新版本 ✓", Toast.LENGTH_SHORT).show()
@@ -56,12 +57,22 @@ object UpdateChecker {
         try {
             val info = fetchRemoteVersion() ?: return
             val code = info.optInt("version_code", 0)
-            if (code <= BuildConfig.VERSION_CODE) return
+            if (code <= localVersionCode(context)) return
             val prefs = context.getSharedPreferences("cfg", Context.MODE_PRIVATE)
             if (prefs.getInt(KEY_NOTIFIED, 0) >= code) return
             prefs.edit().putInt(KEY_NOTIFIED, code).apply()
             notifyNewVersion(context, info)
         } catch (_: Exception) {}
+    }
+
+    /** 本地版本号：经 PackageManager 读取（AGP 8 默认不生成 BuildConfig） */
+    private fun localVersionCode(context: Context): Int {
+        return try {
+            val pm = context.packageManager.getPackageInfo(context.packageName, 0)
+            if (android.os.Build.VERSION.SDK_INT >= 28) pm.longVersionCode.toInt() else pm.versionCode
+        } catch (_: Exception) {
+            0
+        }
     }
 
     private fun fetchRemoteVersion(): JSONObject? {
