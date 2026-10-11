@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v101: 顶栏滚动收纳回归(实时同步中/时间/设置下滑收纳、回顶展开)——v97 已铲频闪真根因(半透明+blur)+v98 删常驻动画后重绘环境干净；本次不用 display:none 瞬跳(整页 reflow 抖动源)，改 max-height+opacity 平滑过渡+迟滞(>80折叠/<40展开)+rAF 节流 -->
 <!-- v100: ①设置弹窗新增「云端备份恢复」：列出最近 8 份每周自动备份(时间+条数)，点击按 id 合并补缺恢复(不删除现有记录)，双确认防误触；每周备份同时存一份到 GitHub 私有仓库 family-health-backups(第二落点，防 Supabase 单点故障) -->
 <!-- v99: ①设备密码锁：首次打开需输入访问密码(固定 000717)，通过后本设备 localStorage 记住不再询问；锁屏为全屏遮罩，未解锁时不渲染数据(防闪现)。注意：此为前端门锁，挡"打开网址看数据"，不挡"直接调云端API"——网址请勿外传 ②月经预测提醒：用已有 v66 周期预测算法(computeCyclePrediction)，预测开始日=今天/明天时在身体页顶部显示提醒横幅(该成员月经进行中则跳过) ③配套云端自动化：每周日自动全量备份两张表到 backups 表(保留8周)+每月1日生成健康月报存备份并经 Server酱 推送微信摘要(SERVERCHAN_KEY secret 未配置时只存不推) -->
 <!-- v98: ①删除确认弹窗被管理弹窗挡住——uiConfirmMask 提 z-index 到 10060(原 9999 同层按 DOM 顺序被压在下面) ②频闪终极修复 v2：取消顶栏滚动收纳(v58 功能，display:none 切换在 sticky 顶栏内触发布局抖动=网页/APP 频闪共同嫌疑)+删除顶栏两个无限 pulse 动画(常驻重绘源)，右侧状态区改为常显(顺带修复滑回顶部按键不恢复) ③AI 建议时机前移：新建项目时立刻预生成记录字段(缓存)，之后点日历记录秒显 ④弹窗重构：自定义项目像内置项目一样成为独立类型按钮，选中后进弹窗即默认该项目；事件名输入框/➕添加按钮/提示文字全部删除(项目名由系统内部维护，不再需要确认) -->
@@ -100,9 +101,22 @@
   .clock .time { font-size: 20px; font-weight: 700; color: #9a3412; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; }
   .clock .time .pulse { display: inline-block; width: 6px; height: 6px; background: var(--primary); border-radius: 50%; margin-right: 6px; vertical-align: middle; }
   .clock .date { font-size: 11px; color: var(--text-3); margin-top: 0; }
-  /* v98：顶栏滚动收纳（v58）整体下线——display:none 切换发生在 sticky 顶栏内部，
-     每次跨越阈值都触发整页布局抖动（网页/APP 频闪共同嫌疑），且 APP 滑回顶部
-     存在按键不恢复的问题。右侧状态区（同步状态/时间/设置）改为常显 */
+  /* v101：顶栏滚动收纳回归 v2——v98 已铲掉频闪真根因（半透明+backdrop-filter blur）
+     和常驻 pulse 动画，重绘环境干净，现在安全重启收纳功能。
+     与旧版的关键区别：不用 display:none 瞬跳（瞬间高度跳变=整页 reflow 抖动源），
+     改用 max-height + opacity 平滑过渡，空间渐变释放，标题/tabs 位置连续不跳 */
+  .topbar > header > .header-right {
+    max-height: 96px;
+    opacity: 1;
+    overflow: hidden;
+    transition: max-height 0.28s ease, opacity 0.22s ease;
+    will-change: max-height, opacity;
+  }
+  .topbar > header > .header-right.header-collapsed {
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
 
   /* v74：APP 专属样式（html.in-app 仅在 APK WebView 中存在，网页版不受影响）
      ①健康页四张统计卡（本周/今年/类别/成员）固定 2 行 2 列
@@ -3274,6 +3288,28 @@ bindClick('bannerConfigBtn', openConfig, '横幅配置按钮');
 
 // v98：顶栏滚动收纳（v58）JS 已整体删除——display:none 切换在 sticky 顶栏内触发布局
 // 抖动（网页/APP 频闪共同嫌疑），且 APP 上滑回顶部时折叠态不恢复。右侧状态区常显。
+
+// v101：顶栏滚动收纳回归——迟滞（>80 折叠、<40 展开，防阈值附近来回横跳）+ rAF 节流。
+// 类切换只发生在跨越迟滞区间时，配合 CSS max-height/opacity 平滑过渡，
+// 不再有 v94 时代 display:none 的整页 reflow 抖动（那时频闪真凶是半透明+blur，已除）
+(function () {
+  const headerRight = document.querySelector('.topbar > header > .header-right');
+  if (!headerRight) return;
+  let collapsed = false, ticking = false;
+  const apply = shouldCollapse => {
+    if (shouldCollapse !== collapsed) {
+      collapsed = shouldCollapse;
+      headerRight.classList.toggle('header-collapsed', collapsed);
+    }
+  };
+  const onScroll = () => {
+    apply(collapsed ? window.scrollY < 40 : window.scrollY > 80);
+    ticking = false;
+  };
+  window.addEventListener('scroll', () => {
+    if (!ticking) { ticking = true; requestAnimationFrame(onScroll); }
+  }, { passive: true });
+})();
 
 function openConfig() {
   document.getElementById('cfgUrl').value = SUPABASE_URL || '';
