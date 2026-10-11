@@ -26,5 +26,19 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/menstrual_widget_info" />
         </receiver>
+
+        <!-- v104：1×1 同房快捷记录小组件（点击即记录当日一次同房 + Toast 提示） -->
+        <receiver
+            android:name=".IntercourseWidget"
+            android:exported="false"
+            android:label="记一次同房">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.familyhealth.app.ACTION_RECORD_INTERCOURSE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/intercourse_widget_info" />
+        </receiver>
     </application>
 </manifest>
