@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- v103: 收纳行为收敛——只有翻到最顶部(≤8px)才出现,离开顶部(>30px)立即收起,中间任何位置上翻下翻都保持折叠(v102 的 <60/>140 阈值太宽松=顶部附近140px区间内部件可见,观感「出现一下再消失」);过渡加速(0.2s/0.14s) -->
+<!-- v103: 收纳行为收敛——只有翻到最顶部(≤8px)才出现,离开顶部(>30px)立即收起,中间任何位置上翻下翻都保持折叠;过渡加速(0.2s/0.14s) -->
+<!-- v104: ①日历删除改长按500ms(pointer实现+震动反馈)，点击不再触发删除 ②同一天可保存多次相同数据(如两次同房点击即新增)，日历同类角标显示数量 ❤️×N ③事件弹窗删「结束时间」行(转hidden兼容月经范围保存)、「开始」改「时间」 ④新增自定义日期时间选择弹窗(年月日时分下拉+「确认」按钮，替代原生picker的不可改「设置」文案) ⑤身体全部记录第一行末尾显示含年份时间(与项目名flex隔开) -->
 <!-- v102: 顶栏收纳修复——v101「跳动后稳定显示/折叠失败」真凶=浏览器滚动锚定(scroll anchoring)：收纳动画收缩页面顶部高度时浏览器自动回拉 scrollY 补偿→低于展开阈值→立即弹回展开→震荡。修复=html overflow-anchor:none + 阈值提高(>140折叠/<60展开) + 过渡期350ms状态锁 -->
 <!-- v101: 顶栏滚动收纳回归(实时同步中/时间/设置下滑收纳、回顶展开)——v97 已铲频闪真根因(半透明+blur)+v98 删常驻动画后重绘环境干净；本次不用 display:none 瞬跳(整页 reflow 抖动源)，改 max-height+opacity 平滑过渡+迟滞(>80折叠/<40展开)+rAF 节流 -->
 <!-- v100: ①设置弹窗新增「云端备份恢复」：列出最近 8 份每周自动备份(时间+条数)，点击按 id 合并补缺恢复(不删除现有记录)，双确认防误触；每周备份同时存一份到 GitHub 私有仓库 family-health-backups(第二落点，防 Supabase 单点故障) -->
@@ -499,14 +500,14 @@
   .event-meta-chip.severity { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #991b1b; }
   .event-meta-chip.tag { background: linear-gradient(135deg, #ede9fe, #ddd6fe); color: #5b21b6; }
   .event-card-actions { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); display: flex; gap: 4px; align-items: center; }
-  .event-card-actions .event-card-time { margin-right: 26px; }
+  /* v104：第一行末尾的含年份时间（与项目名 flex 自动隔开 2~3 格） */
+  .ev-head-time { margin-left: auto; font-size: 11px; color: var(--text-3); white-space: nowrap; font-weight: 400; flex-shrink: 0; }
   .ev-mini-btn { background: #f8fafc; border: 1px solid var(--border); cursor: pointer; font-size: 18px; padding: 7px 9px; line-height: 1; border-radius: 8px; }
   .ev-mini-btn:hover { background: #e2e8f0; transform: scale(1.06); }
   /* 手机端：日期+按钮改为卡片底部一行，正文恢复全宽（v58/v60：按钮靠拢右侧） */
   @media (max-width: 600px) {
     .event-card { padding: 8px 12px; }
     .event-card-actions { position: static; transform: none; justify-content: flex-end; margin-top: 6px; width: 100%; }
-    .event-card-actions .event-card-time { margin-right: auto; }
   }
 
   /* 类型颜色 */
@@ -1020,13 +1021,12 @@
       <select id="eventMemberSelect" class="preview-input"></select>
     </div>
 
-    <!-- 通用：开始/结束时间 -->
-    <div class="preview-row"><label>开始</label>
-      <input type="datetime-local" id="eventTs" class="preview-input">
+    <!-- v104：结束时间输入行删除（字段转 hidden 兼容月经范围保存）；「开始」改「时间」；
+         点击打开自定义日期时间弹窗（v104：原生 datetime picker 的「设置」按钮是 Chromium 内置无法改文字） -->
+    <div class="preview-row"><label>时间</label>
+      <input type="datetime-local" id="eventTs" class="preview-input" readonly placeholder="点击选择">
     </div>
-    <div class="preview-row"><label>结束 <span style="font-weight:400;color:var(--text-3);font-size:11px;">(可选)</span></label>
-      <input type="datetime-local" id="eventEndTs" class="preview-input">
-    </div>
+    <input type="hidden" id="eventEndTs">
 
     <!-- 月经专属字段：痛经日期勾选（在所选月经期内逐日勾选） -->
     <div class="event-fields" data-for="menstrual">
@@ -1138,6 +1138,27 @@
     <div class="modal-actions">
       <button class="btn-secondary" data-close="promptModalMask">取消</button>
       <button class="btn-primary" id="promptModalOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== v104：自定义日期时间选择（替代 Chromium 原生 datetime picker——其「设置」按钮为内置文案无法修改） ===== -->
+<div class="modal-mask" id="dtPickerMask">
+  <div class="modal" style="max-width:360px;">
+    <button class="modal-close" data-close="dtPickerMask" title="关闭">×</button>
+    <h3>🕒 选择日期和时间</h3>
+    <div style="display:flex;gap:6px;justify-content:center;margin:14px 0 6px;">
+      <select id="dtY" class="preview-input" style="width:92px;"></select>
+      <select id="dtM" class="preview-input" style="width:70px;"></select>
+      <select id="dtD" class="preview-input" style="width:70px;"></select>
+    </div>
+    <div style="display:flex;gap:6px;justify-content:center;margin:6px 0 14px;">
+      <select id="dtH" class="preview-input" style="width:86px;"></select>
+      <select id="dtMin" class="preview-input" style="width:86px;"></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" data-close="dtPickerMask">取消</button>
+      <button class="btn-primary" id="dtOk">确认</button>
     </div>
   </div>
 </div>
@@ -2578,10 +2599,10 @@ function updateBtsHint() {
   const hint = document.getElementById('btsHint');
   if (!hint) return;
   const meta = {
-    menstrual: '点击月历上的日期，进入范围选择 → 保存为「月经」',
-    gout: '点击月历上的日期，弹出痛风发作确认弹窗',
-    anomaly: '点击月历上的日期，弹出异常确认弹窗',
-    intercourse: '点击月历日期，立即记录 ❤️（再点一次 = 删除）',
+    menstrual: '点击月历日期进入范围选择 → 保存为「月经」；长按删除',
+    gout: '点击月历日期，弹出痛风发作确认弹窗；长按删除该日记录',
+    anomaly: '点击月历日期，弹出异常确认弹窗；长按删除该日记录',
+    intercourse: '点击月历日期立即记录 ❤️（同一天可多次）；长按删除该日全部',
   };
   if (meta[currentBodyType]) {
     hint.textContent = meta[currentBodyType];
@@ -5286,9 +5307,10 @@ function renderMenstrualCalendar() {
       if (recordedKeys.has(k)) return;  // 已记录月经优先
       const meta = getEventCategoryMeta(e.category);
       if (!otherMarkers[k]) otherMarkers[k] = [];
-      if (!otherMarkers[k].some(m => m.icon === meta.icon)) {  // 同类同日去重
-        otherMarkers[k].push({ icon: meta.icon, label: meta.label });
-      }
+      // v104：同日同类型多条 → 计数（日历上显示 ❤️×N）
+      const found = otherMarkers[k].find(m => m.icon === meta.icon);
+      if (found) found.count++;
+      else otherMarkers[k].push({ icon: meta.icon, label: meta.label, count: 1 });
     }
   });
 
@@ -5307,7 +5329,10 @@ function renderMenstrualCalendar() {
 
   // 绑定每个日期的点击
   wrap.querySelectorAll('.menstrual-day[data-ts]').forEach(el => {
-    el.addEventListener('click', () => onMenstrualDayClick(parseInt(el.dataset.ts, 10), el));
+  // v104：点击 = 记录/操作，长按 500ms = 删除（用户需求：日历删除改长按）
+  wrap.querySelectorAll('.menstrual-day[data-ts]').forEach(el => {
+    bindDayCellActions(el, parseInt(el.dataset.ts, 10));
+  });
   });
 
   // 操作条显示
@@ -5405,12 +5430,12 @@ function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, sel
     else if (isSelectedEnd) { classes.push('selecting'); marker = '<span class="marker">🅱️</span>'; }
     else if (isInRange) classes.push('in-range');
 
-    // 痛风/异常/自定义事件的小角标（即使在月经期也显示）：同日多个全部并排显示（v55）
+    // 痛风/异常/自定义事件的小角标（即使在月经期也显示）：v104 同类多条显示 ❤️×N
     const others = otherMarkers && otherMarkers[k];
     if (others && others.length) {
       classes.push('has-other-event');
       const sizeCls = others.length > 2 ? ' compact' : '';
-      marker += `<span class="other-marker-row${sizeCls}">` + others.map(o => `<span class="other-marker" title="${escapeHtml(o.label)}">${o.icon}</span>`).join('') + `</span>`;
+      marker += `<span class="other-marker-row${sizeCls}">` + others.map(o => `<span class="other-marker" title="${escapeHtml(o.label)}${o.count > 1 ? ' ×' + o.count : ''}">${o.icon}${o.count > 1 ? `<i style="font-style:normal;font-size:8px;font-weight:800;margin-left:1px;">×${o.count}</i>` : ''}</span>`).join('') + `</span>`;
     }
 
     html += `<div class="${classes.join(' ')}" data-ts="${ts}" title="${k}${isRecorded ? '（已记录）' : ''}${isDysmenorrhea ? '（痛经）' : ''}${others && others.length ? '（' + escapeHtml(others.map(o => o.label).join('·')) + '）' : ''}"><span class="day-num">${day}</span>${tagText ? `<span class="phase-tag">${tagText}</span>` : ''}${marker}</div>`;
@@ -5426,22 +5451,8 @@ async function onMenstrualDayClick(ts, el) {
   const memberFilter = currentEventsMemberFilter;
   const memberName = memberFilter === 'all' ? (familyMembers[0] || '文文') : memberFilter;
 
-  // === 月经类型：range 选择 + 弹 modal ===
+  // === 月经类型：range 选择（v104：删除移至长按，点击不再触发删除） ===
   if (currentType === 'menstrual') {
-    const recordedEvents = bodyEvents.filter(e => {
-      if (e.category !== 'menstrual') return false;
-      if (memberFilter !== 'all' && e.member !== memberFilter) return false;
-      return expandEventToDateKeys(e).has(k);
-    });
-    if (recordedEvents.length > 0) {
-      const ev = recordedEvents[0];
-      if (await uiConfirm({ title: '删除这次月经记录？', message: `${ev.member} · ${k}`, icon: '🌷' })) {
-        await removeBodyEvent(ev.id);
-        showToast('✓ 已删除');
-      }
-      return;
-    }
-
     if (!menstrualSelectStart) {
       menstrualSelectStart = ts;
       menstrualSelectEnd = null;
@@ -5458,20 +5469,8 @@ async function onMenstrualDayClick(ts, el) {
     return;
   }
 
-  // === ❤️（同房）：点击即记录，无需确认弹窗；再点一次 = 删除 ===
+  // === ❤️（同房）：点击即新增一条（v104：同一天可记录多次，长按删除） ===
   if (currentType === 'intercourse' || currentType === 'mood') {
-    const existingLove = bodyEvents.find(e =>
-      (e.category === 'intercourse' || e.category === 'mood') &&
-      e.member === memberName &&
-      startOfDay(e.ts).getTime() === day.getTime()
-    );
-    if (existingLove) {
-      if (await uiConfirm({ title: '删除 ❤️ 记录？', message: `${memberName} · ${k}`, icon: '❤️' })) {
-        await removeBodyEvent(existingLove.id);
-        showToast('✓ 已删除');
-      }
-      return;
-    }
     // 时间取值：今天 = 当前时刻；历史日期 = 当天 21:00
     const nowD = new Date();
     const tsLove = dateKey(nowD) === k ? nowD.getTime() : new Date(`${k}T21:00:00`).getTime();
@@ -5481,24 +5480,18 @@ async function onMenstrualDayClick(ts, el) {
       member: memberName, category: 'intercourse',
       severity: 3, title: '❤️', payload: {}, tags: [], note: '',
     });
-    showToast('✓ 已记录 ❤️');
+    const n = bodyEvents.filter(e => (e.category === 'intercourse' || e.category === 'mood') &&
+      e.member === memberName && startOfDay(e.ts).getTime() === day.getTime()).length;
+    showToast(`✓ 已记录 ❤️（${memberName} ${k} 第 ${n} 次）`);
     return;
   }
 
-  // === 痛风/异常/自定义：单击日期 → 弹 modal 确认（不再直接保存） ===
-  // 已经存在该日期+类型的记录 → 删除
-  const existing = bodyEvents.find(e =>
+  // === 痛风/异常/自定义：单击日期 → 弹 modal 补充信息（v104：同一天可保存多条，长按删除） ===
+  const sameDayCount = bodyEvents.filter(e =>
     e.category === currentType &&
     e.member === memberName &&
     startOfDay(e.ts).getTime() === day.getTime()
-  );
-  if (existing) {
-    if (await uiConfirm({ title: '删除这条记录？', message: `${memberName} · ${k}${getEventCategoryMeta(currentType) ? ' · ' + getEventCategoryMeta(currentType).label : ''}`, icon: '🗑' })) {
-      await removeBodyEvent(existing.id);
-      showToast('✓ 已删除');
-    }
-    return;
-  }
+  ).length;
 
   // 弹窗：日期预填为点击日（类型已在上方选过，隐藏弹窗里的类型格 v60）
   openEventModal();
@@ -5520,7 +5513,74 @@ async function onMenstrualDayClick(ts, el) {
     setEventType('custom', currentType);
   }
   const label = (currentType.startsWith('cust_') && getCustomEventType(currentType)) ? getCustomEventType(currentType).name : getEventCategoryMeta(currentType).label;
-  showToast(`已选 ${k} · ${label}，补充信息后点保存`);
+  showToast(`已选 ${k} · ${label}${sameDayCount ? `（当日已有 ${sameDayCount} 条，保存将新增）` : ''}，补充信息后点保存`);
+}
+
+// v104：日历长按删除——长按 500ms 触发，删除该日当前类型的全部记录
+// （月经记录可能跨多日，删除的是整段范围，确认信息中说明）
+async function onMenstrualDayLongPress(ts) {
+  const day = startOfDay(ts);
+  const k = dateKey(day);
+  const currentType = currentBodyType;
+  const memberFilter = currentEventsMemberFilter;
+  if (!currentType) { showToast('请先选择要操作的项目', 'warning'); return; }
+
+  let targets = [];
+  let label = '';
+  if (currentType === 'menstrual') {
+    targets = bodyEvents.filter(e => e.category === 'menstrual' &&
+      (memberFilter === 'all' || e.member === memberFilter) && expandEventToDateKeys(e).has(k));
+    label = '月经记录（整段范围将一并删除）';
+  } else if (currentType === 'intercourse' || currentType === 'mood') {
+    targets = bodyEvents.filter(e => (e.category === 'intercourse' || e.category === 'mood') &&
+      (memberFilter === 'all' || e.member === memberFilter) && startOfDay(e.ts).getTime() === day.getTime());
+    label = '❤️ 同房记录';
+  } else if (currentType.startsWith && currentType.startsWith('cust_')) {
+    const ct = getCustomEventType(currentType);
+    targets = bodyEvents.filter(e => e.category === currentType &&
+      (memberFilter === 'all' || e.member === memberFilter) && startOfDay(e.ts).getTime() === day.getTime());
+    label = ct ? ct.name : '自定义记录';
+  } else {
+    const meta = getEventCategoryMeta(currentType);
+    targets = bodyEvents.filter(e => e.category === currentType &&
+      (memberFilter === 'all' || e.member === memberFilter) && startOfDay(e.ts).getTime() === day.getTime());
+    label = meta ? meta.label : currentType;
+  }
+
+  if (!targets.length) { showToast(`${k} 没有可删除的${label}`, 'warning'); return; }
+  const detail = targets.map(e => `${e.member} ${dateKey(new Date(e.ts))}`).join('、');
+  if (!(await uiConfirm({
+    title: `删除这 ${targets.length} 条记录？`,
+    message: `${k} · ${label}\n${detail}`,
+    icon: '🗑', okText: '删除',
+  }))) return;
+  for (const ev of targets) await removeBodyEvent(ev.id);
+  showToast(`✓ 已删除 ${targets.length} 条`);
+}
+
+// v104：日期格事件绑定——点击=记录，长按 500ms=删除（移动端友好，pointer 事件兼容 WebView）
+function bindDayCellActions(el, ts) {
+  let pressTimer = null, longFired = false, startX = 0, startY = 0;
+  const clear = () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } };
+  el.addEventListener('pointerdown', e => {
+    longFired = false;
+    startX = e.clientX; startY = e.clientY;
+    clear();
+    pressTimer = setTimeout(async () => {
+      pressTimer = null; longFired = true;
+      try { if (navigator.vibrate) navigator.vibrate(30); } catch (_) {}
+      await onMenstrualDayLongPress(ts);
+    }, 500);
+  });
+  el.addEventListener('pointermove', e => {
+    if (pressTimer && (Math.abs(e.clientX - startX) > 12 || Math.abs(e.clientY - startY) > 12)) clear();
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => el.addEventListener(ev, clear));
+  el.addEventListener('click', () => {
+    if (longFired) { longFired = false; return; }  // 长按触发后吞掉紧随的 click
+    onMenstrualDayClick(ts, el);
+  });
+  el.addEventListener('contextmenu', e => e.preventDefault());  // 防长按弹系统菜单
 }
 
 function confirmMenstrualSelection() {
@@ -5554,6 +5614,59 @@ function cancelMenstrualSelection() {
   document.getElementById('mcSelectBar').classList.remove('active');
   renderMenstrualCalendar();
 }
+
+// ===== v104：自定义日期时间选择弹窗——原生 datetime picker 的「设置」按钮是
+// Chromium 内置文案无法修改，改用本弹窗（年/月/日/时/分下拉 + 「确认」按钮） =====
+(function () {
+  const mask = document.getElementById('dtPickerMask');
+  if (!mask) return;
+  const yS = document.getElementById('dtY'), mS = document.getElementById('dtM'),
+        dS = document.getElementById('dtD'), hS = document.getElementById('dtH'),
+        minS = document.getElementById('dtMin');
+  let targetId = null;
+  const pad2 = n => String(n).padStart(2, '0');
+  const fill = (sel, from, to, cur, suffix) => {
+    let html = '';
+    for (let i = from; i <= to; i++) html += `<option value="${i}"${i === cur ? ' selected' : ''}>${pad2(i)}${suffix}</option>`;
+    sel.innerHTML = html;
+  };
+  function updateDays(keepDay) {
+    const days = new Date(+yS.value, +mS.value, 0).getDate();
+    const cur = keepDay ? Math.min(+dS.value || 1, days) : 1;
+    fill(dS, 1, days, cur, '日');
+  }
+  function openFor(inputId) {
+    targetId = inputId;
+    const raw = document.getElementById(inputId).value;
+    let d = raw ? new Date(raw) : new Date();
+    if (isNaN(d.getTime())) d = new Date();
+    const nowY = d.getFullYear();
+    let html = '';
+    for (let y = nowY - 3; y <= nowY + 1; y++) html += `<option value="${y}"${y === nowY ? ' selected' : ''}>${y}年</option>`;
+    yS.innerHTML = html;
+    fill(mS, 1, 12, d.getMonth() + 1, '月');
+    updateDays(true);
+    fill(hS, 0, 23, d.getHours(), '时');
+    fill(minS, 0, 55, Math.floor(d.getMinutes() / 5) * 5, '分');
+    mask.classList.add('show');
+  }
+  yS.addEventListener('change', () => updateDays(true));
+  mS.addEventListener('change', () => updateDays(true));
+  document.getElementById('dtOk').addEventListener('click', () => {
+    if (!targetId) return;
+    const v = `${+yS.value}-${pad2(+mS.value)}-${pad2(+dS.value)}T${pad2(+hS.value)}:${pad2(+minS.value)}`;
+    const inp = document.getElementById(targetId);
+    inp.value = v;
+    inp.dispatchEvent(new Event('change', { bubbles: true }));
+    mask.classList.remove('show');
+  });
+  // 时间输入框设为只读，点击打开本弹窗（readonly 同时阻止弹原生 picker）
+  const ts = document.getElementById('eventTs');
+  if (ts) {
+    ts.readOnly = true;
+    ts.addEventListener('click', () => openFor('eventTs'));
+  }
+})();
 
 function toLocalDatetimeInput(ts) {
   const d = new Date(ts);
@@ -5951,7 +6064,7 @@ function copyLastGout() {
 function saveEventFromForm() {
   const member = document.getElementById('eventMemberSelect').value;
   const tsVal = document.getElementById('eventTs').value;
-  if (!tsVal) { showToast('请选择开始时间', 'warning'); return; }
+  if (!tsVal) { showToast('请选择时间', 'warning'); return; }
   const ts = new Date(tsVal).getTime();
   const endVal = document.getElementById('eventEndTs').value;
   const end_ts = endVal ? new Date(endVal).getTime() : null;
@@ -6280,16 +6393,19 @@ function renderEventCard(ev) {
     });
   }
 
+  // v104：时间（含年份）放第一行末尾，与项目名隔开（flex 自动撑开）
+  const headTime = ev.ts ? `${formatDate(ev.ts)} ${new Date(ev.ts).toTimeString().slice(0, 5)}` : '';
+
   return `
     <div class="event-card event-cat-${escapeHtml(ev.category)}">
       <div class="event-card-head">
         <div class="event-card-icon">${meta.icon}</div>
         <div class="event-card-title"><span class="event-meta-chip" style="${memberPillStyle(ev.member)}">${escapeHtml(ev.member)}</span> <span style="font-weight:700;">${escapeHtml(projectName)}</span></div>
+        ${headTime ? `<span class="ev-head-time">${headTime}</span>` : ''}
       </div>
       ${chips.length ? `<div class="event-card-meta">${chips.join('')}</div>` : ''}
       ${ev.note ? `<div style="font-size:12px;color:var(--text-3);margin-top:4px;line-height:1.5;">${escapeHtml(ev.note)}</div>` : ''}
       <div class="event-card-actions">
-        <div class="event-card-time">${formatEventDateTime(ev.ts)}</div>
         <button class="ev-mini-btn" data-ev-action="edit" data-ev-id="${escapeHtml(ev.id)}" title="编辑">✏️</button>
         <button class="ev-mini-btn" data-ev-action="delete" data-ev-id="${escapeHtml(ev.id)}" title="删除">🗑</button>
       </div>
