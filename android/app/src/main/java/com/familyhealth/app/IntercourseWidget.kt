@@ -13,9 +13,10 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * v104：1×1 同房快捷记录小组件
- * 点击 → 向 Supabase body_events 插入一条当日同房记录（category=intercourse，
- * member=文文，ts=点击时刻）→ Toast 提示已记录；数据实时同步到 APP 日历。
+ * v105：1×1 爱心小组件（双击确认版）
+ * 单击 → 提示「再点一次」；600ms 内再点一次 → 记录当日一次同房
+ * （category=intercourse，member=文文，ts=当前时刻）→ 数据实时同步到 APP 日历。
+ * 双击窗口状态存 prefs，失败/超时自动复位。
  */
 class IntercourseWidget : AppWidgetProvider() {
 
@@ -31,11 +32,10 @@ class IntercourseWidget : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == ACTION_RECORD) {
-            // goAsync：broadcast 有 10s 限制，网络请求放后台线程
-            val pending = goAsync()
+            val pending = goAsync()  // broadcast 10s 限制，网络请求放后台线程
             Thread {
                 try {
-                    recordIntercourse(context)
+                    handleTap(context)
                 } finally {
                     pending.finish()
                 }
@@ -52,6 +52,42 @@ class IntercourseWidget : AppWidgetProvider() {
         )
         views.setOnClickPendingIntent(R.id.intercourse_root, pi)
         manager.updateAppWidget(appWidgetId, views)
+    }
+
+    /** 双击判定：600ms 内两次点击 = 记录；第一击只亮提示 */
+    private fun handleTap(context: Context) {
+        val prefs = context.getSharedPreferences("cfg", Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        val last = prefs.getLong(KEY_LAST_TAP, 0L)
+        if (now - last in 1..DOUBLE_CLICK_MS) {
+            // 第二击 → 记录
+            prefs.edit().putLong(KEY_LAST_TAP, 0L).apply()
+            setHint(context, "")
+            recordIntercourse(context)
+        } else {
+            // 第一击 → 亮提示，等待第二击
+            prefs.edit().putLong(KEY_LAST_TAP, now).apply()
+            setHint(context, "再点一次")
+            toast(context, "再点一次确认记录 ❤️")
+            // 2.5s 后若没等到第二击，自动复位提示
+            Thread {
+                Thread.sleep(2500)
+                if (System.currentTimeMillis() - prefs.getLong(KEY_LAST_TAP, 0L) >= DOUBLE_CLICK_MS) {
+                    setHint(context, "")
+                }
+            }.start()
+        }
+    }
+
+    /** 第一击提示（改小组件自身文字，不依赖 Toast 权限） */
+    private fun setHint(context: Context, text: String) {
+        try {
+            val manager = AppWidgetManager.getInstance(context)
+            val views = RemoteViews(context.packageName, R.layout.widget_intercourse)
+            views.setTextViewText(R.id.tv_hint, text)
+            views.setTextViewText(R.id.tv_heart, if (text.isEmpty()) "❤️" else "💗")
+            manager.updateAppWidget(ComponentName(context, IntercourseWidget::class.java), views)
+        } catch (_: Exception) {}
     }
 
     private fun recordIntercourse(context: Context) {
@@ -105,6 +141,8 @@ class IntercourseWidget : AppWidgetProvider() {
     companion object {
         private const val ACTION_RECORD = "com.familyhealth.app.ACTION_RECORD_INTERCOURSE"
         private const val MEMBER = "文文"
+        private const val KEY_LAST_TAP = "ic_last_tap"
+        private const val DOUBLE_CLICK_MS = 600L
         private val JSONArrayEmpty = org.json.JSONArray()
     }
 }
