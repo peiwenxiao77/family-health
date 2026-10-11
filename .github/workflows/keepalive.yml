@@ -39,13 +39,16 @@ jobs:
           echo "body_events select: HTTP $C2"
 
           # 查询 3：health_records 计数（HEAD + Prefer count）
+          # 注意：HEAD + count=exact 的正常响应码就是 206 Partial Content（Content-Range），
+          # v99 修复误报：此前把 206 当失败导致 Actions 标红（2026-10-10 实测库是活的，
+          # 查询 1/2 均为 200，仅此处误判）
           C3=$(curl -sS -o /dev/null -w "%{http_code}" -I "${AUTH[@]}" \
             -H "Prefer: count=exact" \
             "$BASE/health_records?select=id&limit=0") || C3=000
           echo "health_records count: HTTP $C3"
 
           for c in $C1 $C2 $C3; do
-            if [ "$c" != "200" ]; then fail=1; fi
+            if [ "$c" != "200" ] && [ "$c" != "206" ]; then fail=1; fi
           done
 
           if [ $fail -eq 0 ]; then
