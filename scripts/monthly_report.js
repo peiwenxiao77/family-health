@@ -84,7 +84,7 @@ const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
     const regular = sd < 3 ? '周期规律' : sd <= 5 ? '周期基本规律' : '周期波动较大';
     const next = new Date(starts[starts.length - 1].ts + avg * DAY);
     return { member: m, avg: Math.round(avg), sd, regular, next: dayKey(next) };
-  });
+  }).filter(Boolean);
 
   // —— 总结报告（规则解读，不只是数字） ——
   const totalCur = hr.length + be.length;
