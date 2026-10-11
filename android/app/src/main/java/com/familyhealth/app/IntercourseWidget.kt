@@ -13,13 +13,12 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * v105c：1×1 爱心小组件（双击确认版）
- * 单击 → 组件上亮「再点一次」提示；窗口内再点一次 → 记录当日一次同房
+ * v106：1×1「❤️点击记录」小组件，样式改信封+爱心封章（ic_envelope 矢量图）
+ * 双击确认：第一击 → 封章爱心变浅粉(ic_envelope_active)+亮「再点一次」；窗口内再点 → 记录当日一次同房
  * （category=intercourse，member=文文，ts=当前时刻）→ 数据实时同步到 APP 日历。
  *
- * v105c 修复双击始终不记录：v105b 用进程内存变量(@Volatile)记第一击，
- * 但 Android 会在 broadcast 处理完后很快回收进程——第二次点击时进程已重建、
- * 内存清零，永远被当成第一击。改用 SharedPreferences 持久化判定（跨进程存活）。
+ * v105c 起的稳定机制保留：双击状态用 SharedPreferences 持久化（进程回收不清零），
+ * setHint 更新 RemoteViews 时必须重新 setOnClickPendingIntent（否则第一击后组件"死"掉）。
  */
 class IntercourseWidget : AppWidgetProvider() {
 
@@ -87,9 +86,9 @@ class IntercourseWidget : AppWidgetProvider() {
         }
     }
 
-    /** 提示直接改小组件文字（不依赖 Toast，部分 ROM 会静默吞掉后台 toast）。
-     *  v105c 关键修复：updateAppWidget 用全新 RemoteViews 会把 v105b 之前忘掉的
-     *  点击事件一并清掉——第一击之后组件就"死"了，第二击永远收不到广播。
+    /** 提示直接改小组件（不依赖 Toast，部分 ROM 会静默吞掉后台 toast）。
+     *  v106：状态反馈从「❤️/💗文字」改为切换信封图（红心=就绪，浅粉心=等第二击）。
+     *  v105c 关键修复保留：updateAppWidget 用全新 RemoteViews 会把点击事件一并清掉，
      *  这里必须重新 setOnClickPendingIntent */
     private fun setHint(context: Context, text: String) {
         try {
@@ -102,7 +101,10 @@ class IntercourseWidget : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.intercourse_root, pi)
             views.setTextViewText(R.id.tv_hint, text)
-            views.setTextViewText(R.id.tv_heart, if (text.isEmpty()) "❤️" else "💗")
+            views.setImageViewResource(
+                R.id.iv_envelope,
+                if (text.isEmpty()) R.drawable.ic_envelope else R.drawable.ic_envelope_active
+            )
             manager.updateAppWidget(ComponentName(context, IntercourseWidget::class.java), views)
         } catch (_: Exception) {}
     }

@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- v106：小组件样式改为「信封 + 爱心封章」，下方小字提示 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/intercourse_root"
     android:layout_width="match_parent"
@@ -9,15 +10,15 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:gravity="center">
+        android:gravity="center"
+        android:padding="2dp">
 
-        <TextView
-            android:id="@+id/tv_heart"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:text="❤️"
-            android:textSize="26sp" />
+        <ImageView
+            android:id="@+id/iv_envelope"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/ic_envelope"
+            android:contentDescription="点击记录" />
 
         <TextView
             android:id="@+id/tv_hint"
@@ -25,7 +26,7 @@
             android:layout_height="wrap_content"
             android:gravity="center"
             android:text=""
-            android:textSize="9sp"
+            android:textSize="8sp"
             android:textColor="#9D174D"
             android:maxLines="1" />
     </LinearLayout>
