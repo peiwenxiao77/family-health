@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v110: ①设置弹窗重排为四板块(云端备份恢复/数据导出与导入/Supabase/AI)，AI平台固定DashScope+地址模型Key预填+删获取key教程 ②可填项增删移到「管理项目」弹窗(🧩字段按钮)，添加弹窗只保留填写 ③健康速览：痛风标题改「距离上次痛风」删发作文字、❤️卡改「近30天❤️」主值=近30天总数(副行=距上次+今年)、痛风频率图删「跨度越久」 ④删「异常」项目(历史记录仍显示)、锁屏删「清除浏览器数据可重置」、可见「同房」文案全部改❤️ ⑤顶栏同步中下方新增「AI已/未配置」叠放格(点击进AI配置) ⑥经期进行中(最新经期连续<4天)不预测显示「/」(网页+月报脚本) ⑦日历痛经日显示与月经期一致+删除底部经期阶段图例 -->
+<!-- v111: ①SW更新失败报错不再弹窗(静默) ②连续月经记录合并为一次经期显示(全部记录+趋势图: 10.1/10.2/10.3-10.5 → 10.1开始的5天) ③月经预测规则重写: 预存5天预测窗-开始后5天内待定不预测/上次经期不足5天只预测下次月经窗(无卵泡期等)/记满5天才完整预测; 早来/迟来都按5天窗预存; 到期未记录自动判定本轮天数并生成新预测(网页+小组件+月报同步) ④管理项目「🧩字段」改「✏️编辑」弹窗(可增删可填项) ⑤AI识别: 输入未带参考区间时自动补通用正常范围 ⑥身体页趋势分析加一键收起 ⑦小组件: 单日记录默认1天+合并连续记录+经后期, versionCode 5/v1.4 -->
 <!-- v109: ①全部记录按钮列移最右侧(健康:正常/删除;身体:编辑/删除) ②删两处导出键,设置弹窗重构为三板块(Supabase配置/AI配置/数据导出与导入),新增JSON完整备份导出+导入(按id合并),删「第一次用」「建表SQL」,云端备份恢复移入第三板块 ③删除弹窗新增「自选条目」多选批量删除模式(健康+身体页,batchBar悬浮操作条) ④身体页筛选/搜索框高度对齐人名框 ⑤新增自定义可填项系统(所有项目可增删字段,可选项点击即选,定义存localStorage fh_extra_fields,值存payload.extra_fields) -->
 <!-- v108: ①项目管理弹窗❤️项目不再显示「同房」字样(标题空着,符号示意) ②全部记录改版：健康页「正常/删除」上下叠放收窄放最左侧高度居中+记录三行制(图标+人名+项目名+数值/正常值范围/时间)；身体页「编辑/删除」同样上下叠放收窄左侧居中,删除右侧216px预留让出整卡宽度 ③日历所有符号缩小1/4(角标18→13px,compact 8px,tiny 7px,标记6px) ④修复月经趋势图：v92 把最后一条经期整体剔出图导致倒数第二条(如8.30)算不出与9.24的周期——改为shown含最后一条,周期按「下一条来潮」计算,最后一条只显示来潮天数 ⑤配套APK v108：信封圆角化+内缩4dp(约小1/5)；versionCode 3(v1.2) -->
 <!-- v107: 新增 APP 更新推送——APK 构建后 CI 自动发布 releases/latest.apk+version.json 到 Pages；APP 启动 2.5s 后检查(有新版弹窗一键下载安装,经 FileProvider 拉起安装器)+WidgetWorker 每3h后台检查(发系统通知,同版本只提醒一次,Android13+运行时申请通知权限)；versionCode 递增到 2(v1.1)；网页功能无变化(微增部署) -->
@@ -973,9 +973,12 @@
       <!-- 健康速览（v39 重做，原"时间总览"） -->
       <div class="events-overview" id="eventsOverview"></div>
 
-      <!-- 趋势图：大框（v50，同日历记录框样式） -->
+      <!-- 趋势图：大框（v50，同日历记录框样式；v111 加一键收起） -->
       <div style="margin-top:16px;background:white;border-radius:12px;padding:14px;border:1px solid var(--border);">
-        <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:12px;">🎢 趋势分析</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="font-weight:700;font-size:13px;color:var(--text);">🎢 趋势分析</div>
+          <button class="btn-secondary" id="btnToggleEventsCharts" style="font-size:11px;padding:4px 10px;">⇕ 收起</button>
+        </div>
         <div class="mini-charts-grid" id="eventsChartsGrid"></div>
       </div>
 
@@ -2644,6 +2647,65 @@ function openTypesManager() {
   renderTypesMgrList();
   showModal('typesMgrMask');
 }
+// v111：可填项「编辑」弹窗——列表可删（两击确认）、下方可增，改动立即生效
+function openFieldEditModal(key, name) {
+  const old = document.getElementById('fldEditMask');
+  if (old) old.remove();
+  const mask = document.createElement('div');
+  mask.className = 'modal-mask show';
+  mask.id = 'fldEditMask';
+  const renderRows = () => {
+    const defs = getExtraFieldDefsFor(key);
+    return defs.map(f => `
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px dashed var(--border);font-size:13px;">
+        <div style="flex:1;min-width:0;">
+          <b>${escapeHtml(f.label)}</b>
+          <span style="color:var(--text-3);font-size:12px;">${(f.options && f.options.length) ? '可选：' + f.options.map(escapeHtml).join(' / ') : '自由填写'}</span>
+        </div>
+        <span class="fld-ed-del" data-label="${escapeHtml(f.label)}" style="cursor:pointer;font-size:15px;" title="删除这个填项（永久）">🗑</span>
+      </div>`).join('') || '<div style="font-size:12px;color:var(--text-3);padding:8px 0;">暂无可填项，在下方添加</div>';
+  };
+  mask.innerHTML = `
+    <div class="modal" style="max-width:430px;width:92%;">
+      <div style="font-weight:700;font-size:15px;margin-bottom:10px;">🧩 编辑可填项 · ${escapeHtml(name)}</div>
+      <div id="fldEdList">${renderRows()}</div>
+      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+        <input type="text" id="fldEdName" class="preview-input" placeholder="字段名称，如：卧床时间" style="flex:2;min-width:110px;font-size:12px;height:30px;">
+        <input type="text" id="fldEdOpts" class="preview-input" placeholder="可选项（逗号隔开，留空=自由填写）" style="flex:3;min-width:150px;font-size:12px;height:30px;">
+        <button class="btn-primary" id="fldEdAdd" style="font-size:12px;padding:4px 12px;height:30px;">✓ 添加</button>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:12px;"><button class="btn-secondary" id="fldEdClose">关闭</button></div>
+    </div>`;
+  document.body.appendChild(mask);
+  const close = () => mask.remove();
+  mask.addEventListener('click', e => { if (e.target === mask) close(); });
+  mask.querySelector('#fldEdClose').onclick = close;
+  const bindDel = () => {
+    mask.querySelectorAll('.fld-ed-del').forEach(d => {
+      d.onclick = () => {
+        if (!d.dataset.arm) { d.dataset.arm = '1'; d.textContent = '❓'; setTimeout(() => { d.dataset.arm = ''; d.textContent = '🗑'; }, 2500); return; }
+        removeExtraFieldDefFor(key, d.dataset.label);
+        mask.querySelector('#fldEdList').innerHTML = renderRows();
+        bindDel();
+        if (typeof renderBodyTypeSelector === 'function') renderBodyTypeSelector();
+        showToast(`已删除填项「${d.dataset.label}」`);
+      };
+    });
+  };
+  bindDel();
+  mask.querySelector('#fldEdAdd').onclick = () => {
+    const label = mask.querySelector('#fldEdName').value.trim();
+    if (!label) { showToast('请填写字段名称', 'warning'); return; }
+    if (getExtraFieldDefsFor(key).find(f => f.label === label)) { showToast('该填项已存在', 'warning'); return; }
+    const options = mask.querySelector('#fldEdOpts').value.split(/[,，;；]/).map(s => s.trim()).filter(Boolean).slice(0, 8);
+    putExtraFieldDefFor(key, { label, options });
+    mask.querySelector('#fldEdName').value = ''; mask.querySelector('#fldEdOpts').value = '';
+    mask.querySelector('#fldEdList').innerHTML = renderRows();
+    bindDel();
+    if (typeof renderBodyTypeSelector === 'function') renderBodyTypeSelector();
+    showToast(`✓ 已添加填项「${label}」${options.length ? `（${options.length} 个可选项）` : '（自由填写）'}`);
+  };
+}
 function renderTypesMgrList() {
   const wrap = document.getElementById('typesMgrList');
   if (!wrap) return;
@@ -2653,7 +2715,7 @@ function renderTypesMgrList() {
     <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--border);">
       <span style="font-size:20px;width:28px;text-align:center;">${p.icon}</span>
       <span style="flex:1;font-size:13px;font-weight:600;">${p.name}</span>
-      <button class="mgr-fld-btn" data-key="${p.key}" data-name="${p.icon} ${p.name || '❤️'}" title="管理这个项目的可填项">🧩 字段</button>
+      <button class="mgr-fld-btn" data-key="${p.key}" data-name="${p.icon} ${p.name || '❤️'}" title="编辑这个项目的可填项（增删）">✏️ 编辑</button>
       <span style="font-size:10px;color:var(--text-3);background:#f1f5f9;padding:2px 8px;border-radius:999px;">内置</span>
     </div>
   `).join('');
@@ -2661,7 +2723,7 @@ function renderTypesMgrList() {
     <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--border);">
       <button class="mgr-icon-btn" data-id="${escapeHtml(c.id)}" title="点击更换图标">${escapeHtml(c.icon)}</button>
       <span style="flex:1;font-size:13px;font-weight:600;">${escapeHtml(c.name)}</span>
-      <button class="mgr-fld-btn" data-key="${escapeHtml(c.id)}" data-name="${escapeHtml(c.icon)} ${escapeHtml(c.name)}" title="管理这个项目的可填项">🧩 字段</button>
+      <button class="mgr-fld-btn" data-key="${escapeHtml(c.id)}" data-name="${escapeHtml(c.icon)} ${escapeHtml(c.name)}" title="编辑这个项目的可填项（增删）">✏️ 编辑</button>
       <button class="mgr-del-btn" data-id="${escapeHtml(c.id)}" title="删除该项目">🗑</button>
     </div>
   `).join('');
@@ -2699,58 +2761,9 @@ function renderTypesMgrList() {
   wrap.querySelectorAll('.mgr-del-btn').forEach(btn => {
     btn.onclick = () => deleteCustomEventTypeFlow(btn.dataset.id, () => renderTypesMgrList());
   });
-  // v110：可填项管理（新增/删除字段+可选项）——从添加弹窗移到这里
+  // v111：可填项「编辑」——点击打开独立编辑弹窗（可增删字段+可选项）
   wrap.querySelectorAll('.mgr-fld-btn').forEach(btn => {
-    btn.onclick = () => {
-      const key = btn.dataset.key;
-      const existing = wrap.querySelector('.mgr-fld-panel');
-      if (existing && existing.dataset.key === key) { existing.remove(); return; }
-      wrap.querySelectorAll('.mgr-fld-panel').forEach(p => p.remove());
-      const panel = document.createElement('div');
-      panel.className = 'mgr-fld-panel';
-      panel.dataset.key = key;
-      panel.style.cssText = 'background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:10px;margin:6px 0;';
-      const defs = getExtraFieldDefsFor(key);
-      const defRows = defs.map(f => `
-        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;">
-          <b>${escapeHtml(f.label)}</b>
-          <span style="flex:1;color:var(--text-3);">${(f.options && f.options.length) ? '可选：' + f.options.map(escapeHtml).join(' / ') : '自由填写'}</span>
-          <span class="mgr-fld-del" data-label="${escapeHtml(f.label)}" style="cursor:pointer;" title="删除这个填项（永久）">🗑</span>
-        </div>
-      `).join('');
-      panel.innerHTML = `
-        <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:4px;">${escapeHtml(btn.dataset.name)} · 可填项（新增后每次记录该项目都会出现）</div>
-        <div class="mgr-fld-list">${defRows || '<div style="font-size:12px;color:var(--text-3);padding:4px 0;">暂无可填项</div>'}</div>
-        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
-          <input type="text" class="preview-input mgr-fld-name" placeholder="字段名称，如：卧床时间" style="flex:2;min-width:110px;font-size:12px;height:28px;padding:2px 8px;">
-          <input type="text" class="preview-input mgr-fld-opts" placeholder="可选项（逗号隔开，留空=自由填写）" style="flex:3;min-width:150px;font-size:12px;height:28px;padding:2px 8px;">
-          <button class="btn-primary mgr-fld-save" style="font-size:12px;padding:4px 12px;height:28px;">✓ 添加</button>
-        </div>`;
-      btn.closest('div').after(panel);
-      // 删除字段：两击确认
-      panel.querySelectorAll('.mgr-fld-del').forEach(d => {
-        d.onclick = () => {
-          if (!d.dataset.arm) {
-            d.dataset.arm = '1'; d.textContent = '❓';
-            setTimeout(() => { d.dataset.arm = ''; d.textContent = '🗑'; }, 2500);
-            return;
-          }
-          removeExtraFieldDefFor(key, d.dataset.label);
-          renderTypesMgrList();
-          showToast(`已删除填项「${d.dataset.label}」`);
-        };
-      });
-      // 保存新字段
-      panel.querySelector('.mgr-fld-save').onclick = () => {
-        const label = panel.querySelector('.mgr-fld-name').value.trim();
-        if (!label) { showToast('请填写字段名称', 'warning'); return; }
-        if (getExtraFieldDefsFor(key).find(f => f.label === label)) { showToast('该填项已存在', 'warning'); return; }
-        const options = panel.querySelector('.mgr-fld-opts').value.split(/[,，;；]/).map(s => s.trim()).filter(Boolean).slice(0, 8);
-        putExtraFieldDefFor(key, { label, options });
-        renderTypesMgrList();
-        showToast(`✓ 已添加填项「${label}」${options.length ? `（${options.length} 个可选项）` : '（自由填写）'}`);
-      };
-    };
+    btn.onclick = () => openFieldEditModal(btn.dataset.key, btn.dataset.name);
   });
 }
 async function deleteCustomEventTypeFlow(id, after) {
@@ -4847,7 +4860,8 @@ async function callLLM(text, imageBase64) {
 - 忽略「姓名」「性别」「年龄」「送检日期」「送检医生」这类元数据
 - 如果某行无法解析为「指标+值」，跳过
 - 对于「正常」「阴性」「阴性(-)」这类值，rangeLow/rangeHigh 填空字符串
-- 数字结果（如 5.0、1.027）尽量转为 JSON number 类型，但如果是「1-3」「0-5」这种范围，原样保留为字符串`;
+- 数字结果（如 5.0、1.027）尽量转为 JSON number 类型，但如果是「1-3」「0-5」这种范围，原样保留为字符串
+- 参考区间规则：若输入中已给出参考区间，原样提取；若输入中【没有】给出，请根据通用医学常识补上该指标的常用成人正常参考区间（range 填如 "150-430 μmol/L（通用参考）"，rangeLow/rangeHigh 填对应数字）；只有确实无法确定时才留空字符串。这样每条记录都能自带正常范围，便于后续自动判断正常/异常`;
 
   let userContent;
   if (imageBase64) {
@@ -5080,8 +5094,11 @@ window.addEventListener('error', (e) => {
   showErrorBar(e.message || '未知错误', e.filename, e.lineno);
 });
 window.addEventListener('unhandledrejection', (e) => {
+  const msg = (e.reason && e.reason.message) || String(e.reason || '');
+  // SW 更新失败（网络抖动/CDN 缓存）属正常现象，静默处理不打扰用户
+  if (/ServiceWorker|serviceWorker|sw\.js/i.test(msg)) { console.warn('[SW更新失败-已忽略]', msg); e.preventDefault(); return; }
   console.error('[Promise错误]', e.reason);
-  showErrorBar((e.reason && e.reason.message) || String(e.reason), 'Promise', 0);
+  showErrorBar(msg, 'Promise', 0);
 });
 
 function showErrorBar(msg, file, line) {
@@ -5102,8 +5119,8 @@ function showErrorBar(msg, file, line) {
 if ('serviceWorker' in navigator && !location.search.includes('debug=1')) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').then(reg => {
-      // 检查更新
-      reg.update();
+      // 检查更新；网络抖动时更新失败属正常，静默处理
+      reg.update().catch(() => {});
     }).catch(err => console.log('SW 注册失败：', err));
   });
 }
@@ -5371,6 +5388,16 @@ bindClick('btnToggleEventsList', () => {
   b.textContent = hide ? '⇕ 展开' : '⇕ 收起';
 }, 'toggle 身体全部记录');
 
+// v111：身体页趋势分析大框架一键收起/展开
+bindClick('btnToggleEventsCharts', () => {
+  const w = document.getElementById('eventsChartsGrid');
+  const b = document.getElementById('btnToggleEventsCharts');
+  if (!w || !b) return;
+  const hide = w.style.display !== 'none';
+  w.style.display = hide ? 'none' : '';
+  b.textContent = hide ? '⇕ 展开' : '⇕ 收起';
+}, 'toggle 身体趋势分析');
+
 /* ============================================================
    月经月历：双月视图 + range 选择 + 周期预测
    ============================================================ */
@@ -5428,53 +5455,101 @@ function cycleRegularityLabel(sd) {
 }
 
 // 计算下一次月经 + 各时期
-/* v110：最新一次月经正在进行中（今天落在最新一次经期范围内；未记结束日时按开始后 3 天内
-   视为进行中——即「记录连续时间在 4 天以下」的正在经期状态）→ 不做经期预测，显示「/」 */
-function isMenstrualOngoing(starts) {
-  if (!starts || !starts.length) return false;
-  const last = starts[starts.length - 1];
-  const today = startOfDay(Date.now()).getTime();
-  const s = startOfDay(last.ts).getTime();
-  const e = last.end_ts ? startOfDay(last.end_ts).getTime() : s + 3 * 86400000;
-  return today >= s && today <= e;
+/* v111 预测规则（重写）：
+   ① 预存预测月经天数固定 5 天（MENSTRUAL_PRED_DAYS）
+   ② 最近一次经期开始后 5 天内为「进行中/待定」：不生成周期预测；
+      日历/小组件把待定窗内未记录的日子显示为「预测月经期」
+   ③ 待定结束（开始日+5 当天回看）判定本轮经期天数 = 实际记录天数：
+      - 记满 ≥5 天 → 完整预测（下次月经窗 + 卵泡期/排卵日/排卵期/黄体期）
+      - 不足 5 天 → 只预测下次月经窗（开始日起 5 天），不出现卵泡期等阶段预测
+   ④ 预测的下次月经开始日 = 上次开始日 + 平均周期（不受本轮经期实际天数影响） */
+
+// 预存预测月经天数（v111：固定 5 天）
+const MENSTRUAL_PRED_DAYS = 5;
+
+// v111：把同一成员连续/重叠的月经记录合并为一次次经期
+// 如分别记录 10.1、10.2、10.3-10.5 三条 → 合并为 10.1~10.5 一次经期（5 天）
+function getMenstrualPeriods(member) {
+  const evs = bodyEvents.filter(e => {
+    if (e.category !== 'menstrual') return false;
+    if (member && member !== 'all' && e.member !== member) return false;
+    const p = e.payload || {};
+    return p.is_period_start || p.is_period_start === undefined;  // 老数据兼容
+  }).sort((a, b) => a.ts - b.ts);
+  const spans = [];
+  for (const e of evs) {
+    const s = startOfDay(e.ts).getTime();
+    const en = e.end_ts ? startOfDay(e.end_ts).getTime() : s;   // 单日记录 end=ts
+    const last = spans[spans.length - 1];
+    // 与上一段同成员且重叠/相邻（间隔 ≤1 天）→ 合并
+    if (last && e.member === last.member && s <= last.end_ts + 1.5 * 86400000) {
+      last.end_ts = Math.max(last.end_ts, en);
+      last.events.push(e);
+    } else {
+      spans.push({ ts: s, end_ts: Math.max(s, en), member: e.member, events: [e] });
+    }
+  }
+  spans.forEach(sp => { sp.days = Math.round((sp.end_ts - sp.ts) / 86400000) + 1; });
+  return spans;
 }
 
-function computeCyclePrediction(starts) {
-  if (starts.length < 2) return null;
-  if (isMenstrualOngoing(starts)) return null;  // v110：经期进行中不预测
-  const stat = computeAvgCycle(starts);
+// v111：经期进行中/待定——最近一次经期开始日起，到 max(记录结束日, 开始日+预存5天-1) 之间
+function isMenstrualOngoing(periods) {
+  if (!periods || !periods.length) return false;
+  const last = periods[periods.length - 1];
+  const today = startOfDay(Date.now()).getTime();
+  const pendEnd = Math.max(last.end_ts, last.ts + (MENSTRUAL_PRED_DAYS - 1) * 86400000);
+  return today >= last.ts && today <= pendEnd;
+}
+
+function computeCyclePrediction(periods) {
+  if (!periods || periods.length < 2) return null;
+  const stat = computeAvgCycle(periods);
   if (!stat) return null;  // v66：所有周期间隔都被判为离群时无法预测
-  const last = starts[starts.length - 1];
-  const lastPeriodDays = last.end_ts ? Math.max(1, Math.round((startOfDay(last.end_ts) - startOfDay(last.ts)) / 86400000) + 1) : 5;  // v68：含尾日（预测来潮天数同步修正）
+  const last = periods[periods.length - 1];
+  const today = startOfDay(Date.now()).getTime();
+  const predDays = MENSTRUAL_PRED_DAYS;
+
+  // ① 进行中/待定：本轮经期尚未判定结束
+  const pendEnd = Math.max(last.end_ts, last.ts + (predDays - 1) * 86400000);
+  if (today >= last.ts && today <= pendEnd) {
+    return {
+      mode: 'pending',
+      avgCycle: Math.round(stat.avg),
+      lastStart: new Date(last.ts),
+      lastDays: last.days,
+      pendingStart: new Date(last.ts),
+      pendingEnd: new Date(pendEnd),
+      predDays,
+    };
+  }
+
+  const lastDays = last.days;   // 已判定的本轮经期实际天数
   const cycle = stat.avg;
-
   const nextStart = new Date(last.ts + cycle * 86400000);
-  // 排卵日 = 下次月经前 14 天
-  const ovulationDay = new Date(nextStart.getTime() - 14 * 86400000);
-  // 排卵期窗口 = 排卵日前 5 天到后 1 天（共 7 天）
-  const ovulationWindowStart = new Date(ovulationDay.getTime() - 5 * 86400000);
-  const ovulationWindowEnd = new Date(ovulationDay.getTime() + 1 * 86400000);
-  // 卵泡期 = 月经结束后到排卵前
-  const follicularStart = new Date(last.ts + lastPeriodDays * 86400000);
-  // 黄体期 = 排卵日后到下次月经前
-  const lutealStart = new Date(ovulationDay.getTime() + 1 * 86400000);
-
-  return {
+  const base = {
     avgCycle: Math.round(cycle),
     minCycle: Math.round(stat.min),
     maxCycle: Math.round(stat.max),
-    lastPeriodDays,
+    lastPeriodDays: lastDays,
     lastStart: new Date(last.ts),
     nextStart,
-    follicularStart,
-    ovulationDay,
-    ovulationWindowStart,
-    ovulationWindowEnd,
-    lutealStart,
+    predDays,
     cycleCount: stat.cycles.length,   // v66：有效周期数
     excludedCount: stat.excluded,     // v66：被剔除的离群周期数
     cycleSd: stat.sd,                 // v66：标准差（规律度）
   };
+  if (lastDays >= predDays) {
+    // ② 完整预测：上次经期记满 5 天 → 卵泡期/排卵日/排卵期/黄体期正常出现
+    const ovulationDay = new Date(nextStart.getTime() - 14 * 86400000);
+    const ovulationWindowStart = new Date(ovulationDay.getTime() - 5 * 86400000);
+    const ovulationWindowEnd = new Date(ovulationDay.getTime() + 1 * 86400000);
+    const follicularStart = new Date(last.end_ts + 86400000);  // 经期结束次日
+    const lutealStart = new Date(ovulationDay.getTime() + 1 * 86400000);
+    return { ...base, mode: 'full', follicularStart, ovulationDay, ovulationWindowStart, ovulationWindowEnd, lutealStart };
+  }
+  // ③ 简化预测：上次经期不足 5 天 → 只预测下次月经窗，无各期预测
+  return { ...base, mode: 'period-only' };
 }
 
 function dateKey(d) {
@@ -5513,17 +5588,30 @@ function renderMenstrualCalendar() {
   labelEl.textContent = `${m1.getFullYear()}年${m1.getMonth()+1}-${m2.getMonth()+1}月`;
 
   const member = currentEventsMemberFilter;
-  const starts = getMenstrualStarts(member);
+  const periods = getMenstrualPeriods(member);
   const predictedKeys = {};   // dateKey -> phase label
-  const prediction = computeCyclePrediction(starts);
+  const prediction = computeCyclePrediction(periods);
   if (prediction) {
-    const phases = [
-      { from: prediction.nextStart, to: new Date(prediction.nextStart.getTime() + (prediction.lastPeriodDays - 1) * 86400000), phase: 'menstrual-predicted' },
-      { from: prediction.follicularStart, to: new Date(prediction.ovulationWindowStart.getTime() - 86400000), phase: 'follicular' },
-      { from: prediction.ovulationWindowStart, to: new Date(prediction.ovulationWindowEnd.getTime() - 86400000), phase: 'ovulation-window' },
-      { from: prediction.ovulationDay, to: prediction.ovulationDay, phase: 'ovulation-day' },
-      { from: prediction.lutealStart, to: new Date(prediction.nextStart.getTime() - 86400000), phase: 'luteal' },
-    ];
+    const phases = [];
+    if (prediction.mode === 'pending') {
+      // v111：待定窗内未记录的日 → 预测月经期（已记录日由 recordedKeys 覆盖）
+      const from = prediction.pendingStart.getTime() + prediction.lastDays * 86400000;  // 记录结束次日
+      if (from <= prediction.pendingEnd.getTime()) {
+        phases.push({ from: new Date(from), to: prediction.pendingEnd, phase: 'menstrual-predicted' });
+      }
+    } else {
+      // 预测的下次月经窗 = 开始日起预存 5 天（v111 固定）
+      phases.push({ from: prediction.nextStart, to: new Date(prediction.nextStart.getTime() + (prediction.predDays - 1) * 86400000), phase: 'menstrual-predicted' });
+      if (prediction.mode === 'full') {
+        // v111：仅当上次经期记满 5 天才出现各期预测
+        phases.push(
+          { from: prediction.follicularStart, to: new Date(prediction.ovulationWindowStart.getTime() - 86400000), phase: 'follicular' },
+          { from: prediction.ovulationWindowStart, to: new Date(prediction.ovulationWindowEnd.getTime() - 86400000), phase: 'ovulation-window' },
+          { from: prediction.ovulationDay, to: prediction.ovulationDay, phase: 'ovulation-day' },
+          { from: prediction.lutealStart, to: new Date(prediction.nextStart.getTime() - 86400000), phase: 'luteal' },
+        );
+      }
+    }
     phases.forEach(p => {
       for (let d = new Date(p.from); d <= p.to; d.setDate(d.getDate() + 1)) {
         const k = dateKey(d);
@@ -6510,12 +6598,10 @@ function renderPeriodReminder() {
   const msgs = [];
   (familyMembers || []).forEach(m => {
     if (m === 'all') return;
-    const starts = getMenstrualStarts(m);
-    if (starts.length < 2) return;
-    // 该成员月经正在进行中（今天仍处于某次月经期内）→ 不提醒"即将开始"
-    const ongoing = bodyEvents.some(e => e.category === 'menstrual' && e.member === m && expandEventToDateKeys(e).has(dateKey(today)));
-    if (ongoing) return;
-    const pred = computeCyclePrediction(starts);
+    const periods = getMenstrualPeriods(m);
+    if (periods.length < 2) return;
+    const pred = computeCyclePrediction(periods);
+    // v111：进行中/待定（无 nextStart）或简化预测都正常提醒；pending 模式无 nextStart 自然跳过
     if (!pred || !pred.nextStart) return;
     const diff = Math.round((startOfDay(pred.nextStart.getTime()) - today) / 86400000);
     if (diff === 0) msgs.push(`🌷 预测 <b>${escapeHtml(m)}</b> 的月经<b>今天</b>开始（平均周期 ${pred.avgCycle} 天）`);
@@ -6553,25 +6639,26 @@ function renderEventsOverview() {
     return;
   }
 
-  // ① 下次月经预测（v110：经期进行中显示「/」，不预测）
-  const starts = getMenstrualStarts('all');
-  const pred = computeCyclePrediction(starts);
+  // ① 下次月经预测（v111：合并经期 + 待定窗显示「/」+ 上次不足5天只预测经期窗）
+  const periods = getMenstrualPeriods('all');
+  const pred = computeCyclePrediction(periods);
   let periodVal = '—', periodSub = '记录 2 次月经后可预测', periodColor = 'var(--text)';
-  if (isMenstrualOngoing(starts)) {
+  if (pred && pred.mode === 'pending') {
     periodVal = '/';
     periodSub = '月经期间，暂不预测';
   } else if (pred) {
     const daysTo = Math.ceil((pred.nextStart.getTime() - now) / dayMs);
     const fmt = d => `${d.getMonth() + 1}/${d.getDate()}`;
+    const modeNote = pred.mode === 'period-only' ? ' · 上次经期不足5天，暂无各期预测' : '';
     if (daysTo > 0) {
       periodVal = `还有 ${daysTo} 天`;
-      periodSub = `预测 ${fmt(pred.nextStart)} 来潮 · 周期约 ${pred.avgCycle} 天`;
+      periodSub = `预测 ${fmt(pred.nextStart)} 来潮（${pred.predDays} 天）· 周期约 ${pred.avgCycle} 天${modeNote}`;
     } else if (daysTo === 0) {
       periodVal = '就是今天';
-      periodSub = `预测今天来潮 · 周期约 ${pred.avgCycle} 天`;
+      periodSub = `预测今天来潮（${pred.predDays} 天）· 周期约 ${pred.avgCycle} 天${modeNote}`;
     } else {
       periodVal = `推迟 ${-daysTo} 天`;
-      periodSub = `原预测 ${fmt(pred.nextStart)} · 周期约 ${pred.avgCycle} 天`;
+      periodSub = `原预测 ${fmt(pred.nextStart)} · 周期约 ${pred.avgCycle} 天${modeNote}`;
       periodColor = '#be123c';
     }
   }
@@ -6661,12 +6748,22 @@ function renderEventsList() {
   const evSortKey = e => (evSortKind === 'fill' ? getFillTs(e) : e.ts);
   list.sort((a, b) => evSortDir === 'asc' ? evSortKey(a) - evSortKey(b) : evSortKey(b) - evSortKey(a));
 
+  // v111：连续月经记录合并显示——非主记录默认隐藏（删除模式仍逐条显示，便于批量删）
+  let spanOf = null, primaryOf = null;
+  if (delMode !== 'body' && (!currentEventsCategoryFilter || currentEventsCategoryFilter === 'menstrual')) {
+    spanOf = new Map(); primaryOf = new Set();
+    getMenstrualPeriods(currentEventsMemberFilter).forEach(sp => {
+      sp.events.forEach((e, i) => { spanOf.set(e.id, sp); if (i === 0) primaryOf.add(e.id); });
+    });
+    list = list.filter(e => !(spanOf.has(e.id) && !primaryOf.has(e.id)));
+  }
+
   if (list.length === 0) {
     wrap.innerHTML = `<div style="text-align:center;color:var(--text-3);padding:30px 0;">${bodyEvents.length === 0 ? '📝 还没有记录<br><span style="font-size:12px;">点右上角 ➕ 添加 开始记录</span>' : '没有匹配的记录'}</div>`;
     return;
   }
 
-  wrap.innerHTML = list.slice(0, 50).map(ev => renderEventCard(ev)).join('');
+  wrap.innerHTML = list.slice(0, 50).map(ev => renderEventCard(ev, (spanOf && primaryOf.has(ev.id)) ? spanOf.get(ev.id) : null)).join('');
   // v109：多选删除模式下整条点击切换勾选
   if (delMode === 'body') {
     wrap.querySelectorAll('.event-card.del-mode').forEach(item => {
@@ -6701,17 +6798,29 @@ function renderEventsList() {
   });
 }
 
-function renderEventCard(ev) {
+function renderEventCard(ev, spanInfo) {
   const meta = getEventCategoryMeta(ev.category);
   const dur = getEventDurationStr(ev);
   // v96：两行制——第一行 = 人名 + 项目名；第二行 = 其它记录内容（时长/位置/痛感/用药/AI字段等）
   const isCustom = ev.category === 'custom' || (ev.category && ev.category.startsWith && ev.category.startsWith('cust_'));
-  const projectName = isCustom ? ((ev.payload && ev.payload.custom_name) || meta.label) : meta.label;
+  let projectName = isCustom ? ((ev.payload && ev.payload.custom_name) || meta.label) : meta.label;
   const chips = [];
-  if (dur) chips.push(`<span class="event-meta-chip">⏱ ${dur}</span>`);
-  if (ev.category === 'menstrual') {
-    if (ev.payload.dysmenorrhea_dates && ev.payload.dysmenorrhea_dates.length) {
-      chips.push(`<span class="event-meta-chip" style="background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b;">🔥 痛经 ${ev.payload.dysmenorrhea_dates.length} 天</span>`);
+  // v111：连续月经记录合并显示——「10.1 开始的 5 天月经」（痛经天数跨同次经期合并统计）
+  if (ev.category === 'menstrual' && spanInfo) {
+    const sD = new Date(spanInfo.ts), eD = new Date(spanInfo.end_ts);
+    projectName = `${meta.label}（${sD.getMonth() + 1}/${sD.getDate()} 开始的 ${spanInfo.days} 天）`;
+    chips.push(`<span class="event-meta-chip">⏱ ${sD.getMonth() + 1}/${sD.getDate()}–${eD.getMonth() + 1}/${eD.getDate()}</span>`);
+    const dysSet = new Set();
+    spanInfo.events.forEach(se => {
+      if (se.payload && Array.isArray(se.payload.dysmenorrhea_dates)) se.payload.dysmenorrhea_dates.forEach(k => dysSet.add(k));
+    });
+    if (dysSet.size) chips.push(`<span class="event-meta-chip" style="background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b;">🔥 痛经 ${dysSet.size} 天</span>`);
+  } else {
+    if (dur) chips.push(`<span class="event-meta-chip">⏱ ${dur}</span>`);
+    if (ev.category === 'menstrual') {
+      if (ev.payload.dysmenorrhea_dates && ev.payload.dysmenorrhea_dates.length) {
+        chips.push(`<span class="event-meta-chip" style="background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b;">🔥 痛经 ${ev.payload.dysmenorrhea_dates.length} 天</span>`);
+      }
     }
   }
   if (ev.category === 'gout') {
@@ -6827,12 +6936,14 @@ function renderEventsCharts() {
   const charts = [];
   // 1. 月经周期趋势（v90：按家人分组，一人两条线——实线=周期天数、虚线=来潮天数）
   //    时间范围自适应（与痛风频率图同逻辑 v39）：周期数超过 24 个（两年）→ 每人只显示最近 24 个周期
-  const menstrual = bodyEvents.filter(e => e.category === 'menstrual' && e.payload?.is_period_start !== false).sort((a,b) => a.ts - b.ts);
+  //    v111：先合并连续记录（10.1、10.2、10.3-10.5 → 一次 5 天经期），图表每个经期一个点
   const menstrualByMember = new Map();
-  menstrual.forEach(e => {
-    if (!menstrualByMember.has(e.member)) menstrualByMember.set(e.member, []);
-    menstrualByMember.get(e.member).push(e);
+  getMenstrualPeriods('all').forEach(sp => {
+    if (!menstrualByMember.has(sp.member)) menstrualByMember.set(sp.member, []);
+    menstrualByMember.get(sp.member).push({ ts: sp.ts, end_ts: sp.end_ts, payload: { duration_days: sp.days } });
   });
+  const menstrual = [];
+  menstrualByMember.forEach(l => menstrual.push(...l));
   if (menstrual.length >= 2) {
     // v75：APP 端不截断（横向滑动查看全部）；网页端保持近 24 个周期（约两年）
     const CYCLES_CAP = IN_APP ? Infinity : 24;

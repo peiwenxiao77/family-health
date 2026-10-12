@@ -130,8 +130,8 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                         val m = o.optString("member", "")
                         val dur = when (val d = p?.opt("duration_days")) {
                             is Number -> d.toInt()
-                            is String -> d.toIntOrNull() ?: 5
-                            else -> 5
+                            is String -> d.toIntOrNull() ?: 1
+                            else -> 1  // v111：单日记录默认 1 天（原默认 5 天会与连续合并逻辑冲突）
                         }.coerceIn(1, 14)
                         byMember.getOrPut(m) { mutableListOf() }.add(Pair(ts, dur))
                     }
@@ -141,10 +141,21 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                         infoText = "在APP里记录一次月经"
                     } else {
                         val latest = byMember.values.maxByOrNull { it.maxOfOrNull { p -> p.first } ?: 0L }!!
-                        val sorted = latest.map { startOfDay(it.first) }.sorted()
-                        val lastDur = latest.maxByOrNull { it.first }!!.second
+                        // v111：合并连续/重叠记录（10.1、10.2、10.3-10.5 → 一次 5 天经期）
+                        val merged = ArrayList<Pair<Long, Int>>()
+                        latest.sortedBy { it.first }.forEach { (rawTs, d) ->
+                            val s = startOfDay(rawTs)
+                            val end = s + (d - 1) * DAY
+                            val last = merged.lastOrNull()
+                            if (last != null && s <= last.first + (last.second - 1) * DAY + DAY) {
+                                val newEnd = maxOf(last.first + (last.second - 1) * DAY, end)
+                                merged[merged.size - 1] = Pair(last.first, (((newEnd - last.first) / DAY).toInt() + 1).coerceIn(1, 14))
+                            } else {
+                                merged.add(Pair(s, d))
+                            }
+                        }
                         // 与网页同步——剔除 15~45 天外离群周期 + 最近 6 个有效周期加权平均(6:5:4:3:2:1)
-                        val allGaps = sorted.zipWithNext { a, b -> ((b - a) / DAY).toInt() }
+                        val allGaps = merged.zipWithNext { a, b -> ((b.first - a.first) / DAY).toInt() }
                         val validGaps = allGaps.filter { it in 15..45 }
                         val avg = when {
                             validGaps.isEmpty() -> 28
@@ -159,19 +170,28 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                             }
                             else -> (validGaps.sum().toDouble() / validGaps.size).toInt().coerceIn(15, 45)
                         }
-                        val last0 = sorted.last()
+                        val last0 = merged.last().first
+                        val lastDur = merged.last().second
                         val today0 = startOfDay(System.currentTimeMillis())
                         val dayIn = ((today0 - last0) / DAY).toInt() + 1
                         val next0 = last0 + avg * DAY
                         val daysLeft = ((next0 - today0) / DAY).toInt()
                         val ovu = avg - 14
-                        // v91：排卵日单独显示（与网页日历一致），配色统一为莫兰迪
+                        /* v111 预测规则（与网页同步）：
+                           预存预测月经天数固定 5 天；开始后 5 天内为待定窗（显示月经期）；
+                           待定结束后：本轮记满 ≥5 天 → 正常卵泡期/排卵日/排卵期/黄体期预测；
+                           不足 5 天 → 只预测下次月经窗（无各期预测，中间显示「经后期」） */
+                        val PRED = 5
                         val phase = when {
-                            dayIn <= lastDur -> "月经期"
+                            dayIn <= lastDur -> "月经期"                    // 已记录的经期
+                            lastDur < PRED && dayIn <= PRED -> "月经期"      // 待定窗内（本轮未判定结束）
+                            lastDur < PRED && dayIn >= avg -> "月经期"       // 简化模式：预测的下次月经窗
+                            lastDur < PRED -> "经后期"                       // 简化模式：经期外、预测窗前
                             dayIn == ovu -> "排卵日"
                             dayIn in (ovu - 2)..(ovu + 2) -> "排卵期"
                             dayIn < ovu - 2 -> "卵泡期"
-                            else -> "黄体期"
+                            dayIn < avg -> "黄体期"
+                            else -> "月经期"                                 // 记满5天且已进入预测窗（推迟）
                         }
                         // 顶部药丸 = 时期（按时期配色）
                         pillText = phase

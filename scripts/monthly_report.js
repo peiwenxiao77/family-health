@@ -65,19 +65,30 @@ const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
     return `**${m}**：身体事件 ${beStr}；健康测量 ${hrStr}`;
   });
 
-  // 月经预测（近几个有效周期加权平均，与网页版逻辑一致）
+  // 月经预测（v111：先合并连续记录，再按预存 5 天窗规则，与网页版逻辑一致）
   const predictions = allMembers.map(m => {
-    const starts = beRaw.filter(e => e.category === 'menstrual' && e.member === m && (e.payload?.is_period_start !== false)).sort((a, b) => a.ts - b.ts);
-    if (starts.length < 2) return null;
-    // v110：经期进行中不预测（与网页版一致）——今天落在最新一次经期范围内（未记结束日按开始后 3 天内）则跳过
-    const lastP = starts[starts.length - 1];
-    const todayK = dayKey(new Date());
-    const sK = dayKey(new Date(lastP.ts));
-    const eK = lastP.end_ts ? dayKey(new Date(lastP.end_ts)) : dayKey(new Date(lastP.ts + 3 * DAY));
-    if (todayK >= sK && todayK <= eK) return null;
+    const evs = beRaw.filter(e => e.category === 'menstrual' && e.member === m && (e.payload?.is_period_start !== false)).sort((a, b) => a.ts - b.ts);
+    if (evs.length < 1) return null;
+    // v111：合并连续/重叠记录（如 10.1、10.2、10.3-10.5 三条 → 一次 5 天经期）
+    const spans = [];
+    for (const e of evs) {
+      const s = new Date(e.ts); s.setHours(0, 0, 0, 0);
+      const en = e.end_ts ? (() => { const d = new Date(e.end_ts); d.setHours(0, 0, 0, 0); return d; })() : new Date(s);
+      const last = spans[spans.length - 1];
+      if (last && s.getTime() <= last.end.getTime() + 1.5 * DAY) {
+        last.end = new Date(Math.max(last.end.getTime(), en.getTime()));
+      } else spans.push({ start: new Date(s), end: new Date(Math.max(s.getTime(), en.getTime())) });
+    }
+    spans.forEach(sp => { sp.days = Math.round((sp.end - sp.start) / DAY) + 1; });
+    if (spans.length < 2) return null;
+    // v111：进行中/待定（最近经期开始后 5 天内或记录未结束）不预测，与网页版一致
+    const lastP = spans[spans.length - 1];
+    const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+    const pendEnd = Math.max(lastP.end.getTime(), lastP.start.getTime() + 4 * DAY);
+    if (today0.getTime() >= lastP.start.getTime() && today0.getTime() <= pendEnd) return null;
     const gaps = [];
-    for (let i = 1; i < starts.length; i++) {
-      const d = Math.round((starts[i].ts - starts[i - 1].ts) / DAY);
+    for (let i = 1; i < spans.length; i++) {
+      const d = Math.round((spans[i].start - spans[i - 1].start) / DAY);
       if (d >= 15 && d <= 45) gaps.push(d);
     }
     if (!gaps.length) return null;
@@ -88,8 +99,11 @@ const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
     const mean = gaps.reduce((s, v) => s + v, 0) / gaps.length;
     const sd = Math.sqrt(gaps.reduce((s, v) => s + (v - mean) ** 2, 0) / gaps.length);
     const regular = sd < 3 ? '周期规律' : sd <= 5 ? '周期基本规律' : '周期波动较大';
-    const next = new Date(starts[starts.length - 1].ts + avg * DAY);
-    return { member: m, avg: Math.round(avg), sd, regular, next: dayKey(next) };
+    const next = new Date(spans[spans.length - 1].start.getTime() + avg * DAY);
+    // v111：上次经期不足 5 天 → 只预测下次月经窗，无卵泡期等各期预测
+    const lastDays = lastP.days;
+    const note = lastDays >= 5 ? '' : `（上次经期仅 ${lastDays} 天，暂无卵泡期等各期预测）`;
+    return { member: m, avg: Math.round(avg), sd, regular, next: dayKey(next), note };
   }).filter(Boolean);
 
   // —— 总结报告（规则解读，不只是数字） ——
@@ -106,7 +120,7 @@ const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
 
   // 月经总结
   predictions.forEach(p => {
-    summaryLines.push(`🌷 **${p.member}**：平均周期 ${p.avg} 天，${p.regular}（波动 ${p.sd.toFixed(1)} 天）；预测下次 **${p.next}**`);
+    summaryLines.push(`🌷 **${p.member}**：平均周期 ${p.avg} 天，${p.regular}（波动 ${p.sd.toFixed(1)} 天）；预测下次 **${p.next}**${p.note || ''}`);
   });
 
   // 痛风总结
