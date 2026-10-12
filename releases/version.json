@@ -1,7 +1,7 @@
 {
-  "version_code": 9,
-  "version_name": "1.8",
+  "version_code": 10,
+  "version_name": "1.9",
   "apk_url": "https://peiwenxiao77.github.io/family-health/releases/latest.apk",
-  "notes": "v115: 趋势分析恢复图标原高度改压矮图表容器;修复信封小组件白底灰圈(Space控件不兼容RemoteViews,改TextView占位);新增跨天自动刷新链(每天00:02自续刷新,无需打开APP); versionCode 9/v1.8, sw v30",
-  "updated_at": "2026-10-12T13:01:00Z"
+  "notes": "v116: 信封小组件增大1/5(0.6→0.72)+圆角加大(4.3→5.8)+提示文字权重同步;月经小组件圆点/药丸分区与网页日历完全对齐——排卵日=下次月经前14天即周期第n-13天(原n-14少算一天),排卵窗=排卵日前5天到后1天(原±2); versionCode 10/v1.9",
+  "updated_at": "2026-10-12T14:37:35Z"
 }
