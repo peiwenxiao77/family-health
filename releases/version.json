@@ -1,7 +1,7 @@
 {
-  "version_code": 4,
-  "version_name": "1.3",
+  "version_code": 5,
+  "version_name": "1.4",
   "apk_url": "https://peiwenxiao77.github.io/family-health/releases/latest.apk",
-  "notes": "v109: 记录按钮右置+设置弹窗三板块(数据导出/导入JSON备份/删教程SQL)+自选条目多选删除(健康+身体)+身体筛选框高度对齐+自定义可填项系统(增删字段/可选项永久保存)+APP图标冰绿GN5351-4+小组件提示去「同房」",
-  "updated_at": "2026-10-12T05:36:24Z"
+  "notes": "v111: SW更新失败报错静默+连续月经记录合并为一次经期显示(全部记录+趋势图)+月经预测规则重写(预存5天窗:待定不预测/不足5天只预测经期窗/记满5天完整预测,网页+小组件+月报同步)+管理项目「字段」改「编辑」弹窗(可增删可填项)+AI识别自动补通用正常范围+身体趋势分析一键收起; APK versionCode 5/v1.4",
+  "updated_at": "2026-10-12T09:59:36Z"
 }
