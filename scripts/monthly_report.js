@@ -52,7 +52,7 @@ const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
   const allMembers = [...new Set([...hr.map(r => r.member).filter(Boolean), ...be.map(e => e.member).filter(Boolean)])].sort();
 
   // —— 基础统计 ——
-  const catLabel = c => ({ menstrual: '🌷 月经', gout: '🦴 痛风', anomaly: '😖 异常', intercourse: '❤️ 同房' }[c] || (c && c.startsWith && c.startsWith('cust_') ? '📝 ' + (be.find(e => e.category === c)?.payload?.custom_name || '自定义') : c));
+  const catLabel = c => ({ menstrual: '🌷 月经', gout: '🦴 痛风', anomaly: '😖 异常', intercourse: '❤️' }[c] || (c && c.startsWith && c.startsWith('cust_') ? '📝 ' + (be.find(e => e.category === c)?.payload?.custom_name || '自定义') : c));
   const memberLines = allMembers.map(m => {
     const mBe = be.filter(e => e.member === m);
     const counts = {};
@@ -69,6 +69,12 @@ const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
   const predictions = allMembers.map(m => {
     const starts = beRaw.filter(e => e.category === 'menstrual' && e.member === m && (e.payload?.is_period_start !== false)).sort((a, b) => a.ts - b.ts);
     if (starts.length < 2) return null;
+    // v110：经期进行中不预测（与网页版一致）——今天落在最新一次经期范围内（未记结束日按开始后 3 天内）则跳过
+    const lastP = starts[starts.length - 1];
+    const todayK = dayKey(new Date());
+    const sK = dayKey(new Date(lastP.ts));
+    const eK = lastP.end_ts ? dayKey(new Date(lastP.end_ts)) : dayKey(new Date(lastP.ts + 3 * DAY));
+    if (todayK >= sK && todayK <= eK) return null;
     const gaps = [];
     for (let i = 1; i < starts.length; i++) {
       const d = Math.round((starts[i].ts - starts[i - 1].ts) / DAY);

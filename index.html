@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v110: ①设置弹窗重排为四板块(云端备份恢复/数据导出与导入/Supabase/AI)，AI平台固定DashScope+地址模型Key预填+删获取key教程 ②可填项增删移到「管理项目」弹窗(🧩字段按钮)，添加弹窗只保留填写 ③健康速览：痛风标题改「距离上次痛风」删发作文字、❤️卡改「近30天❤️」主值=近30天总数(副行=距上次+今年)、痛风频率图删「跨度越久」 ④删「异常」项目(历史记录仍显示)、锁屏删「清除浏览器数据可重置」、可见「同房」文案全部改❤️ ⑤顶栏同步中下方新增「AI已/未配置」叠放格(点击进AI配置) ⑥经期进行中(最新经期连续<4天)不预测显示「/」(网页+月报脚本) ⑦日历痛经日显示与月经期一致+删除底部经期阶段图例 -->
 <!-- v109: ①全部记录按钮列移最右侧(健康:正常/删除;身体:编辑/删除) ②删两处导出键,设置弹窗重构为三板块(Supabase配置/AI配置/数据导出与导入),新增JSON完整备份导出+导入(按id合并),删「第一次用」「建表SQL」,云端备份恢复移入第三板块 ③删除弹窗新增「自选条目」多选批量删除模式(健康+身体页,batchBar悬浮操作条) ④身体页筛选/搜索框高度对齐人名框 ⑤新增自定义可填项系统(所有项目可增删字段,可选项点击即选,定义存localStorage fh_extra_fields,值存payload.extra_fields) -->
 <!-- v108: ①项目管理弹窗❤️项目不再显示「同房」字样(标题空着,符号示意) ②全部记录改版：健康页「正常/删除」上下叠放收窄放最左侧高度居中+记录三行制(图标+人名+项目名+数值/正常值范围/时间)；身体页「编辑/删除」同样上下叠放收窄左侧居中,删除右侧216px预留让出整卡宽度 ③日历所有符号缩小1/4(角标18→13px,compact 8px,tiny 7px,标记6px) ④修复月经趋势图：v92 把最后一条经期整体剔出图导致倒数第二条(如8.30)算不出与9.24的周期——改为shown含最后一条,周期按「下一条来潮」计算,最后一条只显示来潮天数 ⑤配套APK v108：信封圆角化+内缩4dp(约小1/5)；versionCode 3(v1.2) -->
 <!-- v107: 新增 APP 更新推送——APK 构建后 CI 自动发布 releases/latest.apk+version.json 到 Pages；APP 启动 2.5s 后检查(有新版弹窗一键下载安装,经 FileProvider 拉起安装器)+WidgetWorker 每3h后台检查(发系统通知,同版本只提醒一次,Android13+运行时申请通知权限)；versionCode 递增到 2(v1.1)；网页功能无变化(微增部署) -->
@@ -105,6 +106,13 @@
   .sync-indicator.offline .dot { background: #ef4444; }
   .sync-indicator.local { background: #fef3c7; color: #92400e; }
   .sync-indicator.local .dot { background: #f59e0b; }
+  /* v110：同步状态 + AI 配置状态上下叠放，整体与时钟窗口同高 */
+  .sync-stack { display: flex; flex-direction: column; gap: 4px; justify-content: center; align-self: stretch; }
+  .sync-stack .sync-indicator { padding: 3px 10px; font-size: 11px; }
+  .ai-indicator { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; background: #f1f5f9; color: #64748b; cursor: pointer; }
+  .ai-indicator .dot { width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; }
+  .ai-indicator.on { background: #f5f3ff; color: #6d28d9; }
+  .ai-indicator.on .dot { background: #8b5cf6; }
   .settings-btn { width: 36px; height: 36px; border-radius: 12px; border: 1px solid var(--border); background: white; color: var(--text-2); cursor: pointer; font-size: 16px; transition: all 0.2s; }
   .settings-btn:hover { border-color: var(--primary); color: var(--primary); background: #fff7ed; }
   .clock { background: linear-gradient(135deg, #fff7ed, #ffedd5); padding: 8px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); text-align: right; }
@@ -631,6 +639,7 @@
   .menstrual-select-bar .btn-cancel { background: white; color: #9d174d; border: 1px solid #f9a8d4; }
 
   .menstrual-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; font-size: 10px; color: var(--text-2); padding: 8px; background: #fefce8; border-radius: 8px; }
+  .menstrual-legend:empty { display: none; }  /* v110：图例已删除，空容器不再占位 */
   .menstrual-legend-item { display: inline-flex; align-items: center; gap: 4px; }
   .menstrual-legend-color { width: 12px; height: 12px; border-radius: 3px; }
 
@@ -708,7 +717,7 @@
   <div class="lock-card">
     <div class="lock-icon">🔒</div>
     <div class="lock-title">龙龙＆文文の小家</div>
-    <div class="lock-sub">请输入访问密码<br>本设备验证一次后不再询问（清除浏览器数据可重置）</div>
+    <div class="lock-sub">请输入访问密码<br>本设备验证一次后不再询问</div>
     <input type="password" id="lockPass" class="lock-input" inputmode="numeric" placeholder="····" autocomplete="off">
     <button id="lockBtn" class="lock-btn">进入</button>
     <div class="lock-err" id="lockErr"></div>
@@ -753,9 +762,14 @@
         </div>
       </div>
       <div class="header-right">
-        <span class="sync-indicator" id="syncIndicator">
-          <span class="dot"></span><span id="syncText">连接中…</span>
-        </span>
+        <div class="sync-stack">
+          <span class="sync-indicator" id="syncIndicator">
+            <span class="dot"></span><span id="syncText">连接中…</span>
+          </span>
+          <span class="ai-indicator" id="aiIndicator" title="点击打开 AI 配置">
+            <span class="dot"></span><span id="aiText">AI 检测中…</span>
+          </span>
+        </div>
         <div class="clock">
           <div class="time"><span class="pulse"></span><span id="currentTime">--:--:--</span></div>
           <div class="date" id="currentDate">--</div>
@@ -921,10 +935,7 @@
             <span class="bts-icon">🦶</span>
             <span class="bts-text">痛风</span>
           </button>
-          <button class="bts-btn" data-type="anomaly" data-color="#f59e0b">
-            <span class="bts-icon">😖</span>
-            <span class="bts-text">异常</span>
-          </button>
+          <!-- v110：「异常」项目已删除（历史异常记录仍可正常显示） -->
           <button class="bts-btn" data-type="intercourse" data-color="#f43f5e">
             <span class="bts-icon">❤️</span>
           </button>
@@ -993,7 +1004,6 @@
             <option value="">全部类型</option>
             <option value="menstrual">🌷 月经</option>
             <option value="gout">🦴 痛风</option>
-            <option value="anomaly">😖 异常</option>
             <option value="intercourse">❤️</option>
             <option value="custom">📝 自定义</option>
           </select>
@@ -1039,7 +1049,7 @@
     <div class="event-type-grid" id="eventTypeGrid">
       <button class="event-type-btn active" data-type="menstrual"><div class="event-type-icon">🌷</div><div class="event-type-name">月经</div></button>
       <button class="event-type-btn" data-type="gout"><div class="event-type-icon">🦴</div><div class="event-type-name">痛风发作</div></button>
-      <button class="event-type-btn" data-type="anomaly"><div class="event-type-icon">😖</div><div class="event-type-name">异常情况</div></button>
+      <!-- v110：「异常」项目已删除 -->
       <button class="event-type-btn" data-type="intercourse"><div class="event-type-icon">❤️</div><div class="event-type-name"></div></button>
     </div>
 
@@ -1336,14 +1346,41 @@
   </div>
 </div>
 
-<!-- ===== v109：设置弹窗（三大板块：Supabase 配置 / AI 配置 / 数据导出与导入） ===== -->
+<!-- ===== v110：设置弹窗（顺序：云端备份恢复 / 数据导出与导入 / Supabase 配置 / AI 配置） ===== -->
 <div class="modal-mask" id="configMask">
   <div class="modal" style="max-width:500px;">
     <button class="modal-close" data-close="configMask" title="关闭">×</button>
     <h3>⚙ 设置</h3>
 
-    <!-- 板块一：Supabase 配置 -->
-    <details open style="margin:0 0 10px;border:1px solid var(--border);border-radius:10px;padding:0 12px;">
+    <!-- 板块一：云端备份恢复 -->
+    <details id="secCloud" style="margin:0 0 10px;border:1px solid var(--border);border-radius:10px;padding:0 12px;">
+      <summary style="cursor:pointer;color:#0891b2;font-size:14px;font-weight:700;padding:10px 0;">☁️ 云端备份恢复（每周自动备份 · 误删救急用）</summary>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;font-size:12px;color:#475569;margin:6px 0 10px;line-height:1.7;">
+        <div id="restoreList">加载中…</div>
+        <div style="margin-top:8px;color:#94a3b8;">♻️ 恢复 = 把备份里本地缺少的记录按 id 补回来（<b>不会删除</b>现有记录，可放心点）</div>
+      </div>
+    </details>
+
+    <!-- 板块二：数据导出与导入 -->
+    <details id="secData" style="margin:0 0 10px;border:1px solid var(--border);border-radius:10px;padding:0 12px;">
+      <summary style="cursor:pointer;color:#059669;font-size:14px;font-weight:700;padding:10px 0;">📦 数据导出与导入</summary>
+      <div style="padding:8px 0 12px;">
+        <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;">导出</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+          <button class="btn-secondary" id="btnExpJSON" style="font-size:12px;">💾 导出完整备份 (JSON)</button>
+          <button class="btn-secondary" id="btnExpHealthCSV" style="font-size:12px;">📊 健康记录 CSV</button>
+          <button class="btn-secondary" id="btnExpBodyCSV" style="font-size:12px;">🧍 身体记录 CSV</button>
+        </div>
+        <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;">导入（JSON 备份文件，按 id 合并补缺，不删除现有记录）</div>
+        <div>
+          <button class="btn-secondary" id="btnImpJSON" style="font-size:12px;">📥 导入备份文件</button>
+          <input type="file" id="impJSONFile" accept=".json,application/json" style="display:none;">
+        </div>
+      </div>
+    </details>
+
+    <!-- 板块三：Supabase 配置 -->
+    <details id="secSupabase" style="margin:0 0 10px;border:1px solid var(--border);border-radius:10px;padding:0 12px;">
       <summary style="cursor:pointer;color:#0891b2;font-size:14px;font-weight:700;padding:10px 0;">🔌 Supabase 配置</summary>
       <div class="modal-sub" style="margin:0 0 10px;">配置后所有设备实时同步；未配置则使用本地模式（只本浏览器可见）</div>
       <div class="cfg-field">
@@ -1362,78 +1399,30 @@
       </div>
     </details>
 
-    <!-- 板块二：AI 配置（v109 从独立弹窗移入） -->
-    <details style="margin:0 0 10px;border:1px solid var(--border);border-radius:10px;padding:0 12px;">
+    <!-- 板块四：AI 配置（v110：平台固定、信息预填、删除获取 key 教程） -->
+    <details id="secAI" style="margin:0 0 10px;border:1px solid var(--border);border-radius:10px;padding:0 12px;">
       <summary style="cursor:pointer;color:#8b5cf6;font-size:14px;font-weight:700;padding:10px 0;">🪄 AI 配置（智能识别 + 项目字段建议）</summary>
       <div class="cfg-field" style="margin-top:6px;">
         <label>API 平台</label>
-        <select class="cfg-field-input" id="aiProvider">
-          <option value="dashscope">🇨🇳 通义千问 DashScope（推荐，免费）</option>
-          <option value="deepseek">🇨🇳 DeepSeek（中文好，便宜）</option>
-          <option value="openai">🌍 OpenAI（需科学上网）</option>
-          <option value="zhipu">🇨🇳 智谱 GLM</option>
-          <option value="custom">⚙️ 自定义（OpenAI 兼容）</option>
-        </select>
+        <div style="font-size:13px;font-weight:600;color:var(--text-2);padding:6px 0;">🇨🇳 通义千问 DashScope</div>
       </div>
       <div class="cfg-field">
         <label>API 地址 (Base URL)</label>
         <input type="text" id="aiBaseUrl" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1">
-        <div class="hint">切换平台会自动填默认值</div>
+        <div class="hint">已预填默认值，一般无需修改</div>
       </div>
       <div class="cfg-field">
         <label>API Key</label>
         <input type="text" id="aiApiKey" class="key-input" placeholder="sk-xxxxxxxxxxxxxxxx">
-        <div class="hint">👆 key 仅存在你的浏览器，不上传任何服务器</div>
+        <div class="hint">key 仅存在你的浏览器，不上传任何服务器</div>
       </div>
       <div class="cfg-field">
         <label>模型</label>
         <input type="text" id="aiModel" placeholder="qwen3.6-flash">
-        <div class="hint">默认 qwen3.6-flash（支持识图）；识图专用可填 qwen3-vl-plus。qwen-turbo / qwen-vl-plus / qwen3-vl-flash 已下线不可用</div>
+        <div class="hint">已预填默认模型（支持识图），一般无需修改</div>
       </div>
-      <details style="margin: 0 0 12px;">
-        <summary style="cursor:pointer;color:#0891b2;font-size:13px;font-weight:600;">📖 怎么获取 API Key？（点开看教程）</summary>
-        <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px;font-size:12px;color:#475569;margin-top:8px;line-height:1.7;">
-          <b>🇨🇳 通义千问（推荐，免费 100 万 token/月）：</b><br>
-          1. 打开 <a href="https://bailian.console.aliyun.com" target="_blank">bailian.console.aliyun.com</a> 注册<br>
-          2. 开通「模型服务」→ 创建 API Key<br>
-          3. 复制 sk-xxxxxx 填到上面<br><br>
-
-          <b>🇨🇳 DeepSeek：</b><br>
-          1. <a href="https://platform.deepseek.com" target="_blank">platform.deepseek.com</a> 注册<br>
-          2. API Keys → 创建新 key<br><br>
-
-          <b>🌍 OpenAI：</b><br>
-          需要海外工具，Base URL 填 <code>https://api.openai.com/v1</code>，模型 <code>gpt-4o-mini</code>
-        </div>
-      </details>
       <div class="cfg-actions-row">
         <button class="btn-primary" id="aiCfgSave">💾 保存 AI 配置</button>
-      </div>
-    </details>
-
-    <!-- 板块三：数据导出与导入（含云端备份恢复） -->
-    <details style="margin:0 0 10px;border:1px solid var(--border);border-radius:10px;padding:0 12px;">
-      <summary style="cursor:pointer;color:#059669;font-size:14px;font-weight:700;padding:10px 0;">📦 数据导出与导入</summary>
-      <div style="padding:8px 0 4px;">
-        <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;">导出</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
-          <button class="btn-secondary" id="btnExpJSON" style="font-size:12px;">💾 导出完整备份 (JSON)</button>
-          <button class="btn-secondary" id="btnExpHealthCSV" style="font-size:12px;">📊 健康记录 CSV</button>
-          <button class="btn-secondary" id="btnExpBodyCSV" style="font-size:12px;">🧍 身体记录 CSV</button>
-        </div>
-        <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;">导入（JSON 备份文件，按 id 合并补缺，不删除现有记录）</div>
-        <div style="margin-bottom:14px;">
-          <button class="btn-secondary" id="btnImpJSON" style="font-size:12px;">📥 导入备份文件</button>
-          <input type="file" id="impJSONFile" accept=".json,application/json" style="display:none;">
-        </div>
-        <!-- v100：云端备份恢复（v109 移入本板块） -->
-        <details id="restoreBox">
-          <summary style="cursor:pointer;color:#0891b2;font-size:13px;font-weight:600;">☁️ 云端备份恢复（每周自动备份 · 误删救急用）</summary>
-          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;font-size:12px;color:#475569;margin-top:8px;line-height:1.7;">
-            <div id="restoreList">加载中…</div>
-            <div style="margin-top:8px;color:#94a3b8;">♻️ 恢复 = 把备份里本地缺少的记录按 id 补回来（<b>不会删除</b>现有记录，可放心点）</div>
-          </div>
-        </details>
       </div>
     </details>
   </div>
@@ -2567,10 +2556,9 @@ function getCustomEventType(id) {
 function renderBodyTypeSelector() {
   const grid = document.getElementById('btsGrid');
   if (!grid) return;
-  // 保留固定按钮（月经/痛风/异常/同房）和最后的"添加"按钮
+  // 保留固定按钮（月经/痛风/同房）和最后的"添加"按钮（v110：「异常」项目已删除）
   const fixedStart = grid.querySelector('[data-type="menstrual"]').outerHTML;
   const fixedGout = grid.querySelector('[data-type="gout"]').outerHTML;
-  const fixedAnomaly = grid.querySelector('[data-type="anomaly"]').outerHTML;
   const fixedMood = grid.querySelector('[data-type="intercourse"]') ? grid.querySelector('[data-type="intercourse"]').outerHTML : '';
   const addBtn = grid.querySelector('[data-action="add-custom"]').outerHTML;
   const customs = customEventTypes.map(c => `
@@ -2581,7 +2569,7 @@ function renderBodyTypeSelector() {
   `).join('');
   /* v97：内嵌删除键已删除——button 嵌套 button 是非法 HTML，浏览器解析时拆散导致
      APP 里图标/标题/删除键分离错位。删除/换图标统一移到「⚙ 管理」弹窗 */
-  grid.innerHTML = fixedStart + fixedGout + fixedAnomaly + fixedMood + customs + addBtn;
+  grid.innerHTML = fixedStart + fixedGout + fixedMood + customs + addBtn;
   // v98：弹窗类型格同步插入自定义项目按钮（像内置项目一样的独立按钮）
   renderEventTypeGrid();
   // 重新激活当前选中的
@@ -2604,7 +2592,6 @@ function syncEventsCategoryFilter() {
   sel.innerHTML = '<option value="">全部类型</option>'
     + '<option value="menstrual">🌷 月经</option>'
     + '<option value="gout">🦴 痛风</option>'
-    + '<option value="anomaly">😖 异常</option>'
     + '<option value="intercourse">❤️</option>'
     + '<option value="custom">📝 自定义（未分类）</option>'
     + customEventTypes.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.icon)} ${escapeHtml(c.name)}</option>`).join('');
@@ -2617,7 +2604,6 @@ function updateBtsHint() {
   const meta = {
     menstrual: '点击月历日期进入范围选择 → 保存为「月经」；长按删除',
     gout: '点击月历日期，弹出痛风发作确认弹窗；长按删除该日记录',
-    anomaly: '点击月历日期，弹出异常确认弹窗；长按删除该日记录',
     intercourse: '点击月历日期立即记录 ❤️（同一天可多次）；长按删除该日全部',
   };
   if (meta[currentBodyType]) {
@@ -2662,11 +2648,12 @@ function renderTypesMgrList() {
   const wrap = document.getElementById('typesMgrList');
   if (!wrap) return;
   const builtin = [
-    { icon: '🌷', name: '月经' }, { icon: '🦴', name: '痛风' }, { icon: '😖', name: '异常' }, { icon: '❤️', name: '' },  // v108：❤️ 项目不显示「同房」字样，符号示意即可
+    { icon: '🌷', name: '月经', key: 'menstrual' }, { icon: '🦴', name: '痛风', key: 'gout' }, { icon: '❤️', name: '', key: 'intercourse' },  // v110：「异常」项目已删除；❤️ 项目不显示文字
   ].map(p => `
     <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--border);">
       <span style="font-size:20px;width:28px;text-align:center;">${p.icon}</span>
       <span style="flex:1;font-size:13px;font-weight:600;">${p.name}</span>
+      <button class="mgr-fld-btn" data-key="${p.key}" data-name="${p.icon} ${p.name || '❤️'}" title="管理这个项目的可填项">🧩 字段</button>
       <span style="font-size:10px;color:var(--text-3);background:#f1f5f9;padding:2px 8px;border-radius:999px;">内置</span>
     </div>
   `).join('');
@@ -2674,6 +2661,7 @@ function renderTypesMgrList() {
     <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--border);">
       <button class="mgr-icon-btn" data-id="${escapeHtml(c.id)}" title="点击更换图标">${escapeHtml(c.icon)}</button>
       <span style="flex:1;font-size:13px;font-weight:600;">${escapeHtml(c.name)}</span>
+      <button class="mgr-fld-btn" data-key="${escapeHtml(c.id)}" data-name="${escapeHtml(c.icon)} ${escapeHtml(c.name)}" title="管理这个项目的可填项">🧩 字段</button>
       <button class="mgr-del-btn" data-id="${escapeHtml(c.id)}" title="删除该项目">🗑</button>
     </div>
   `).join('');
@@ -2710,6 +2698,59 @@ function renderTypesMgrList() {
   // 删除
   wrap.querySelectorAll('.mgr-del-btn').forEach(btn => {
     btn.onclick = () => deleteCustomEventTypeFlow(btn.dataset.id, () => renderTypesMgrList());
+  });
+  // v110：可填项管理（新增/删除字段+可选项）——从添加弹窗移到这里
+  wrap.querySelectorAll('.mgr-fld-btn').forEach(btn => {
+    btn.onclick = () => {
+      const key = btn.dataset.key;
+      const existing = wrap.querySelector('.mgr-fld-panel');
+      if (existing && existing.dataset.key === key) { existing.remove(); return; }
+      wrap.querySelectorAll('.mgr-fld-panel').forEach(p => p.remove());
+      const panel = document.createElement('div');
+      panel.className = 'mgr-fld-panel';
+      panel.dataset.key = key;
+      panel.style.cssText = 'background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:10px;margin:6px 0;';
+      const defs = getExtraFieldDefsFor(key);
+      const defRows = defs.map(f => `
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;">
+          <b>${escapeHtml(f.label)}</b>
+          <span style="flex:1;color:var(--text-3);">${(f.options && f.options.length) ? '可选：' + f.options.map(escapeHtml).join(' / ') : '自由填写'}</span>
+          <span class="mgr-fld-del" data-label="${escapeHtml(f.label)}" style="cursor:pointer;" title="删除这个填项（永久）">🗑</span>
+        </div>
+      `).join('');
+      panel.innerHTML = `
+        <div style="font-size:12px;font-weight:700;color:var(--text-2);margin-bottom:4px;">${escapeHtml(btn.dataset.name)} · 可填项（新增后每次记录该项目都会出现）</div>
+        <div class="mgr-fld-list">${defRows || '<div style="font-size:12px;color:var(--text-3);padding:4px 0;">暂无可填项</div>'}</div>
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
+          <input type="text" class="preview-input mgr-fld-name" placeholder="字段名称，如：卧床时间" style="flex:2;min-width:110px;font-size:12px;height:28px;padding:2px 8px;">
+          <input type="text" class="preview-input mgr-fld-opts" placeholder="可选项（逗号隔开，留空=自由填写）" style="flex:3;min-width:150px;font-size:12px;height:28px;padding:2px 8px;">
+          <button class="btn-primary mgr-fld-save" style="font-size:12px;padding:4px 12px;height:28px;">✓ 添加</button>
+        </div>`;
+      btn.closest('div').after(panel);
+      // 删除字段：两击确认
+      panel.querySelectorAll('.mgr-fld-del').forEach(d => {
+        d.onclick = () => {
+          if (!d.dataset.arm) {
+            d.dataset.arm = '1'; d.textContent = '❓';
+            setTimeout(() => { d.dataset.arm = ''; d.textContent = '🗑'; }, 2500);
+            return;
+          }
+          removeExtraFieldDefFor(key, d.dataset.label);
+          renderTypesMgrList();
+          showToast(`已删除填项「${d.dataset.label}」`);
+        };
+      });
+      // 保存新字段
+      panel.querySelector('.mgr-fld-save').onclick = () => {
+        const label = panel.querySelector('.mgr-fld-name').value.trim();
+        if (!label) { showToast('请填写字段名称', 'warning'); return; }
+        if (getExtraFieldDefsFor(key).find(f => f.label === label)) { showToast('该填项已存在', 'warning'); return; }
+        const options = panel.querySelector('.mgr-fld-opts').value.split(/[,，;；]/).map(s => s.trim()).filter(Boolean).slice(0, 8);
+        putExtraFieldDefFor(key, { label, options });
+        renderTypesMgrList();
+        showToast(`✓ 已添加填项「${label}」${options.length ? `（${options.length} 个可选项）` : '（自由填写）'}`);
+      };
+    };
   });
 }
 async function deleteCustomEventTypeFlow(id, after) {
@@ -3363,6 +3404,10 @@ bindClick('bannerConfigBtn', openConfig, '横幅配置按钮');
 function openConfig() {
   document.getElementById('cfgUrl').value = SUPABASE_URL || '';
   document.getElementById('cfgKey').value = SUPABASE_ANON_KEY || '';
+  // v110：AI 配置同步预填（平台固定 DashScope，地址/模型给默认值）
+  document.getElementById('aiBaseUrl').value = aiConfig.baseUrl || AI_PRESETS.dashscope.baseUrl;
+  document.getElementById('aiApiKey').value = aiConfig.apiKey || '';
+  document.getElementById('aiModel').value = aiConfig.model || AI_PRESETS.dashscope.model;
   document.getElementById('configMask').classList.add('show');
   console.log('✓ 配置弹窗已打开');
 }
@@ -3400,7 +3445,8 @@ async function sbGet(path) {
 }
 
 (function () {
-  const box = document.getElementById('restoreBox');
+  // v110：云端备份恢复独立成设置弹窗第一板块（secCloud）
+  const box = document.getElementById('secCloud');
   if (!box) return;
   box.addEventListener('toggle', () => { if (box.open) loadBackupList(); });
 })();
@@ -4734,41 +4780,43 @@ function getAiConfig() {
   return cfg;
 }
 
+/* v110：顶栏 AI 配置状态格（与「实时同步中」叠放） */
+function updateAiIndicator() {
+  const el = document.getElementById('aiIndicator');
+  const txt = document.getElementById('aiText');
+  if (!el || !txt) return;
+  const ok = !!getAiConfig();
+  el.classList.toggle('on', ok);
+  txt.textContent = ok ? 'AI 已配置' : 'AI 未配置';
+}
+updateAiIndicator();
+document.getElementById('aiIndicator').addEventListener('click', openAiConfig);
+
 function openAiConfig() {
-  // v109：AI 配置并入设置弹窗第二板块——打开设置并展开 AI 部分
-  document.getElementById('aiProvider').value = aiConfig.provider || 'dashscope';
+  // v110：AI 配置在设置弹窗第四板块——平台固定 DashScope，地址/模型/Key 预填
   document.getElementById('aiBaseUrl').value = aiConfig.baseUrl || AI_PRESETS.dashscope.baseUrl;
   document.getElementById('aiApiKey').value = aiConfig.apiKey || '';
   document.getElementById('aiModel').value = aiConfig.model || AI_PRESETS.dashscope.model;
   const mask = document.getElementById('configMask');
   mask.classList.add('show');
-  mask.querySelectorAll('details').forEach(d => d.open = false);
-  const aiSec = mask.querySelector('details:nth-of-type(2)');
+  mask.querySelectorAll(':scope > .modal > details').forEach(d => d.open = false);
+  const aiSec = document.getElementById('secAI');
   if (aiSec) aiSec.open = true;
 }
 
-document.getElementById('aiProvider').addEventListener('change', (e) => {
-  const preset = AI_PRESETS[e.target.value];
-  if (preset) {
-    if (!document.getElementById('aiBaseUrl').dataset.userEdited) document.getElementById('aiBaseUrl').value = preset.baseUrl;
-    if (!document.getElementById('aiModel').dataset.userEdited) document.getElementById('aiModel').value = preset.model;
-  }
-});
-['aiBaseUrl', 'aiModel'].forEach(id => {
-  document.getElementById(id).addEventListener('input', () => document.getElementById(id).dataset.userEdited = '1');
-});
-
+// v110：API 平台不再提供选项（固定 DashScope），移除平台切换监听
 document.getElementById('aiCfgSave').addEventListener('click', () => {
   aiConfig = {
-    provider: document.getElementById('aiProvider').value,
-    baseUrl: document.getElementById('aiBaseUrl').value.trim(),
+    provider: 'dashscope',
+    baseUrl: document.getElementById('aiBaseUrl').value.trim() || AI_PRESETS.dashscope.baseUrl,
     apiKey: document.getElementById('aiApiKey').value.trim(),
-    model: document.getElementById('aiModel').value.trim()
+    model: document.getElementById('aiModel').value.trim() || AI_PRESETS.dashscope.model
   };
-  if (!aiConfig.baseUrl || !aiConfig.apiKey) {
-    showToast('请填写 API 地址和 Key', 'warning'); return;
+  if (!aiConfig.apiKey) {
+    showToast('请填写 API Key', 'warning'); return;
   }
   localStorage.setItem('ai_config', JSON.stringify(aiConfig));
+  updateAiIndicator();
   showToast('✓ AI 配置已保存');
 });
 
@@ -5380,8 +5428,20 @@ function cycleRegularityLabel(sd) {
 }
 
 // 计算下一次月经 + 各时期
+/* v110：最新一次月经正在进行中（今天落在最新一次经期范围内；未记结束日时按开始后 3 天内
+   视为进行中——即「记录连续时间在 4 天以下」的正在经期状态）→ 不做经期预测，显示「/」 */
+function isMenstrualOngoing(starts) {
+  if (!starts || !starts.length) return false;
+  const last = starts[starts.length - 1];
+  const today = startOfDay(Date.now()).getTime();
+  const s = startOfDay(last.ts).getTime();
+  const e = last.end_ts ? startOfDay(last.end_ts).getTime() : s + 3 * 86400000;
+  return today >= s && today <= e;
+}
+
 function computeCyclePrediction(starts) {
   if (starts.length < 2) return null;
+  if (isMenstrualOngoing(starts)) return null;  // v110：经期进行中不预测
   const stat = computeAvgCycle(starts);
   if (!stat) return null;  // v66：所有周期间隔都被判为离群时无法预测
   const last = starts[starts.length - 1];
@@ -5536,16 +5596,8 @@ function renderMenstrualCalendar() {
     bar.classList.remove('active');
   }
 
-  // 图例（简化：颜色 + 文字标签）
-  legendEl.innerHTML = `
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#F9C2CB,#F2A0AC);"></span>已记录月经期</div>
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#FBDCE1;box-shadow:inset 0 0 0 1px #F7B3BD;"></span>预测月经期</div>
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#FAEDBF;"></span>卵泡期</div>
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#FDD9B5;"></span>排卵期</div>
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#F5A96B;"></span>排卵日</div>
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:#D6E8C8;"></span>黄体期</div>
-    <div class="menstrual-legend-item"><span class="menstrual-legend-color" style="background:linear-gradient(135deg,#fee2e2,#fecaca);box-shadow:inset 0 0 0 1px #ef4444;"></span>痛经日</div>
-  `;
+  // v110：日历下方「不同经期阶段与对应颜色」图例已删除（menstrualLegend 保留元素但不再填充）
+  legendEl.innerHTML = '';
 }
 
 function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, selectedStartKey, selectedEndKey, rangeKeys, dysmenorrheaKeys, otherMarkers) {
@@ -5605,11 +5657,7 @@ function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, sel
       classes.push(phase);
       tagText = phaseLabel[phase] || '';
     }
-    if (isDysmenorrhea && isRecorded) {
-      // 痛经 + 月经：保留 in-period 显示，叠加重边框
-      classes.push('dysmenorrhea-day');
-      tagText = '月经·痛';
-    }
+    // v110：痛经日显示方式与已记录月经期完全一致（不再叠加红色边框/「月经·痛」标签）
     if (isSelectedStart) { classes.push('selecting'); marker = '<span class="marker">🅰️</span>'; }
     else if (isSelectedEnd) { classes.push('selecting'); marker = '<span class="marker">🅱️</span>'; }
     else if (isInRange) classes.push('in-range');
@@ -5627,7 +5675,7 @@ function renderSingleMonth(monthDate, recordedKeys, predictedKeys, todayKey, sel
       marker += `<span class="other-marker-row${sizeCls}">${iconSpans}</span>`;
     }
 
-    html += `<div class="${classes.join(' ')}" data-ts="${ts}" title="${k}${isRecorded ? '（已记录）' : ''}${isDysmenorrhea ? '（痛经）' : ''}${others && others.length ? '（' + escapeHtml(others.map(o => o.label).join('·')) + '）' : ''}"><span class="day-num">${day}</span>${tagText ? `<span class="phase-tag">${tagText}</span>` : ''}${marker}</div>`;
+    html += `<div class="${classes.join(' ')}" data-ts="${ts}" title="${k}${isRecorded ? '（已记录）' : ''}${others && others.length ? '（' + escapeHtml(others.map(o => o.label).join('·')) + '）' : ''}"><span class="day-num">${day}</span>${tagText ? `<span class="phase-tag">${tagText}</span>` : ''}${marker}</div>`;
   }
   html += `</div></div>`;
   return html;
@@ -5726,7 +5774,7 @@ async function onMenstrualDayLongPress(ts) {
   } else if (currentType === 'intercourse' || currentType === 'mood') {
     targets = bodyEvents.filter(e => (e.category === 'intercourse' || e.category === 'mood') &&
       (memberFilter === 'all' || e.member === memberFilter) && startOfDay(e.ts).getTime() === day.getTime());
-    label = '❤️ 同房记录';
+    label = '❤️ 记录';
   } else if (currentType.startsWith && currentType.startsWith('cust_')) {
     const ct = getCustomEventType(currentType);
     targets = bodyEvents.filter(e => e.category === currentType &&
@@ -6112,13 +6160,12 @@ function getExtraFieldsMap() {
   catch (e) { return {}; }
 }
 function saveExtraFieldsMap(m) { localStorage.setItem(EXTRA_FIELDS_KEY, JSON.stringify(m)); }
-function getExtraFieldDefs() {
-  const key = currentCustomTypeId || currentEventType;
+// v110：字段定义函数改为显式 key（管理弹窗里可操作任意项目，不依赖当前选中项）
+function getExtraFieldDefsFor(key) {
   if (!key) return [];
   return getExtraFieldsMap()[key] || [];
 }
-function putExtraFieldDef(def) {
-  const key = currentCustomTypeId || currentEventType;
+function putExtraFieldDefFor(key, def) {
   if (!key || !def.label) return;
   const m = getExtraFieldsMap();
   const arr = m[key] || [];
@@ -6126,15 +6173,19 @@ function putExtraFieldDef(def) {
   m[key] = arr;
   saveExtraFieldsMap(m);
 }
-function removeExtraFieldDef(label) {
-  const key = currentCustomTypeId || currentEventType;
+function removeExtraFieldDefFor(key, label) {
   if (!key) return;
   const m = getExtraFieldsMap();
   m[key] = (m[key] || []).filter(f => f.label !== label);
   saveExtraFieldsMap(m);
 }
+// 兼容包装：添加弹窗里的字段按「当前选中项目」存取
+function getExtraFieldDefs() { return getExtraFieldDefsFor(currentCustomTypeId || currentEventType); }
+function putExtraFieldDef(def) { putExtraFieldDefFor(currentCustomTypeId || currentEventType, def); }
+function removeExtraFieldDef(label) { removeExtraFieldDefFor(currentCustomTypeId || currentEventType, label); }
 
 // 渲染自定义可填项区域（existing = 编辑回填 [{label,value}]）
+// v110：新增/删除入口移到「⚙ 管理项目」弹窗——这里只负责填写
 function renderExtraFields(existing) {
   const wrap = document.getElementById('extraFieldsWrap');
   if (!wrap) return;
@@ -6145,25 +6196,12 @@ function renderExtraFields(existing) {
       `<span class="ai-opt-chip extra-opt-chip" data-val="${escapeHtml(o)}" title="点击填入">${escapeHtml(o)}</span>`
     ).join('');
     return `<div class="preview-row extra-field-row" data-label="${escapeHtml(f.label)}">
-      <label>${escapeHtml(f.label)} <span class="extra-del" title="删除这个填项（永久）">🗑</span></label>
+      <label>${escapeHtml(f.label)}</label>
       <input type="text" class="preview-input extra-field-input" data-label="${escapeHtml(f.label)}" value="${escapeHtml((prev && prev.value) || '')}" placeholder="${(f.options && f.options.length) ? '点下方选项即可填入' : '选填'}">
       ${chips ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${chips}</div>` : ''}
     </div>`;
   }).join('');
-  wrap.innerHTML = rows + `
-    <button type="button" class="btn-secondary" id="btnAddExtraField" style="font-size:11px;padding:4px 10px;margin:2px 0 6px;">➕ 新增填项</button>
-    <div id="extraFieldEditor" style="display:none;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px;">
-      <div class="preview-row"><label style="font-size:12px;">名称</label>
-        <input type="text" id="efLabel" class="preview-input" style="font-size:13px;" placeholder="如：卧床时间">
-      </div>
-      <div class="preview-row"><label style="font-size:12px;">可选项</label>
-        <input type="text" id="efOptions" class="preview-input" style="font-size:13px;" placeholder="多个用逗号隔开，如：1小时,3小时,6小时（留空=自由填写）">
-      </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;">
-        <button type="button" class="btn-secondary" id="efCancel" style="font-size:11px;padding:4px 10px;">取消</button>
-        <button type="button" class="btn-primary" id="efSave" style="font-size:11px;padding:4px 10px;">✓ 保存字段</button>
-      </div>
-    </div>`;
+  wrap.innerHTML = rows;
   // 选项 chip 点击填入（同 AI 建议字段）
   wrap.querySelectorAll('.extra-opt-chip').forEach(chip => {
     chip.onclick = () => {
@@ -6171,43 +6209,6 @@ function renderExtraFields(existing) {
       if (inp) inp.value = chip.dataset.val;
     };
   });
-  // 删除字段：两击确认（第一击变红问号，2.5 秒内再击才删）
-  wrap.querySelectorAll('.extra-del').forEach(d => {
-    d.style.cursor = 'pointer';
-    d.onclick = (e) => {
-      e.stopPropagation();
-      if (!d.dataset.arm) {
-        d.dataset.arm = '1';
-        d.textContent = '❓';
-        setTimeout(() => { d.dataset.arm = ''; d.textContent = '🗑'; }, 2500);
-        return;
-      }
-      const label = d.closest('.extra-field-row').dataset.label;
-      removeExtraFieldDef(label);
-      // 重渲染，保留已填的其它字段值
-      const vals = collectExtraFieldValues();
-      renderExtraFields(vals.filter(v => v.label !== label));
-      showToast(`已删除填项「${label}」`);
-    };
-  });
-  // 新增字段编辑器
-  wrap.querySelector('#btnAddExtraField').onclick = () => {
-    const ed = wrap.querySelector('#extraFieldEditor');
-    ed.style.display = ed.style.display === 'none' ? '' : 'none';
-    if (ed.style.display !== 'none') wrap.querySelector('#efLabel').focus();
-  };
-  wrap.querySelector('#efCancel').onclick = () => { wrap.querySelector('#extraFieldEditor').style.display = 'none'; };
-  wrap.querySelector('#efSave').onclick = () => {
-    const label = wrap.querySelector('#efLabel').value.trim();
-    if (!label) { showToast('请填写字段名称', 'warning'); return; }
-    if (getExtraFieldDefs().find(f => f.label === label)) { showToast('该填项已存在', 'warning'); return; }
-    const options = wrap.querySelector('#efOptions').value.split(/[,，;；]/).map(s => s.trim()).filter(Boolean).slice(0, 8);
-    putExtraFieldDef({ label, options });
-    const vals = collectExtraFieldValues();
-    renderExtraFields(vals);
-    wrap.querySelector('#extraFieldEditor').style.display = 'none';
-    showToast(`✓ 已添加填项「${label}」${options.length ? `（${options.length} 个可选项）` : '（自由填写）'}`);
-  };
 }
 
 // 收集当前已填的自定义字段值
@@ -6552,11 +6553,14 @@ function renderEventsOverview() {
     return;
   }
 
-  // ① 下次月经预测
+  // ① 下次月经预测（v110：经期进行中显示「/」，不预测）
   const starts = getMenstrualStarts('all');
   const pred = computeCyclePrediction(starts);
   let periodVal = '—', periodSub = '记录 2 次月经后可预测', periodColor = 'var(--text)';
-  if (pred) {
+  if (isMenstrualOngoing(starts)) {
+    periodVal = '/';
+    periodSub = '月经期间，暂不预测';
+  } else if (pred) {
     const daysTo = Math.ceil((pred.nextStart.getTime() - now) / dayMs);
     const fmt = d => `${d.getMonth() + 1}/${d.getDate()}`;
     if (daysTo > 0) {
@@ -6572,7 +6576,7 @@ function renderEventsOverview() {
     }
   }
 
-  // ② 痛风
+  // ② 痛风（v110：标题改「距离上次痛风」，副行去掉「距上次发作」字样）
   const gouts = bodyEvents.filter(e => e.category === 'gout').sort((a, b) => b.ts - a.ts);
   let goutVal = '—', goutSub = '暂无痛风记录，好现象 👍';
   if (gouts.length) {
@@ -6582,7 +6586,7 @@ function renderEventsOverview() {
     const mCount = gouts.filter(e => e.ts >= monthStart.getTime()).length;
     const yCount = gouts.filter(e => e.ts >= yearStart).length;
     goutVal = `${daysSince} 天`;
-    goutSub = `距上次发作 · 本月 ${mCount} 次 / 今年 ${yCount} 次`;
+    goutSub = `本月 ${mCount} 次 / 今年 ${yCount} 次`;
   }
 
   // ③ 本周记录 + 今日补录提醒
@@ -6594,17 +6598,17 @@ function renderEventsOverview() {
   let weekSub = todayCount > 0 ? `今天已记录 ${todayCount} 条 ✓` : '今天还没记录，点 ➕ 补一条';
   if (weekEvents.length === 0) weekSub = '本周还没有记录';
 
-  // ④ 同房
+  // ④ ❤️（v110：主值改近 30 天统计总数，副行=距上次 + 今年）
   const loveEvents = bodyEvents.filter(e => e.category === 'intercourse' || e.category === 'mood').sort((a, b) => b.ts - a.ts);
   let loveVal = '—', loveSub = '点击月历日期即可记录';
   if (loveEvents.length) {
     const daysSinceLove = Math.floor((now - loveEvents[0].ts) / dayMs);
-    const loveMonthStart = new Date(); loveMonthStart.setDate(1); loveMonthStart.setHours(0, 0, 0, 0);
+    const love30Start = now - 30 * dayMs;
     const loveYearStart = new Date(new Date().getFullYear(), 0, 1).getTime();
-    const loveM = loveEvents.filter(e => e.ts >= loveMonthStart.getTime()).length;
+    const love30 = loveEvents.filter(e => e.ts >= love30Start).length;
     const loveY = loveEvents.filter(e => e.ts >= loveYearStart).length;
-    loveVal = `${daysSinceLove} 天`;
-    loveSub = `距上次 · 本月 ${loveM} 次 / 今年 ${loveY} 次`;
+    loveVal = `${love30} 次`;
+    loveSub = `距上次 ${daysSinceLove} 天 / 今年 ${loveY} 次`;
   }
 
   wrap.innerHTML = `
@@ -6620,7 +6624,7 @@ function renderEventsOverview() {
           <div class="eo-stat-sub">${periodSub}</div>
         </div>
         <div class="eo-stat" style="background:rgba(239,68,68,0.07);">
-          <div class="eo-stat-label">🦴 痛风</div>
+          <div class="eo-stat-label">🦴 距离上次痛风</div>
           <div class="eo-stat-val" style="color:#b91c1c;">${goutVal}</div>
           <div class="eo-stat-sub">${goutSub}</div>
         </div>
@@ -6630,7 +6634,7 @@ function renderEventsOverview() {
           <div class="eo-stat-sub" style="color:${todayCount > 0 ? 'var(--text-3)' : '#be123c'};font-weight:${todayCount > 0 ? 400 : 600};">${weekSub}</div>
         </div>
         <div class="eo-stat" style="background:rgba(244,63,94,0.07);">
-          <div class="eo-stat-label">❤️</div>
+          <div class="eo-stat-label">近30天❤️</div>
           <div class="eo-stat-val" style="color:#e11d48;">${loveVal}</div>
           <div class="eo-stat-sub">${loveSub}</div>
         </div>
@@ -6902,7 +6906,7 @@ function renderEventsCharts() {
     charts.push({
       id: 'gout-frequency',
       title: '🦴 痛风发作频率',
-      subtitle: `${freq.subtitle}，跨度越久数据越能反映趋势${goutExtra}`,
+      subtitle: `${freq.subtitle}${goutExtra}`,
       type: 'freq-lines',
       labels: freq.labels,
       series: freq.series,
