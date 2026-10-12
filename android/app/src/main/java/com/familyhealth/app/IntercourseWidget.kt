@@ -144,7 +144,7 @@ class IntercourseWidget : AppWidgetProvider() {
             val code = conn.responseCode
             conn.disconnect()
             if (code in 200..299) {
-                toast(context, "✓ 已记录一次同房 ❤️")
+                toast(context, "✓ 已记录一次 ❤️")
                 // 顺带刷新桌面小组件数据
                 try { WidgetWorker.refresh(context) } catch (_: Exception) {}
             } else {

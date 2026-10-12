@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v109: ①全部记录按钮列移最右侧(健康:正常/删除;身体:编辑/删除) ②删两处导出键,设置弹窗重构为三板块(Supabase配置/AI配置/数据导出与导入),新增JSON完整备份导出+导入(按id合并),删「第一次用」「建表SQL」,云端备份恢复移入第三板块 ③删除弹窗新增「自选条目」多选批量删除模式(健康+身体页,batchBar悬浮操作条) ④身体页筛选/搜索框高度对齐人名框 ⑤新增自定义可填项系统(所有项目可增删字段,可选项点击即选,定义存localStorage fh_extra_fields,值存payload.extra_fields) -->
 <!-- v108: ①项目管理弹窗❤️项目不再显示「同房」字样(标题空着,符号示意) ②全部记录改版：健康页「正常/删除」上下叠放收窄放最左侧高度居中+记录三行制(图标+人名+项目名+数值/正常值范围/时间)；身体页「编辑/删除」同样上下叠放收窄左侧居中,删除右侧216px预留让出整卡宽度 ③日历所有符号缩小1/4(角标18→13px,compact 8px,tiny 7px,标记6px) ④修复月经趋势图：v92 把最后一条经期整体剔出图导致倒数第二条(如8.30)算不出与9.24的周期——改为shown含最后一条,周期按「下一条来潮」计算,最后一条只显示来潮天数 ⑤配套APK v108：信封圆角化+内缩4dp(约小1/5)；versionCode 3(v1.2) -->
 <!-- v107: 新增 APP 更新推送——APK 构建后 CI 自动发布 releases/latest.apk+version.json 到 Pages；APP 启动 2.5s 后检查(有新版弹窗一键下载安装,经 FileProvider 拉起安装器)+WidgetWorker 每3h后台检查(发系统通知,同版本只提醒一次,Android13+运行时申请通知权限)；versionCode 递增到 2(v1.1)；网页功能无变化(微增部署) -->
 <!-- v106b: 小组件样式返工——组件整体即一枚信封(背景矢量图 intercourse_bg 铺满：纸身+上盖三角信封盖+盖尖红色爱心封章)，待确认状态整体切换 intercourse_bg_active(浅粉封章)，提示文字写在信封下部；网页无功能变化(微增部署) -->
@@ -311,6 +312,15 @@
   .history-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: linear-gradient(135deg, #fffefb, #fffaf3); border-radius: var(--radius-sm); border: 1px solid var(--border); transition: all 0.2s; }
   .history-item:hover { background: linear-gradient(135deg, #fff7ed, #ffedd5); border-color: #fdba74; }
   .h-btn-col { display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; }
+  /* v109：多选删除模式（健康页 + 身体页通用） */
+  .history-item.del-mode, .event-card.del-mode { cursor: pointer; }
+  .history-item.del-selected, .event-card.del-selected { outline: 2px solid #ef4444; background: #fef2f2 !important; }
+  .del-check { width: 22px; height: 22px; accent-color: #ef4444; flex-shrink: 0; cursor: pointer; }
+  #batchBar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 10070; background: #1e293b; color: white; border-radius: 999px; padding: 10px 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.35); font-size: 13px; font-weight: 600; white-space: nowrap; }
+  #batchBar button { border: none; border-radius: 999px; padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  #batchBar .bb-all { background: #334155; color: #cbd5e1; }
+  #batchBar .bb-del { background: #ef4444; color: white; }
+  #batchBar .bb-cancel { background: transparent; color: #94a3b8; }
   .h-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white; flex-shrink: 0; }
   .h-icon-sm { font-size: 15px; line-height: 1; flex-shrink: 0; }  /* v108：行内小图标 */
   .h-info { flex: 1; min-width: 0; }
@@ -870,7 +880,7 @@
           </select>
           <button class="btn-secondary" id="btnToggleHistory" style="font-size:11px;padding:4px 10px;">⇕ 收起</button>
           <span class="time-filter-chip" id="timeFilterChip" style="display:none;">📅 <span id="timeFilterLabel"></span> <button class="time-filter-clear" id="timeFilterClear" title="清除时间筛选">✕</button></span>
-          <button class="btn-secondary" id="btnExportCSV">📤 导出</button>
+          <!-- v109：导出键移到 设置→数据导出与导入 -->
           <button class="btn-danger" id="btnDelete">🗑 删除</button>
         </div>
       </div>
@@ -969,7 +979,8 @@
               <option value="fill-desc">填写时间 新→旧</option>
               <option value="fill-asc">填写时间 旧→新</option>
             </select>
-            <button class="btn-secondary" id="btnExportBody" style="font-size:11px;padding:4px 10px;">📤 导出</button>
+            <!-- v109：导出键移到 设置→数据导出与导入；新增批量删除 -->
+            <button class="btn-danger" id="btnDeleteBody" style="font-size:11px;padding:4px 10px;">🗑 删除</button>
             <button class="btn-secondary" id="btnToggleEventsList" style="font-size:11px;padding:4px 10px;">⇕ 收起</button>
           </div>
         </div>
@@ -978,7 +989,7 @@
         <!-- 筛选 + 搜索 -->
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
           <div class="member-filter" id="eventsMemberFilter"></div>
-          <select id="eventsCategoryFilter" class="preview-input" style="width:auto;font-size:13px;">
+          <select id="eventsCategoryFilter" class="preview-input" style="width:auto;font-size:12px;height:28px;padding:2px 8px;">
             <option value="">全部类型</option>
             <option value="menstrual">🌷 月经</option>
             <option value="gout">🦴 痛风</option>
@@ -986,7 +997,7 @@
             <option value="intercourse">❤️</option>
             <option value="custom">📝 自定义</option>
           </select>
-          <input type="search" id="eventsSearch" class="preview-input" placeholder="🔍 搜索标题、备注..." style="flex:1;min-width:140px;">
+          <input type="search" id="eventsSearch" class="preview-input" placeholder="🔍 搜索标题、备注..." style="flex:1;min-width:140px;height:28px;padding:2px 8px;font-size:12px;">
         </div>
 
         <!-- 列表 -->
@@ -1114,6 +1125,10 @@
       <!-- AI 生成该项目的建议记录字段（可填写后一并保存） -->
       <div id="aiFieldsWrap" style="margin-top:6px;"></div>
     </div>
+
+    <!-- v109：自定义可填项（所有项目通用）——用户可自由新增/删除字段，
+         可选字段配「点击即选」选项（同用药 pill），定义永久保存在本机 -->
+    <div id="extraFieldsWrap" style="margin-top:6px;"></div>
 
     <!-- 通用：备注 -->
     <div class="preview-row"><label>备注</label>
@@ -1297,6 +1312,14 @@
       </div>
     </div>
 
+    <!-- v109：自选条目删除——进入列表逐条勾选 -->
+    <div class="preview-row">
+      <label>方式</label>
+      <div style="flex:1;">
+        <button class="btn-secondary" id="btnDelPick" style="font-size:12px;width:100%;">🔲 自选条目（进入记录列表勾选多条，统一删除）</button>
+      </div>
+    </div>
+
     <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;font-size:13px;color:#92400e;margin-top:12px;line-height:1.6;">
       ⚠️ <b>将匹配 <span id="delMatchCount">0</span> 条记录</b>，被删除后无法恢复（建议先导出 CSV 备份）
     </div>
@@ -1313,150 +1336,106 @@
   </div>
 </div>
 
-<!-- ===== 配置弹窗 ===== -->
+<!-- ===== v109：设置弹窗（三大板块：Supabase 配置 / AI 配置 / 数据导出与导入） ===== -->
 <div class="modal-mask" id="configMask">
-  <div class="modal">
+  <div class="modal" style="max-width:500px;">
     <button class="modal-close" data-close="configMask" title="关闭">×</button>
-    <h3>⚙ Supabase 配置</h3>
-    <div class="modal-sub">配置后所有设备实时同步；未配置则使用本地模式（只本浏览器可见）</div>
+    <h3>⚙ 设置</h3>
 
-    <div class="cfg-field">
-      <label>Supabase URL</label>
-      <input type="text" id="cfgUrl" placeholder="https://dlnqhosjodkgyuojbyxo.supabase.co">
-      <div class="hint">格式：https://你的项目ID.supabase.co</div>
-    </div>
-
-    <div class="cfg-field">
-      <label>Publishable Key（Anon Key）</label>
-      <input type="text" id="cfgKey" class="key-input" placeholder="sb_publishable_xxxxxxxxxxxxx...">
-      <div class="hint">从 Supabase → Project Settings → API Keys 复制</div>
-    </div>
-
-    <details style="margin: 8px 0 12px;">
-      <summary style="cursor:pointer;color:#0891b2;font-size:13px;font-weight:600;">📖 第一次用？点开看教程</summary>
-      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px;font-size:12px;color:#475569;margin-top:8px;line-height:1.7;">
-        1. 打开 <a href="https://supabase.com" target="_blank">supabase.com</a> → 注册 → New Project<br>
-        2. 项目创建后，左侧 <b>Project Settings → API Keys</b><br>
-        3. 复制 <b>Project URL</b> 和 <b>publishable key</b>（anon）<br>
-        4. 左侧 <b>SQL Editor</b> → New Query → 粘贴下方建表 SQL → Run
+    <!-- 板块一：Supabase 配置 -->
+    <details open style="margin:0 0 10px;border:1px solid var(--border);border-radius:10px;padding:0 12px;">
+      <summary style="cursor:pointer;color:#0891b2;font-size:14px;font-weight:700;padding:10px 0;">🔌 Supabase 配置</summary>
+      <div class="modal-sub" style="margin:0 0 10px;">配置后所有设备实时同步；未配置则使用本地模式（只本浏览器可见）</div>
+      <div class="cfg-field">
+        <label>Supabase URL</label>
+        <input type="text" id="cfgUrl" placeholder="https://dlnqhosjodkgyuojbyxo.supabase.co">
+        <div class="hint">格式：https://你的项目ID.supabase.co</div>
+      </div>
+      <div class="cfg-field">
+        <label>Publishable Key（Anon Key）</label>
+        <input type="text" id="cfgKey" class="key-input" placeholder="sb_publishable_xxxxxxxxxxxxx...">
+        <div class="hint">从 Supabase → Project Settings → API Keys 复制</div>
+      </div>
+      <div class="cfg-actions-row">
+        <button class="btn-secondary" id="cfgLocalMode">仅本地模式</button>
+        <button class="btn-primary" id="cfgSave">💾 保存并刷新</button>
       </div>
     </details>
 
-    <details style="margin: 0 0 12px;">
-      <summary style="cursor:pointer;color:#0891b2;font-size:13px;font-weight:600;">📋 建表 SQL（点开复制）</summary>
-      <pre style="background:#1e293b;color:#e2e8f0;padding:12px;border-radius:8px;font-size:11px;margin-top:8px;overflow-x:auto;line-height:1.6;white-space:pre;">CREATE TABLE health_records (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  ts BIGINT NOT NULL,
-  member TEXT NOT NULL,
-  category JSONB NOT NULL,
-  values JSONB NOT NULL,
-  note TEXT DEFAULT '',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE INDEX idx_health_records_ts ON health_records(ts DESC);
-ALTER TABLE health_records ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public_all" ON health_records FOR ALL
-  TO anon USING (true) WITH CHECK (true);
-ALTER PUBLICATION supabase_realtime ADD TABLE health_records;
+    <!-- 板块二：AI 配置（v109 从独立弹窗移入） -->
+    <details style="margin:0 0 10px;border:1px solid var(--border);border-radius:10px;padding:0 12px;">
+      <summary style="cursor:pointer;color:#8b5cf6;font-size:14px;font-weight:700;padding:10px 0;">🪄 AI 配置（智能识别 + 项目字段建议）</summary>
+      <div class="cfg-field" style="margin-top:6px;">
+        <label>API 平台</label>
+        <select class="cfg-field-input" id="aiProvider">
+          <option value="dashscope">🇨🇳 通义千问 DashScope（推荐，免费）</option>
+          <option value="deepseek">🇨🇳 DeepSeek（中文好，便宜）</option>
+          <option value="openai">🌍 OpenAI（需科学上网）</option>
+          <option value="zhipu">🇨🇳 智谱 GLM</option>
+          <option value="custom">⚙️ 自定义（OpenAI 兼容）</option>
+        </select>
+      </div>
+      <div class="cfg-field">
+        <label>API 地址 (Base URL)</label>
+        <input type="text" id="aiBaseUrl" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1">
+        <div class="hint">切换平台会自动填默认值</div>
+      </div>
+      <div class="cfg-field">
+        <label>API Key</label>
+        <input type="text" id="aiApiKey" class="key-input" placeholder="sk-xxxxxxxxxxxxxxxx">
+        <div class="hint">👆 key 仅存在你的浏览器，不上传任何服务器</div>
+      </div>
+      <div class="cfg-field">
+        <label>模型</label>
+        <input type="text" id="aiModel" placeholder="qwen3.6-flash">
+        <div class="hint">默认 qwen3.6-flash（支持识图）；识图专用可填 qwen3-vl-plus。qwen-turbo / qwen-vl-plus / qwen3-vl-flash 已下线不可用</div>
+      </div>
+      <details style="margin: 0 0 12px;">
+        <summary style="cursor:pointer;color:#0891b2;font-size:13px;font-weight:600;">📖 怎么获取 API Key？（点开看教程）</summary>
+        <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px;font-size:12px;color:#475569;margin-top:8px;line-height:1.7;">
+          <b>🇨🇳 通义千问（推荐，免费 100 万 token/月）：</b><br>
+          1. 打开 <a href="https://bailian.console.aliyun.com" target="_blank">bailian.console.aliyun.com</a> 注册<br>
+          2. 开通「模型服务」→ 创建 API Key<br>
+          3. 复制 sk-xxxxxx 填到上面<br><br>
 
-CREATE TABLE body_events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  ts BIGINT NOT NULL,
-  end_ts BIGINT,
-  member TEXT NOT NULL,
-  category TEXT NOT NULL,
-  severity INTEGER DEFAULT 3,
-  title TEXT,
-  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
-  tags TEXT[] DEFAULT '{}',
-  note TEXT DEFAULT '',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE INDEX idx_body_events_ts ON body_events(ts DESC);
-CREATE INDEX idx_body_events_member ON body_events(member);
-CREATE INDEX idx_body_events_category ON body_events(category);
-ALTER TABLE body_events ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public_all_body" ON body_events FOR ALL
-  TO anon USING (true) WITH CHECK (true);
-ALTER PUBLICATION supabase_realtime ADD TABLE body_events;</pre>
-    </details>
+          <b>🇨🇳 DeepSeek：</b><br>
+          1. <a href="https://platform.deepseek.com" target="_blank">platform.deepseek.com</a> 注册<br>
+          2. API Keys → 创建新 key<br><br>
 
-    <!-- v100：云端备份恢复 -->
-    <details id="restoreBox" style="margin: 0 0 12px;">
-      <summary style="cursor:pointer;color:#0891b2;font-size:13px;font-weight:600;">☁️ 云端备份恢复（每周自动备份 · 误删救急用）</summary>
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;font-size:12px;color:#475569;margin-top:8px;line-height:1.7;">
-        <div id="restoreList">加载中…</div>
-        <div style="margin-top:8px;color:#94a3b8;">♻️ 恢复 = 把备份里本地缺少的记录按 id 补回来（<b>不会删除</b>现有记录，可放心点）</div>
+          <b>🌍 OpenAI：</b><br>
+          需要海外工具，Base URL 填 <code>https://api.openai.com/v1</code>，模型 <code>gpt-4o-mini</code>
+        </div>
+      </details>
+      <div class="cfg-actions-row">
+        <button class="btn-primary" id="aiCfgSave">💾 保存 AI 配置</button>
       </div>
     </details>
 
-    <div class="cfg-actions-row">
-      <button class="btn-secondary" id="cfgLocalMode">仅本地模式</button>
-      <button class="btn-primary" id="cfgSave">💾 保存并刷新</button>
-    </div>
-    <div style="margin-top:10px;text-align:right;">
-      <button class="btn-secondary" id="cfgCancel" style="font-size:11px;">取消</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== AI 配置弹窗 ===== -->
-<div class="modal-mask" id="aiConfigMask">
-  <div class="modal" style="max-width:520px;">
-    <button class="modal-close" data-close="aiConfigMask" title="关闭">×</button>
-    <h3>🪄 AI 智能识别配置</h3>
-    <div class="modal-sub">使用 OpenAI 兼容 API，支持通义千问/DeepSeek/OpenAI 等</div>
-
-    <div class="cfg-field">
-      <label>API 平台</label>
-      <select class="cfg-field-input" id="aiProvider">
-        <option value="dashscope">🇨🇳 通义千问 DashScope（推荐，免费）</option>
-        <option value="deepseek">🇨🇳 DeepSeek（中文好，便宜）</option>
-        <option value="openai">🌍 OpenAI（需科学上网）</option>
-        <option value="zhipu">🇨🇳 智谱 GLM</option>
-        <option value="custom">⚙️ 自定义（OpenAI 兼容）</option>
-      </select>
-    </div>
-
-    <div class="cfg-field">
-      <label>API 地址 (Base URL)</label>
-      <input type="text" id="aiBaseUrl" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1">
-      <div class="hint">切换平台会自动填默认值</div>
-    </div>
-
-    <div class="cfg-field">
-      <label>API Key</label>
-      <input type="text" id="aiApiKey" class="key-input" placeholder="sk-xxxxxxxxxxxxxxxx">
-      <div class="hint">👆 key 仅存在你的浏览器，不上传任何服务器</div>
-    </div>
-
-    <div class="cfg-field">
-      <label>模型</label>
-      <input type="text" id="aiModel" placeholder="qwen3.6-flash">
-      <div class="hint">默认 qwen3.6-flash（支持识图）；识图专用可填 qwen3-vl-plus。qwen-turbo / qwen-vl-plus / qwen3-vl-flash 已下线不可用</div>
-    </div>
-
-    <details style="margin: 0 0 12px;">
-      <summary style="cursor:pointer;color:#0891b2;font-size:13px;font-weight:600;">📖 怎么获取 API Key？（点开看教程）</summary>
-      <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px;font-size:12px;color:#475569;margin-top:8px;line-height:1.7;">
-        <b>🇨🇳 通义千问（推荐，免费 100 万 token/月）：</b><br>
-        1. 打开 <a href="https://bailian.console.aliyun.com" target="_blank">bailian.console.aliyun.com</a> 注册<br>
-        2. 开通「模型服务」→ 创建 API Key<br>
-        3. 复制 sk-xxxxxx 填到上面<br><br>
-
-        <b>🇨🇳 DeepSeek：</b><br>
-        1. <a href="https://platform.deepseek.com" target="_blank">platform.deepseek.com</a> 注册<br>
-        2. API Keys → 创建新 key<br><br>
-
-        <b>🌍 OpenAI：</b><br>
-        需要海外工具，Base URL 填 <code>https://api.openai.com/v1</code>，模型 <code>gpt-4o-mini</code>
+    <!-- 板块三：数据导出与导入（含云端备份恢复） -->
+    <details style="margin:0 0 10px;border:1px solid var(--border);border-radius:10px;padding:0 12px;">
+      <summary style="cursor:pointer;color:#059669;font-size:14px;font-weight:700;padding:10px 0;">📦 数据导出与导入</summary>
+      <div style="padding:8px 0 4px;">
+        <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;">导出</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+          <button class="btn-secondary" id="btnExpJSON" style="font-size:12px;">💾 导出完整备份 (JSON)</button>
+          <button class="btn-secondary" id="btnExpHealthCSV" style="font-size:12px;">📊 健康记录 CSV</button>
+          <button class="btn-secondary" id="btnExpBodyCSV" style="font-size:12px;">🧍 身体记录 CSV</button>
+        </div>
+        <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;">导入（JSON 备份文件，按 id 合并补缺，不删除现有记录）</div>
+        <div style="margin-bottom:14px;">
+          <button class="btn-secondary" id="btnImpJSON" style="font-size:12px;">📥 导入备份文件</button>
+          <input type="file" id="impJSONFile" accept=".json,application/json" style="display:none;">
+        </div>
+        <!-- v100：云端备份恢复（v109 移入本板块） -->
+        <details id="restoreBox">
+          <summary style="cursor:pointer;color:#0891b2;font-size:13px;font-weight:600;">☁️ 云端备份恢复（每周自动备份 · 误删救急用）</summary>
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;font-size:12px;color:#475569;margin-top:8px;line-height:1.7;">
+            <div id="restoreList">加载中…</div>
+            <div style="margin-top:8px;color:#94a3b8;">♻️ 恢复 = 把备份里本地缺少的记录按 id 补回来（<b>不会删除</b>现有记录，可放心点）</div>
+          </div>
+        </details>
       </div>
     </details>
-
-    <div class="cfg-actions-row">
-      <button class="btn-secondary" id="aiCfgCancel">取消</button>
-      <button class="btn-primary" id="aiCfgSave">💾 保存</button>
-    </div>
   </div>
 </div>
 
@@ -3388,11 +3367,6 @@ function openConfig() {
   console.log('✓ 配置弹窗已打开');
 }
 
-bindClick('cfgCancel', () => {
-  document.getElementById('configMask').classList.remove('show');
-  console.log('关闭配置弹窗');
-});
-
 bindClick('cfgLocalMode', () => {
   localStorage.setItem(CFG_LOCAL_KEY, '1');
   showToast('已切到本地模式');
@@ -3611,6 +3585,7 @@ document.addEventListener('click', (e) => {
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    if (delMode) { exitDeleteMode(); return; }  // v109：先退多选删除模式
     document.querySelectorAll('.modal-mask.show').forEach(m => m.classList.remove('show'));
   }
 });
@@ -3637,6 +3612,91 @@ document.getElementById('delConfirmBtn').addEventListener('click', async () => {
     }
   }
 });
+
+/* ===== v109：多选批量删除模式（健康页 + 身体页通用） ===== */
+let delMode = null;              // 'health' | 'body' | null
+const delSelIds = new Set();
+
+function enterDeleteMode(page) {
+  if (page === 'health' && records.length === 0) { showToast('暂无记录', 'warning'); return; }
+  if (page === 'body' && bodyEvents.length === 0) { showToast('暂无记录', 'warning'); return; }
+  delMode = page;
+  delSelIds.clear();
+  if (page === 'health') renderHistory(); else renderEventsList();
+  showBatchBar();
+  showToast(page === 'health' ? '已进入删除模式：点选要删除的记录' : '已进入删除模式：点选要删除的记录');
+}
+
+function exitDeleteMode() {
+  delMode = null;
+  delSelIds.clear();
+  const bar = document.getElementById('batchBar');
+  if (bar) bar.remove();
+  try { renderHistory(); } catch (e) {}
+  try { renderEventsList(); } catch (e) {}
+}
+
+function showBatchBar() {
+  let bar = document.getElementById('batchBar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'batchBar';
+    bar.innerHTML = `
+      <span id="bbCount">已选 0 条</span>
+      <button class="bb-all" id="bbAll">全选</button>
+      <button class="bb-del" id="bbDel">🗑 删除所选</button>
+      <button class="bb-cancel" id="bbCancel">取消</button>
+    `;
+    document.body.appendChild(bar);
+    document.getElementById('bbAll').onclick = () => {
+      const boxes = (delMode === 'health' ? document.querySelectorAll('#historyList .del-check') : document.querySelectorAll('#eventsList .del-check'));
+      const allChecked = Array.from(boxes).every(b => b.checked);
+      boxes.forEach(b => { b.checked = !allChecked; b.dispatchEvent(new Event('change')); });
+      document.getElementById('bbAll').textContent = allChecked ? '全选' : '全不选';
+    };
+    document.getElementById('bbDel').onclick = batchDeleteSel;
+    document.getElementById('bbCancel').onclick = exitDeleteMode;
+  }
+  updateBatchBar();
+}
+
+function updateBatchBar() {
+  const el = document.getElementById('bbCount');
+  if (el) el.textContent = `已选 ${delSelIds.size} 条`;
+}
+
+async function batchDeleteSel() {
+  if (!delSelIds.size) { showToast('请先勾选要删除的条目', 'warning'); return; }
+  if (!(await uiConfirm({ title: `删除选中的 ${delSelIds.size} 条记录？`, message: '删除后无法恢复（可先在 设置→数据导出与导入 导出备份）', icon: '🗑', okText: '删除' }))) return;
+  const ids = new Set(delSelIds);
+  const page = delMode;
+  exitDeleteMode();
+  if (page === 'health') {
+    records = records.filter(r => !ids.has(r.id));
+    saveLocalCache(); render();
+    if (!LOCAL_MODE && isConfigured) {
+      for (const id of ids) {
+        if (!id.startsWith('pending-') && !id.startsWith('local-')) deleteFromCloud(id).catch(e => console.error(e));
+      }
+    }
+  } else {
+    bodyEvents = bodyEvents.filter(e => !ids.has(e.id));
+    saveBodyEventsCache(); renderEvents();
+    if (dbClient) {
+      for (const id of ids) {
+        if (!id.startsWith('pending-')) deleteBodyEventFromCloud(id).catch(e => console.error(e));
+      }
+    }
+  }
+  showToast(`✓ 已删除 ${ids.size} 条`);
+}
+
+// 入口：健康页删除弹窗「自选条目」+ 身体页「🗑 删除」
+bindClick('btnDelPick', () => {
+  document.getElementById('deleteMask').classList.remove('show');
+  enterDeleteMode('health');
+}, '自选条目删除');
+bindClick('btnDeleteBody', () => enterDeleteMode('body'), '身体页批量删除');
 
 /* ============================================================
    渲染
@@ -4103,14 +4163,13 @@ function renderHistory() {
       : '';
     // 状态按钮文字：去掉 ✓/⚠ emoji（按钮已经带颜色），更紧凑
     const btnLabel = st.cls === 'normal' ? '正常' : '异常';
-    // v108：按钮列（正常/删除上下叠放）放最左侧高度居中；记录三行制——
+    // v109：多选删除模式——显示勾选框、隐藏操作按钮，整条点击即切换勾选
+    const inDelMode = delMode === 'health';
+    // v109：按钮列（正常/删除上下叠放）移到最右侧高度居中；记录三行制——
     // 第一行 图标+人名+项目名(+数值)、第二行 正常值范围、第三行 时间(备注/徽章)
     return `
-      <div class="history-item">
-        <div class="h-btn-col">
-          <button class="h-status-btn ${st.cls}" data-id="${r.id}" title="点击手动修正">${btnLabel}${manualTag}</button>
-          <button class="h-delete" data-id="${r.id}" title="删除这条记录">删除</button>
-        </div>
+      <div class="history-item${inDelMode ? ' del-mode' : ''}${delSelIds.has(r.id) ? ' del-selected' : ''}" ${inDelMode ? `data-del-id="${r.id}"` : ''}>
+        ${inDelMode ? `<input type="checkbox" class="del-check" data-del-id="${r.id}" ${delSelIds.has(r.id) ? 'checked' : ''}>` : ''}
         <div class="h-info">
           <div class="h-line1">
             <span class="h-icon-sm">${r.category.icon}</span>
@@ -4125,9 +4184,34 @@ function renderHistory() {
             ${pendingBadge}
           </div>
         </div>
+        ${inDelMode ? '' : `
+        <div class="h-btn-col">
+          <button class="h-status-btn ${st.cls}" data-id="${r.id}" title="点击手动修正">${btnLabel}${manualTag}</button>
+          <button class="h-delete" data-id="${r.id}" title="删除这条记录">删除</button>
+        </div>`}
       </div>
     `;
   }).join('');
+  // v109：多选模式下整条点击切换勾选
+  if (delMode === 'health') {
+    list.querySelectorAll('.history-item.del-mode').forEach(item => {
+      item.onclick = (e) => {
+        if (e.target.closest('.del-check')) return;  // checkbox 自己会触发 change
+        const cb = item.querySelector('.del-check');
+        cb.checked = !cb.checked;
+        cb.dispatchEvent(new Event('change'));
+      };
+    });
+    list.querySelectorAll('.del-check').forEach(cb => {
+      cb.onchange = () => {
+        const id = cb.dataset.delId;
+        if (cb.checked) delSelIds.add(id); else delSelIds.delete(id);
+        cb.closest('.history-item').classList.toggle('del-selected', cb.checked);
+        updateBatchBar();
+      };
+    });
+    return;  // 多选模式不绑操作按钮
+  }
   list.querySelectorAll('.h-delete').forEach(btn => {
     // v77：直接调 deleteRecord（内部自带一次 uiConfirm 确认）——此前这里先弹一次确认、
     // deleteRecord 内部又弹一次，导致健康页删除要点两次；与身体页保持一致只确认一次
@@ -4579,8 +4663,8 @@ function downloadFile(filename, content, type) {
   URL.revokeObjectURL(url);
 }
 
-// v84：健康页导出去掉 JSON 模式，只保留 CSV 一种（按钮改名「📤 导出」）；JSON 导出已移除
-document.getElementById('btnExportCSV').onclick = () => {
+// v84：健康页导出只保留 CSV 一种；v109 导出键统一移到 设置→数据导出与导入
+document.getElementById('btnExpHealthCSV').onclick = () => {
   if (!records.length) { showToast('暂无数据', 'warning'); return; }
   const rows = [['记录时间', '家人', '类别', '数值', '单位', '状态', '备注']];
   records.slice().reverse().forEach(r => {
@@ -4651,11 +4735,16 @@ function getAiConfig() {
 }
 
 function openAiConfig() {
+  // v109：AI 配置并入设置弹窗第二板块——打开设置并展开 AI 部分
   document.getElementById('aiProvider').value = aiConfig.provider || 'dashscope';
   document.getElementById('aiBaseUrl').value = aiConfig.baseUrl || AI_PRESETS.dashscope.baseUrl;
   document.getElementById('aiApiKey').value = aiConfig.apiKey || '';
   document.getElementById('aiModel').value = aiConfig.model || AI_PRESETS.dashscope.model;
-  document.getElementById('aiConfigMask').classList.add('show');
+  const mask = document.getElementById('configMask');
+  mask.classList.add('show');
+  mask.querySelectorAll('details').forEach(d => d.open = false);
+  const aiSec = mask.querySelector('details:nth-of-type(2)');
+  if (aiSec) aiSec.open = true;
 }
 
 document.getElementById('aiProvider').addEventListener('change', (e) => {
@@ -4669,9 +4758,6 @@ document.getElementById('aiProvider').addEventListener('change', (e) => {
   document.getElementById(id).addEventListener('input', () => document.getElementById(id).dataset.userEdited = '1');
 });
 
-document.getElementById('aiCfgCancel').addEventListener('click', () => {
-  document.getElementById('aiConfigMask').classList.remove('show');
-});
 document.getElementById('aiCfgSave').addEventListener('click', () => {
   aiConfig = {
     provider: document.getElementById('aiProvider').value,
@@ -4683,7 +4769,6 @@ document.getElementById('aiCfgSave').addEventListener('click', () => {
     showToast('请填写 API 地址和 Key', 'warning'); return;
   }
   localStorage.setItem('ai_config', JSON.stringify(aiConfig));
-  document.getElementById('aiConfigMask').classList.remove('show');
   showToast('✓ AI 配置已保存');
 });
 
@@ -5152,8 +5237,8 @@ bindClick('btnToggleHistory', () => {
   w.style.display = hide ? 'none' : '';
   b.textContent = hide ? '⇕ 展开' : '⇕ 收起';
 }, 'toggle 健康全部记录');
-// v84：身体全部记录导出 CSV（与健康页同款单模式导出）
-bindClick('btnExportBody', () => {
+// v84：身体记录导出 CSV；v109 导出键统一移到 设置→数据导出与导入
+bindClick('btnExpBodyCSV', () => {
   if (!bodyEvents.length) { showToast('暂无数据', 'warning'); return; }
   const rows = [['记录时间', '类型', '家人', '持续', '备注']];
   bodyEvents.slice().sort((a, b) => a.ts - b.ts).forEach(ev => {
@@ -5162,6 +5247,61 @@ bindClick('btnExportBody', () => {
   });
   downloadFile(`身体记录_${formatDate(Date.now())}.csv`, '\ufeff' + rows.map(row => row.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n'), 'text/csv;charset=utf-8');
   showToast('✓ 已导出 CSV');
+});
+
+// ===== v109：完整备份导出/导入（JSON，含 id/ts/payload 全量字段；导入按 id 合并补缺不删除） =====
+bindClick('btnExpJSON', () => {
+  if (!records.length && !bodyEvents.length) { showToast('暂无数据', 'warning'); return; }
+  const data = {
+    exported_at: new Date().toISOString(),
+    health_records: records,
+    body_events: bodyEvents,
+    members: familyMembers,
+  };
+  downloadFile(`家庭健康完整备份_${formatDate(Date.now())}.json`, JSON.stringify(data), 'application/json');
+  showToast(`✓ 已导出 ${records.length + bodyEvents.length} 条完整备份`);
+});
+
+bindClick('btnImpJSON', () => document.getElementById('impJSONFile').click());
+document.getElementById('impJSONFile').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  let data;
+  try { data = JSON.parse(await file.text()); }
+  catch (err) { showToast('文件解析失败：不是有效的 JSON', 'error'); return; }
+  const hr = Array.isArray(data.health_records) ? data.health_records : [];
+  const be = Array.isArray(data.body_events) ? data.body_events : [];
+  if (!hr.length && !be.length) { showToast('备份里没有记录', 'warning'); return; }
+  if (!(await uiConfirm({ title: `导入 ${hr.length + be.length} 条记录？`, message: '按 id 合并补缺：本地已有的不覆盖，缺的补进来；不会删除任何现有记录', icon: '📥', okText: '导入' }))) return;
+  const knownH = new Set(records.map(r => r.id));
+  const addH = hr.filter(r => r && r.id && !knownH.has(r.id));
+  const knownB = new Set(bodyEvents.map(b => b.id));
+  const addB = be.filter(b => b && b.id && !knownB.has(b.id));
+  records = addH.concat(records);
+  bodyEvents = addB.concat(bodyEvents);
+  saveLocalCache();
+  saveBodyEventsCache();
+  render(); renderEvents();
+  showToast(`✓ 已导入：健康 ${addH.length} 条 / 身体 ${addB.length} 条（其余本地已有）`);
+  // 云端补传（本地新增的部分，upsert 按 id 不重复）
+  if (!LOCAL_MODE && isConfigured && dbClient && (addH.length + addB.length)) {
+    try {
+      const hPush = addH.filter(r => r.id && !r.id.startsWith('pending-') && !r.id.startsWith('local-'))
+        .map(r => dbClient.from('health_records').upsert({
+          id: r.id, ts: r.ts, member: r.member, category: r.category,
+          values: r.values, note: r.note || '',
+        }));
+      const bPush = addB.filter(b => b.id && !b.id.startsWith('pending-'))
+        .map(b => dbClient.from('body_events').upsert({
+          id: b.id, ts: b.ts, end_ts: b.end_ts || null, member: b.member,
+          category: b.category, severity: b.severity || 3, title: b.title || null,
+          payload: b.payload || {}, tags: b.tags || [], note: b.note || '',
+        }));
+      await Promise.allSettled([...hPush, ...bPush]);
+      showToast('☁️ 已同步到云端');
+    } catch (err) { console.error('导入后云端同步失败', err); }
+  }
 });
 
 // v94：身体页全部记录排序
@@ -5815,6 +5955,8 @@ function setEventType(type, customId) {
       wrap.innerHTML = '';
     }
   }
+  // v109：切换类型时渲染该项目的自定义可填项（新建=空白；编辑流稍后会带值重渲染）
+  renderExtraFields(null);
 }
 
 // v98：弹窗类型格动态渲染——自定义项目像内置项目一样成为独立按钮（data-type=cust_xxx）
@@ -5957,6 +6099,123 @@ function renderAISuggestedFields(name, existing) {
 }
 
 // v98：项目名输入防抖已删除——事件名输入框移除，AI 建议改为新建项目时预生成
+
+/* ============================================================
+   v109：自定义可填项（所有项目通用，永久保存）
+   - 定义存 localStorage fh_extra_fields：{ 'gout': [{label,options:[]}], 'cust_xxx': [...] }
+   - 有 options 的字段渲染「点击即选」chip（同 AI 建议字段交互）；无 options 为自由填写
+   - 值随 payload.extra_fields = [{label,value}] 保存，全部记录卡片显示为标签
+   ============================================================ */
+const EXTRA_FIELDS_KEY = 'fh_extra_fields';
+function getExtraFieldsMap() {
+  try { return JSON.parse(localStorage.getItem(EXTRA_FIELDS_KEY) || '{}') || {}; }
+  catch (e) { return {}; }
+}
+function saveExtraFieldsMap(m) { localStorage.setItem(EXTRA_FIELDS_KEY, JSON.stringify(m)); }
+function getExtraFieldDefs() {
+  const key = currentCustomTypeId || currentEventType;
+  if (!key) return [];
+  return getExtraFieldsMap()[key] || [];
+}
+function putExtraFieldDef(def) {
+  const key = currentCustomTypeId || currentEventType;
+  if (!key || !def.label) return;
+  const m = getExtraFieldsMap();
+  const arr = m[key] || [];
+  if (!arr.find(f => f.label === def.label)) arr.push(def);
+  m[key] = arr;
+  saveExtraFieldsMap(m);
+}
+function removeExtraFieldDef(label) {
+  const key = currentCustomTypeId || currentEventType;
+  if (!key) return;
+  const m = getExtraFieldsMap();
+  m[key] = (m[key] || []).filter(f => f.label !== label);
+  saveExtraFieldsMap(m);
+}
+
+// 渲染自定义可填项区域（existing = 编辑回填 [{label,value}]）
+function renderExtraFields(existing) {
+  const wrap = document.getElementById('extraFieldsWrap');
+  if (!wrap) return;
+  const defs = getExtraFieldDefs();
+  const rows = defs.map(f => {
+    const prev = (existing || []).find(x => x.label === f.label);
+    const chips = (f.options || []).map(o =>
+      `<span class="ai-opt-chip extra-opt-chip" data-val="${escapeHtml(o)}" title="点击填入">${escapeHtml(o)}</span>`
+    ).join('');
+    return `<div class="preview-row extra-field-row" data-label="${escapeHtml(f.label)}">
+      <label>${escapeHtml(f.label)} <span class="extra-del" title="删除这个填项（永久）">🗑</span></label>
+      <input type="text" class="preview-input extra-field-input" data-label="${escapeHtml(f.label)}" value="${escapeHtml((prev && prev.value) || '')}" placeholder="${(f.options && f.options.length) ? '点下方选项即可填入' : '选填'}">
+      ${chips ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${chips}</div>` : ''}
+    </div>`;
+  }).join('');
+  wrap.innerHTML = rows + `
+    <button type="button" class="btn-secondary" id="btnAddExtraField" style="font-size:11px;padding:4px 10px;margin:2px 0 6px;">➕ 新增填项</button>
+    <div id="extraFieldEditor" style="display:none;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px;">
+      <div class="preview-row"><label style="font-size:12px;">名称</label>
+        <input type="text" id="efLabel" class="preview-input" style="font-size:13px;" placeholder="如：卧床时间">
+      </div>
+      <div class="preview-row"><label style="font-size:12px;">可选项</label>
+        <input type="text" id="efOptions" class="preview-input" style="font-size:13px;" placeholder="多个用逗号隔开，如：1小时,3小时,6小时（留空=自由填写）">
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button type="button" class="btn-secondary" id="efCancel" style="font-size:11px;padding:4px 10px;">取消</button>
+        <button type="button" class="btn-primary" id="efSave" style="font-size:11px;padding:4px 10px;">✓ 保存字段</button>
+      </div>
+    </div>`;
+  // 选项 chip 点击填入（同 AI 建议字段）
+  wrap.querySelectorAll('.extra-opt-chip').forEach(chip => {
+    chip.onclick = () => {
+      const inp = chip.closest('.preview-row').querySelector('.extra-field-input');
+      if (inp) inp.value = chip.dataset.val;
+    };
+  });
+  // 删除字段：两击确认（第一击变红问号，2.5 秒内再击才删）
+  wrap.querySelectorAll('.extra-del').forEach(d => {
+    d.style.cursor = 'pointer';
+    d.onclick = (e) => {
+      e.stopPropagation();
+      if (!d.dataset.arm) {
+        d.dataset.arm = '1';
+        d.textContent = '❓';
+        setTimeout(() => { d.dataset.arm = ''; d.textContent = '🗑'; }, 2500);
+        return;
+      }
+      const label = d.closest('.extra-field-row').dataset.label;
+      removeExtraFieldDef(label);
+      // 重渲染，保留已填的其它字段值
+      const vals = collectExtraFieldValues();
+      renderExtraFields(vals.filter(v => v.label !== label));
+      showToast(`已删除填项「${label}」`);
+    };
+  });
+  // 新增字段编辑器
+  wrap.querySelector('#btnAddExtraField').onclick = () => {
+    const ed = wrap.querySelector('#extraFieldEditor');
+    ed.style.display = ed.style.display === 'none' ? '' : 'none';
+    if (ed.style.display !== 'none') wrap.querySelector('#efLabel').focus();
+  };
+  wrap.querySelector('#efCancel').onclick = () => { wrap.querySelector('#extraFieldEditor').style.display = 'none'; };
+  wrap.querySelector('#efSave').onclick = () => {
+    const label = wrap.querySelector('#efLabel').value.trim();
+    if (!label) { showToast('请填写字段名称', 'warning'); return; }
+    if (getExtraFieldDefs().find(f => f.label === label)) { showToast('该填项已存在', 'warning'); return; }
+    const options = wrap.querySelector('#efOptions').value.split(/[,，;；]/).map(s => s.trim()).filter(Boolean).slice(0, 8);
+    putExtraFieldDef({ label, options });
+    const vals = collectExtraFieldValues();
+    renderExtraFields(vals);
+    wrap.querySelector('#extraFieldEditor').style.display = 'none';
+    showToast(`✓ 已添加填项「${label}」${options.length ? `（${options.length} 个可选项）` : '（自由填写）'}`);
+  };
+}
+
+// 收集当前已填的自定义字段值
+function collectExtraFieldValues() {
+  return Array.from(document.querySelectorAll('#extraFieldsWrap .extra-field-input'))
+    .map(el => ({ label: el.dataset.label, value: el.value.trim() }))
+    .filter(f => f.value);
+}
 // + 选中项目时（setEventType）直接渲染
 
 function setDefaultEventTimes() {
@@ -6052,6 +6311,8 @@ function openEventModal(ev) {
       (ev && ev.payload && ev.payload.ai_fields) || null
     );
   }
+  // v109：编辑回填自定义可填项（新建记录 setEventType 已渲染空白版）
+  renderExtraFields((ev && ev.payload && ev.payload.extra_fields) || null);
   showModal('eventModalMask');
 }
 
@@ -6164,6 +6425,10 @@ function saveEventFromForm() {
       .filter(f => f.value);
     if (aiFields.length) payload.ai_fields = aiFields;
   }
+
+  // v109：自定义可填项（所有项目通用，填写了才存）
+  const extraVals = collectExtraFieldValues();
+  if (extraVals.length) payload.extra_fields = extraVals;
 
   // 自定义事件 category 优先用关联的 cust_xxx id，否则保留 'custom'
   let finalCategory = currentEventType;
@@ -6398,6 +6663,26 @@ function renderEventsList() {
   }
 
   wrap.innerHTML = list.slice(0, 50).map(ev => renderEventCard(ev)).join('');
+  // v109：多选删除模式下整条点击切换勾选
+  if (delMode === 'body') {
+    wrap.querySelectorAll('.event-card.del-mode').forEach(item => {
+      item.onclick = (e) => {
+        if (e.target.closest('.del-check')) return;
+        const cb = item.querySelector('.del-check');
+        cb.checked = !cb.checked;
+        cb.dispatchEvent(new Event('change'));
+      };
+    });
+    wrap.querySelectorAll('.del-check').forEach(cb => {
+      cb.onchange = () => {
+        const id = cb.dataset.delId;
+        if (cb.checked) delSelIds.add(id); else delSelIds.delete(id);
+        cb.closest('.event-card').classList.toggle('del-selected', cb.checked);
+        updateBatchBar();
+      };
+    });
+    return;
+  }
   // 绑定事件
   wrap.querySelectorAll('[data-ev-action]').forEach(btn => {
     btn.onclick = async () => {
@@ -6444,16 +6729,19 @@ function renderEventCard(ev) {
       chips.push(`<span class="event-meta-chip tag">${escapeHtml(f.label)} ${escapeHtml(f.value)}</span>`);
     });
   }
+  // v109：自定义可填项标签
+  if (ev.payload.extra_fields && ev.payload.extra_fields.length) {
+    ev.payload.extra_fields.forEach(f => {
+      chips.push(`<span class="event-meta-chip tag">${escapeHtml(f.label)} ${escapeHtml(f.value)}</span>`);
+    });
+  }
 
   // v104：时间（含年份）放第一行末尾，与项目名隔开（flex 自动撑开）
   const headTime = ev.ts ? `${formatDate(ev.ts)} ${new Date(ev.ts).toTimeString().slice(0, 5)}` : '';
 
   return `
-    <div class="event-card event-cat-${escapeHtml(ev.category)}">
-      <div class="event-card-actions">
-        <button class="ev-mini-btn" data-ev-action="edit" data-ev-id="${escapeHtml(ev.id)}" title="编辑">✏️</button>
-        <button class="ev-mini-btn" data-ev-action="delete" data-ev-id="${escapeHtml(ev.id)}" title="删除">🗑</button>
-      </div>
+    <div class="event-card event-cat-${escapeHtml(ev.category)}${delMode === 'body' ? ' del-mode' : ''}${delSelIds.has(ev.id) ? ' del-selected' : ''}" ${delMode === 'body' ? `data-del-id="${ev.id}"` : ''}>
+      ${delMode === 'body' ? `<input type="checkbox" class="del-check" data-del-id="${ev.id}" ${delSelIds.has(ev.id) ? 'checked' : ''}>` : ''}
       <div class="event-card-body">
         <div class="event-card-head">
           <div class="event-card-icon">${meta.icon}</div>
@@ -6463,6 +6751,11 @@ function renderEventCard(ev) {
         ${chips.length ? `<div class="event-card-meta">${chips.join('')}</div>` : ''}
         ${ev.note ? `<div style="font-size:12px;color:var(--text-3);margin-top:4px;line-height:1.5;">${escapeHtml(ev.note)}</div>` : ''}
       </div>
+      ${delMode === 'body' ? '' : `
+      <div class="event-card-actions">
+        <button class="ev-mini-btn" data-ev-action="edit" data-ev-id="${escapeHtml(ev.id)}" title="编辑">✏️</button>
+        <button class="ev-mini-btn" data-ev-action="delete" data-ev-id="${escapeHtml(ev.id)}" title="删除">🗑</button>
+      </div>`}
     </div>
   `;
 }
