@@ -1,33 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- v108：信封圆角化（纸身四角圆弧，盖沿内缩不溢出角），尺寸内缩 1/5（layout 层 margin 4dp） -->
+<!-- v114：信封缩小为组件的 3/5（路径绕中心缩放 0.6），四角圆弧加大（圆角 4，约原比例 2 倍），
+     外围透明；文字提示改由 layout 内 LinearLayout 权重定位到信封下部 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp"
     android:height="48dp"
     android:viewportWidth="48"
     android:viewportHeight="48">
 
-    <!-- 信封纸身（圆角矩形，铺满内缩后的组件区域） -->
+    <!-- 信封纸身（圆角矩形，占视口中央 60%） -->
     <path
         android:fillColor="#FFFBF5"
         android:strokeColor="#EC4899"
-        android:strokeWidth="1.5"
-        android:pathData="M6,5 L42,5 Q46.5,5 46.5,9.5 L46.5,38.5 Q46.5,43 42,43 L6,43 Q1.5,43 1.5,38.5 L1.5,9.5 Q1.5,5 6,5 Z" />
+        android:strokeWidth="2"
+        android:pathData="M13.2,12.6 L33.5,12.6 Q37.5,12.6 37.5,16.6 L37.5,31.4 Q37.5,35.4 33.5,35.4 L14.5,35.4 Q10.5,35.4 10.5,31.4 L10.5,16.6 Q10.5,12.6 14.5,12.6 Z" />
 
     <!-- 盖下的信封盖（填充，起点内缩避开圆角） -->
     <path
         android:fillColor="#FFE4EC"
-        android:pathData="M4,6 L24,26 L44,6 Z" />
+        android:pathData="M12,13.2 L24,25.2 L36,13.2 Z" />
 
     <!-- 信封盖折线（只描边不填充，避免顶部重复描线） -->
     <path
         android:strokeColor="#EC4899"
-        android:strokeWidth="1.5"
-        android:pathData="M4,6 L24,26 L44,6" />
+        android:strokeWidth="2"
+        android:pathData="M12,13.2 L24,25.2 L36,13.2" />
 
     <!-- 爱心封章（盖在盖尖上，像火漆印） -->
     <path
         android:fillColor="#E11D48"
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="1"
-        android:pathData="M24,31 C24,31 16,26.2 16,21.6 C16,18.7 18.1,17 20.1,17 C21.8,17 23.2,18 24,19.4 C24.8,18 26.2,17 27.9,17 C29.9,17 32,18.7 32,21.6 C32,26.2 24,31 24,31 Z" />
+        android:strokeWidth="1.5"
+        android:pathData="M24,28.2 C24,28.2 19.2,25.3 19.2,22.6 C19.2,20.8 20.5,19.8 21.7,19.8 C22.7,19.8 23.5,20.4 24,21.2 C24.5,20.4 25.3,19.8 26.3,19.8 C27.5,19.8 28.8,20.8 28.8,22.6 C28.8,25.3 24,28.2 24,28.2 Z" />
 </vector>

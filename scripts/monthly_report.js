@@ -111,10 +111,11 @@ const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
     const sd = Math.sqrt(gaps.reduce((s, v) => s + (v - mean) ** 2, 0) / gaps.length);
     const regular = sd < 3 ? '周期规律' : sd <= 5 ? '周期基本规律' : '周期波动较大';
     const next = new Date(spans[spans.length - 1].start.getTime() + avg * DAY);
-    // v112：上次经期不足预存天数（历史加权平均）→ 只预测下次月经窗，无卵泡期等各期预测
-    const predDays = wAvg(spans.map(sp => sp.days).filter(d => d >= 1 && d <= 14).slice(-6));
+    // v114：下次经期天数 = 上次实际记录 <5 天按实际天数，否则历史加权平均；
+    // 经期判定结束后一律给出各期预测（「只预测月经窗」仅适用于经期进行中的待定期）
     const lastDays = lastP.days;
-    const note = lastDays >= predDays ? `（预测经期约 ${predDays} 天）` : `（上次经期仅 ${lastDays} 天，预测经期约 ${predDays} 天，暂无卵泡期等各期预测）`;
+    const predDays = lastDays < 5 ? lastDays : wAvg(spans.map(sp => sp.days).filter(d => d >= 1 && d <= 14).slice(-6));
+    const note = `（预测经期约 ${predDays} 天）`;
     return { member: m, avg: Math.round(avg), sd, regular, next: dayKey(next), note };
   }).filter(Boolean);
 

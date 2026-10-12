@@ -1,7 +1,7 @@
 /* 家庭健康记录 Service Worker
  * 缓存策略：network-first（HTML/JS/CSS，避免新版本被旧缓存遮蔽）+ stale-while-revalidate（CDN 资源）
  */
-const CACHE = 'family-health-v28';  // v112：预测经期天数改历史加权平均（网页+小组件+月报三端同步）
+const CACHE = 'family-health-v29';  // v114：预测规则修正(判定结束即完整预测/短经期按实际天数)+卵泡期#F9D770+速览❤️近30天+趋势图标压矮
 const CORE = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v112: 月经预测经期天数改为历史经期天数加权平均(最近6次,权重6:5:4:3:2:1,与周期算法同款;无历史回退5天); 最新一次未记完的经期不计入(待定窗用不含本轮的历史均值); 早来/正常/迟来均按同一预存天数预测; 上次经期≥预存天数才完整预测卵泡期等; 网页+小组件(versionCode 6/v1.5)+月报三端同步 -->
+<!-- v114: ①月经预测修正: 经期判定结束后一律给出卵泡期等各期预测(「只预测月经窗」仅限经期进行中的待定期); 下次经期天数=上次实际记录<5天按实际天数,否则历史加权平均 ②卵泡期配色改#F9D770(日历) ③健康速览「近30天❤️」→「❤️ 近30天」 ④身体页趋势分析标题emoji压矮1/2; APK versionCode 8/v1.7: 信封小组件缩至3/5+圆角加大,卵泡期圆点/药丸#F9D770 -->
 <!-- v109: ①全部记录按钮列移最右侧(健康:正常/删除;身体:编辑/删除) ②删两处导出键,设置弹窗重构为三板块(Supabase配置/AI配置/数据导出与导入),新增JSON完整备份导出+导入(按id合并),删「第一次用」「建表SQL」,云端备份恢复移入第三板块 ③删除弹窗新增「自选条目」多选批量删除模式(健康+身体页,batchBar悬浮操作条) ④身体页筛选/搜索框高度对齐人名框 ⑤新增自定义可填项系统(所有项目可增删字段,可选项点击即选,定义存localStorage fh_extra_fields,值存payload.extra_fields) -->
 <!-- v108: ①项目管理弹窗❤️项目不再显示「同房」字样(标题空着,符号示意) ②全部记录改版：健康页「正常/删除」上下叠放收窄放最左侧高度居中+记录三行制(图标+人名+项目名+数值/正常值范围/时间)；身体页「编辑/删除」同样上下叠放收窄左侧居中,删除右侧216px预留让出整卡宽度 ③日历所有符号缩小1/4(角标18→13px,compact 8px,tiny 7px,标记6px) ④修复月经趋势图：v92 把最后一条经期整体剔出图导致倒数第二条(如8.30)算不出与9.24的周期——改为shown含最后一条,周期按「下一条来潮」计算,最后一条只显示来潮天数 ⑤配套APK v108：信封圆角化+内缩4dp(约小1/5)；versionCode 3(v1.2) -->
 <!-- v107: 新增 APP 更新推送——APK 构建后 CI 自动发布 releases/latest.apk+version.json 到 Pages；APP 启动 2.5s 后检查(有新版弹窗一键下载安装,经 FileProvider 拉起安装器)+WidgetWorker 每3h后台检查(发系统通知,同版本只提醒一次,Android13+运行时申请通知权限)；versionCode 递增到 2(v1.1)；网页功能无变化(微增部署) -->
@@ -606,7 +606,7 @@
   .menstrual-day.in-period .marker, .menstrual-day.in-period .phase-tag { color: #7A2837; }
   /* 修复 bug：CSS 名要和 JS 一致 —— 预测月经期浅粉格 */
   .menstrual-day.menstrual-predicted { background: #FBDCE1; color: #7A2837; box-shadow: inset 0 0 0 1.5px #F7B3BD; }
-  .menstrual-day.follicular { background: #FAEDBF; color: #8A6D1E; }
+  .menstrual-day.follicular { background: #F9D770; color: #8A6D1E; }
   .menstrual-day.ovulation-window { background: #FDD9B5; color: #96551F; }
   /* v94：排卵日不再特意加外框，只像其它时期一样改底色 */
   .menstrual-day.ovulation-day { background: #F5A96B; color: #6E3A10; }
@@ -5461,10 +5461,11 @@ function cycleRegularityLabel(sd) {
    ② 最近一次经期开始后、待定窗内（窗长 = 不含本轮的历史经期加权平均）为「进行中/待定」：
       不生成周期预测；日历/小组件把待定窗内未记录的日子显示为「预测月经期」
    ③ 待定结束判定本轮经期天数 = 实际记录天数：
-      - 记满 ≥ 预存天数 → 完整预测（下次月经窗 + 卵泡期/排卵日/排卵期/黄体期）
-      - 不足 → 只预测下次月经窗（开始日起预存天数），不出现卵泡期等阶段预测
+      - v114：判定结束后一律给出完整预测（卵泡期/排卵日/排卵期/黄体期）——
+        「只预测月经窗」仅适用于经期进行中的待定期
    ④ 预测的下次月经开始日 = 上次开始日 + 平均周期（不受本轮经期实际天数影响）；
-      早来 / 正常来 / 迟来，预测窗天数都按同一预存天数 */
+      早来 / 正常来 / 迟来，预测窗天数都按同一预存天数；
+      下次经期预测天数 = 上次实际记录 <5 天时按实际天数，否则按历史加权平均 */
 
 const DEFAULT_PRED_DAYS = 5;
 
@@ -5522,8 +5523,6 @@ function computeCyclePrediction(periods) {
   if (!stat) return null;  // v66：所有周期间隔都被判为离群时无法预测
   const last = periods[periods.length - 1];
   const today = startOfDay(Date.now()).getTime();
-  // v112：预存预测经期天数 = 历史经期天数加权平均（本轮以内的历史）
-  const predDays = weightedAvgPeriodDays(periods);
 
   // ① 进行中/待定：本轮经期尚未判定结束
   //    待定窗长 = 不含本轮（最新一次未记完的经期不计入）的历史加权平均
@@ -5544,6 +5543,8 @@ function computeCyclePrediction(periods) {
   const lastDays = last.days;   // 已判定的本轮经期实际天数
   const cycle = stat.avg;
   const nextStart = new Date(last.ts + cycle * 86400000);
+  // v114：下次经期预测天数——上次实际记录 <5 天 → 按实际记录天数；否则按历史加权平均
+  const predDays = lastDays < 5 ? lastDays : weightedAvgPeriodDays(periods);
   const base = {
     avgCycle: Math.round(cycle),
     minCycle: Math.round(stat.min),
@@ -5556,17 +5557,14 @@ function computeCyclePrediction(periods) {
     excludedCount: stat.excluded,     // v66：被剔除的离群周期数
     cycleSd: stat.sd,                 // v66：标准差（规律度）
   };
-  if (lastDays >= predDays) {
-    // ② 完整预测：上次经期记满 5 天 → 卵泡期/排卵日/排卵期/黄体期正常出现
-    const ovulationDay = new Date(nextStart.getTime() - 14 * 86400000);
-    const ovulationWindowStart = new Date(ovulationDay.getTime() - 5 * 86400000);
-    const ovulationWindowEnd = new Date(ovulationDay.getTime() + 1 * 86400000);
-    const follicularStart = new Date(last.end_ts + 86400000);  // 经期结束次日
-    const lutealStart = new Date(ovulationDay.getTime() + 1 * 86400000);
-    return { ...base, mode: 'full', follicularStart, ovulationDay, ovulationWindowStart, ovulationWindowEnd, lutealStart };
-  }
-  // ③ 简化预测：上次经期不足 5 天 → 只预测下次月经窗，无各期预测
-  return { ...base, mode: 'period-only' };
+  // ② 完整预测（v114：上次经期已判定结束后，无论天数多少都给出各期预测；
+  //    「只预测月经窗」仅适用于经期进行中的待定期）
+  const ovulationDay = new Date(nextStart.getTime() - 14 * 86400000);
+  const ovulationWindowStart = new Date(ovulationDay.getTime() - 5 * 86400000);
+  const ovulationWindowEnd = new Date(ovulationDay.getTime() + 1 * 86400000);
+  const follicularStart = new Date(last.end_ts + 86400000);  // 经期结束次日
+  const lutealStart = new Date(ovulationDay.getTime() + 1 * 86400000);
+  return { ...base, mode: 'full', follicularStart, ovulationDay, ovulationWindowStart, ovulationWindowEnd, lutealStart };
 }
 
 function dateKey(d) {
@@ -6666,16 +6664,15 @@ function renderEventsOverview() {
   } else if (pred) {
     const daysTo = Math.ceil((pred.nextStart.getTime() - now) / dayMs);
     const fmt = d => `${d.getMonth() + 1}/${d.getDate()}`;
-    const modeNote = pred.mode === 'period-only' ? ' · 上次经期不足5天，暂无各期预测' : '';
     if (daysTo > 0) {
       periodVal = `还有 ${daysTo} 天`;
-      periodSub = `预测 ${fmt(pred.nextStart)} 来潮（${pred.predDays} 天）· 周期约 ${pred.avgCycle} 天${modeNote}`;
+      periodSub = `预测 ${fmt(pred.nextStart)} 来潮（${pred.predDays} 天）· 周期约 ${pred.avgCycle} 天`;
     } else if (daysTo === 0) {
       periodVal = '就是今天';
-      periodSub = `预测今天来潮（${pred.predDays} 天）· 周期约 ${pred.avgCycle} 天${modeNote}`;
+      periodSub = `预测今天来潮（${pred.predDays} 天）· 周期约 ${pred.avgCycle} 天`;
     } else {
       periodVal = `推迟 ${-daysTo} 天`;
-      periodSub = `原预测 ${fmt(pred.nextStart)} · 周期约 ${pred.avgCycle} 天${modeNote}`;
+      periodSub = `原预测 ${fmt(pred.nextStart)} · 周期约 ${pred.avgCycle} 天`;
       periodColor = '#be123c';
     }
   }
@@ -6738,7 +6735,7 @@ function renderEventsOverview() {
           <div class="eo-stat-sub" style="color:${todayCount > 0 ? 'var(--text-3)' : '#be123c'};font-weight:${todayCount > 0 ? 400 : 600};">${weekSub}</div>
         </div>
         <div class="eo-stat" style="background:rgba(244,63,94,0.07);">
-          <div class="eo-stat-label">近30天❤️</div>
+          <div class="eo-stat-label">❤️ 近30天</div>
           <div class="eo-stat-val" style="color:#e11d48;">${loveVal}</div>
           <div class="eo-stat-sub">${loveSub}</div>
         </div>
@@ -7073,9 +7070,11 @@ function renderEventsCharts() {
     // v75：APP 端数据点多时给 canvas 固定加宽 + 横向滚动容器，默认滚到最右（最近记录）
     const nL = c.labels ? c.labels.length : (c.data ? c.data.length : 0);
     const wPx = IN_APP && nL > 8 ? nL * 46 + 40 : 0;
+    // v114：标题开头的 emoji 图标压矮一半（趋势分析图标过高）
+    const squash = s => String(s).replace(/^(\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*)/u, '<span style="display:inline-block;transform:scaleY(.5);transform-origin:center bottom;">$1</span>');
     return `
     <div class="mini-chart-card${c.wide ? ' wide' : ''}" style="background:white;border-radius:12px;padding:14px;border:1px solid var(--border);">
-      <div style="font-weight:700;font-size:13px;color:var(--text);">${c.title}</div>
+      <div style="font-weight:700;font-size:13px;color:var(--text);">${squash(c.title)}</div>
       <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;">${c.subtitle}</div>
       <div style="position:relative;height:${c.wide ? 200 : 160}px;overflow-x:auto;" data-evscroll="1"><div style="position:relative;height:100%;${wPx ? `width:${wPx}px;min-width:100%;` : ''}"><canvas id="ev-chart-${c.id}"></canvas></div></div>
     </div>

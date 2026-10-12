@@ -365,7 +365,7 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             // v97：圆点恢复明亮配色——v93 的浅马卡龙（奶黄/开心果）在小组件浅色背景上几乎
             // 看不见（用户反馈"圆点全消失"）。日历格保持浅马卡龙，圆点单独用明亮马卡龙
             // （mensColor 已在函数开头声明，v113 经期进度图共用）
-            val follicleColor = 0xFFD9A93F.toInt() // 卵泡期 金黄
+            val follicleColor = 0xFFF9D770.toInt() // 卵泡期 柠檬黄（v114：与网页日历统一 #F9D770）
             val ovuColor = 0xFFE8944A.toInt()      // 排卵期 亮橙
             val ovuDayColor = 0xFFD9712E.toInt()   // 排卵日 深亮橙
             val lutealColor = 0xFF7FB069.toInt()   // 黄体期 草绿

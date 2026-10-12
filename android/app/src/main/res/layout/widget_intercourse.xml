@@ -1,24 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- v108b：小组件整体 = 一枚圆角信封（背景矢量图铺满整个组件，四角圆弧），
-     提示文字写在信封下部「收件人」区 -->
+<!-- v114：组件整体仍是一枚信封（背景矢量图，信封占中央 3/5），
+     提示文字用权重定位到信封下部「收件人」区（信封底边约在 74% 高度处） -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/intercourse_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/intercourse_bg">
 
-    <TextView
-        android:id="@+id/tv_hint"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|center_horizontal"
-        android:gravity="center"
-        android:paddingBottom="5dp"
-        android:paddingLeft="6dp"
-        android:paddingRight="6dp"
-        android:text=""
-        android:textSize="8sp"
-        android:textColor="#9D174D"
-        android:maxLines="1" />
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.62" />
+
+        <TextView
+            android:id="@+id/tv_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingBottom="2dp"
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
+            android:text=""
+            android:textSize="8sp"
+            android:textColor="#9D174D"
+            android:maxLines="1" />
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.30" />
+    </LinearLayout>
 
 </FrameLayout>
