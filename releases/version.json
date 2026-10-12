@@ -1,7 +1,7 @@
 {
-  "version_code": 3,
-  "version_name": "1.2",
+  "version_code": 4,
+  "version_name": "1.3",
   "apk_url": "https://peiwenxiao77.github.io/family-health/releases/latest.apk",
-  "notes": "v108b: 小组件整体即圆角信封(铺满,非浮动内缩)",
-  "updated_at": "2026-10-11T15:50:23Z"
+  "notes": "v109: 记录按钮右置+设置弹窗三板块(数据导出/导入JSON备份/删教程SQL)+自选条目多选删除(健康+身体)+身体筛选框高度对齐+自定义可填项系统(增删字段/可选项永久保存)+APP图标冰绿GN5351-4+小组件提示去「同房」",
+  "updated_at": "2026-10-12T05:36:24Z"
 }
