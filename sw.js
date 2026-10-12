@@ -1,7 +1,7 @@
 /* 家庭健康记录 Service Worker
  * 缓存策略：network-first（HTML/JS/CSS，避免新版本被旧缓存遮蔽）+ stale-while-revalidate（CDN 资源）
  */
-const CACHE = 'family-health-v27';  // 改 cache 名强制旧 SW 失效（v111：SW更新报错静默+月经连续记录合并+预测规则重写(预存5天窗)+可填项编辑弹窗+AI补正常范围+趋势分析收起）
+const CACHE = 'family-health-v28';  // v112：预测经期天数改历史加权平均（网页+小组件+月报三端同步）
 const CORE = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {

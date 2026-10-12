@@ -177,21 +177,35 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                         val next0 = last0 + avg * DAY
                         val daysLeft = ((next0 - today0) / DAY).toInt()
                         val ovu = avg - 14
-                        /* v111 预测规则（与网页同步）：
-                           预存预测月经天数固定 5 天；开始后 5 天内为待定窗（显示月经期）；
-                           待定结束后：本轮记满 ≥5 天 → 正常卵泡期/排卵日/排卵期/黄体期预测；
-                           不足 5 天 → 只预测下次月经窗（无各期预测，中间显示「经后期」） */
-                        val PRED = 5
+                        /* v112 预测规则（与网页同步）：
+                           预存预测经期天数 = 历史经期天数加权平均（最近6次，权重同周期算法，回退5天）；
+                           最新一次未记完的经期不计入 → 待定窗长用「不含本轮」的历史均值（predPrev）；
+                           待定结束后：本轮记满 ≥ 预存天数 → 正常卵泡期/排卵日/排卵期/黄体期预测；
+                           不足 → 只预测下次月经窗（无各期预测，中间显示「经后期」） */
+                        fun avgDur(list: List<Int>): Int = when {
+                            list.isEmpty() -> 5
+                            list.size >= 3 -> {
+                                var ws = 0.0; var vs = 0.0
+                                list.forEachIndexed { i, v ->
+                                    val w = (i + 1 + (6 - list.size)).toDouble()
+                                    ws += w; vs += v * w
+                                }
+                                (vs / ws).toInt().coerceIn(1, 14)
+                            }
+                            else -> (list.sum().toDouble() / list.size).toInt().coerceIn(1, 14)
+                        }
+                        val predPrev = avgDur(merged.dropLast(1).map { it.second })  // 待定窗天数（不含本轮）
+                        val PRED = avgDur(merged.map { it.second })                  // 下次预测窗天数（全部已判定历史）
                         val phase = when {
                             dayIn <= lastDur -> "月经期"                    // 已记录的经期
-                            lastDur < PRED && dayIn <= PRED -> "月经期"      // 待定窗内（本轮未判定结束）
+                            dayIn <= predPrev -> "月经期"                   // 待定窗内（本轮未判定结束）
                             lastDur < PRED && dayIn >= avg -> "月经期"       // 简化模式：预测的下次月经窗
                             lastDur < PRED -> "经后期"                       // 简化模式：经期外、预测窗前
                             dayIn == ovu -> "排卵日"
                             dayIn in (ovu - 2)..(ovu + 2) -> "排卵期"
                             dayIn < ovu - 2 -> "卵泡期"
                             dayIn < avg -> "黄体期"
-                            else -> "月经期"                                 // 记满5天且已进入预测窗（推迟）
+                            else -> "月经期"                                 // 记满预存天数且已进入预测窗（推迟）
                         }
                         // 顶部药丸 = 时期（按时期配色）
                         pillText = phase

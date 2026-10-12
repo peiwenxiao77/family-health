@@ -81,10 +81,21 @@ const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
     }
     spans.forEach(sp => { sp.days = Math.round((sp.end - sp.start) / DAY) + 1; });
     if (spans.length < 2) return null;
-    // v111：进行中/待定（最近经期开始后 5 天内或记录未结束）不预测，与网页版一致
+    // v112：进行中/待定不预测；待定窗长 = 不含本轮的历史经期天数加权平均（与网页版一致）
     const lastP = spans[spans.length - 1];
     const today0 = new Date(); today0.setHours(0, 0, 0, 0);
-    const pendEnd = Math.max(lastP.end.getTime(), lastP.start.getTime() + 4 * DAY);
+    const hist = spans.slice(0, -1).map(sp => sp.days).filter(d => d >= 1 && d <= 14).slice(-6);
+    const wAvg = ds => {
+      if (!ds.length) return 5;
+      if (ds.length >= 3) {
+        let ws = 0, vs = 0;
+        ds.forEach((d, i) => { const w = i + 1 + (6 - ds.length); ws += w; vs += d * w; });
+        return Math.min(14, Math.max(1, Math.round(vs / ws)));
+      }
+      return Math.min(14, Math.max(1, Math.round(ds.reduce((s, d) => s + d, 0) / ds.length)));
+    };
+    const pendDays = wAvg(hist);
+    const pendEnd = Math.max(lastP.end.getTime(), lastP.start.getTime() + (pendDays - 1) * DAY);
     if (today0.getTime() >= lastP.start.getTime() && today0.getTime() <= pendEnd) return null;
     const gaps = [];
     for (let i = 1; i < spans.length; i++) {
@@ -100,9 +111,10 @@ const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '
     const sd = Math.sqrt(gaps.reduce((s, v) => s + (v - mean) ** 2, 0) / gaps.length);
     const regular = sd < 3 ? '周期规律' : sd <= 5 ? '周期基本规律' : '周期波动较大';
     const next = new Date(spans[spans.length - 1].start.getTime() + avg * DAY);
-    // v111：上次经期不足 5 天 → 只预测下次月经窗，无卵泡期等各期预测
+    // v112：上次经期不足预存天数（历史加权平均）→ 只预测下次月经窗，无卵泡期等各期预测
+    const predDays = wAvg(spans.map(sp => sp.days).filter(d => d >= 1 && d <= 14).slice(-6));
     const lastDays = lastP.days;
-    const note = lastDays >= 5 ? '' : `（上次经期仅 ${lastDays} 天，暂无卵泡期等各期预测）`;
+    const note = lastDays >= predDays ? `（预测经期约 ${predDays} 天）` : `（上次经期仅 ${lastDays} 天，预测经期约 ${predDays} 天，暂无卵泡期等各期预测）`;
     return { member: m, avg: Math.round(avg), sd, regular, next: dayKey(next), note };
   }).filter(Boolean);
 
