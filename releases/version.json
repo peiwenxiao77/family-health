@@ -1,7 +1,7 @@
 {
-  "version_code": 8,
-  "version_name": "1.7",
+  "version_code": 9,
+  "version_name": "1.8",
   "apk_url": "https://peiwenxiao77.github.io/family-health/releases/latest.apk",
-  "notes": "v114: 预测规则修正——经期判定结束后一律给出卵泡期等各期预测(只预测月经窗仅限经期进行中的待定期),下次经期天数=上次实际记录<5天按实际天数否则加权平均;卵泡期配色#F9D770(日历+小组件圆点/药丸);健康速览「❤️ 近30天」;趋势分析标题emoji压矮1/2;信封小组件缩至3/5+圆角加大+提示文字权重定位; versionCode 8/v1.7, sw v29",
-  "updated_at": "2026-10-12T12:29:43Z"
+  "notes": "v115: 趋势分析恢复图标原高度改压矮图表容器;修复信封小组件白底灰圈(Space控件不兼容RemoteViews,改TextView占位);新增跨天自动刷新链(每天00:02自续刷新,无需打开APP); versionCode 9/v1.8, sw v30",
+  "updated_at": "2026-10-12T13:01:00Z"
 }
