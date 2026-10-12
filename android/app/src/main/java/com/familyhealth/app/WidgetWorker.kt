@@ -32,6 +32,9 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         refresh(applicationContext)
         // v107：顺带检查 APP 新版本，发现则发系统通知（同版本只提醒一次）
         UpdateChecker.checkAndNotify(applicationContext)
+        // v115：续接「跨天刷新链」——每次任务跑完，预约一个到明天 00:02 的一次性任务，
+        // 到点自动再刷新小组件（不打开 APP 也会跨天更新预测/经期状态）
+        scheduleMidnightRefresh(applicationContext)
         return Result.success()
     }
 
@@ -44,6 +47,8 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                 WorkManager.getInstance(ctx).enqueueUniquePeriodicWork(
                     "menstrual_widget", ExistingPeriodicWorkPolicy.KEEP, req
                 )
+                // v115：同时启动跨天刷新链（首次装组件即生效）
+                scheduleMidnightRefresh(ctx)
             } catch (_: Exception) {}
         }
 
@@ -52,6 +57,31 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                 val req = OneTimeWorkRequestBuilder<WidgetWorker>().build()
                 WorkManager.getInstance(ctx).enqueueUniqueWork(
                     "menstrual_now", ExistingWorkPolicy.REPLACE, req
+                )
+            } catch (_: Exception) {}
+        }
+
+        /**
+         * v115：跨天自动刷新链。
+         * 原有 3 小时周期任务跨天最多延迟 3 小时才更新；此链保证每天 00:02 必刷新一次，
+         * 且 doWork 每次结束都会续接下一天（自续链，装好组件后永久生效，无需打开 APP）。
+         * 与 onEnabled 里的 schedule(ctx) 一起调用，确保链首次被启动。
+         */
+        fun scheduleMidnightRefresh(ctx: Context) {
+            try {
+                val c = Calendar.getInstance()
+                c.add(Calendar.DAY_OF_YEAR, 1)
+                c.set(Calendar.HOUR_OF_DAY, 0)
+                c.set(Calendar.MINUTE, 2)
+                c.set(Calendar.SECOND, 0)
+                c.set(Calendar.MILLISECOND, 0)
+                val delay = c.timeInMillis - System.currentTimeMillis()
+                if (delay <= 0) return
+                val req = OneTimeWorkRequestBuilder<WidgetWorker>()
+                    .setInitialDelay(delay, TimeUnit.MILLISECONDS)
+                    .build()
+                WorkManager.getInstance(ctx).enqueueUniqueWork(
+                    "menstrual_midnight", ExistingWorkPolicy.REPLACE, req
                 )
             } catch (_: Exception) {}
         }

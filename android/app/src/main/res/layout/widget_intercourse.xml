@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- v114：组件整体仍是一枚信封（背景矢量图，信封占中央 3/5），
-     提示文字用权重定位到信封下部「收件人」区（信封底边约在 74% 高度处） -->
+<!-- v115：修复「白底灰圈」——v114 用的 <Space> 不在 RemoteViews 允许的控件白名单里，
+     小组件布局加载失败时桌面就显示默认错误占位图（白底灰圈）。
+     改用空 TextView（白名单内）做权重占位，定位效果不变：
+     提示文字权重定位到信封下部「收件人」区（信封底边约在 74% 高度处） -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/intercourse_root"
     android:layout_width="match_parent"
@@ -12,10 +14,11 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <Space
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="0.62" />
+            android:layout_weight="0.62"
+            android:text="" />
 
         <TextView
             android:id="@+id/tv_hint"
@@ -30,10 +33,11 @@
             android:textColor="#9D174D"
             android:maxLines="1" />
 
-        <Space
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="0.30" />
+            android:layout_weight="0.30"
+            android:text="" />
     </LinearLayout>
 
 </FrameLayout>

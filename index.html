@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v114: ①月经预测修正: 经期判定结束后一律给出卵泡期等各期预测(「只预测月经窗」仅限经期进行中的待定期); 下次经期天数=上次实际记录<5天按实际天数,否则历史加权平均 ②卵泡期配色改#F9D770(日历) ③健康速览「近30天❤️」→「❤️ 近30天」 ④身体页趋势分析标题emoji压矮1/2; APK versionCode 8/v1.7: 信封小组件缩至3/5+圆角加大,卵泡期圆点/药丸#F9D770 -->
+<!-- v115: ①趋势分析恢复图标原高度,改为图表容器压矮1/2(200/160px→100/80px) ②APK v1.8: 修复信封小组件白底灰圈(v114误用RemoteViews不支持的Space控件致布局加载失败,改空TextView占位) + 新增跨天自动刷新链(每天00:02自动刷新小组件,无需打开APP;原3小时周期任务保留兜底) -->
 <!-- v109: ①全部记录按钮列移最右侧(健康:正常/删除;身体:编辑/删除) ②删两处导出键,设置弹窗重构为三板块(Supabase配置/AI配置/数据导出与导入),新增JSON完整备份导出+导入(按id合并),删「第一次用」「建表SQL」,云端备份恢复移入第三板块 ③删除弹窗新增「自选条目」多选批量删除模式(健康+身体页,batchBar悬浮操作条) ④身体页筛选/搜索框高度对齐人名框 ⑤新增自定义可填项系统(所有项目可增删字段,可选项点击即选,定义存localStorage fh_extra_fields,值存payload.extra_fields) -->
 <!-- v108: ①项目管理弹窗❤️项目不再显示「同房」字样(标题空着,符号示意) ②全部记录改版：健康页「正常/删除」上下叠放收窄放最左侧高度居中+记录三行制(图标+人名+项目名+数值/正常值范围/时间)；身体页「编辑/删除」同样上下叠放收窄左侧居中,删除右侧216px预留让出整卡宽度 ③日历所有符号缩小1/4(角标18→13px,compact 8px,tiny 7px,标记6px) ④修复月经趋势图：v92 把最后一条经期整体剔出图导致倒数第二条(如8.30)算不出与9.24的周期——改为shown含最后一条,周期按「下一条来潮」计算,最后一条只显示来潮天数 ⑤配套APK v108：信封圆角化+内缩4dp(约小1/5)；versionCode 3(v1.2) -->
 <!-- v107: 新增 APP 更新推送——APK 构建后 CI 自动发布 releases/latest.apk+version.json 到 Pages；APP 启动 2.5s 后检查(有新版弹窗一键下载安装,经 FileProvider 拉起安装器)+WidgetWorker 每3h后台检查(发系统通知,同版本只提醒一次,Android13+运行时申请通知权限)；versionCode 递增到 2(v1.1)；网页功能无变化(微增部署) -->
@@ -7070,13 +7070,11 @@ function renderEventsCharts() {
     // v75：APP 端数据点多时给 canvas 固定加宽 + 横向滚动容器，默认滚到最右（最近记录）
     const nL = c.labels ? c.labels.length : (c.data ? c.data.length : 0);
     const wPx = IN_APP && nL > 8 ? nL * 46 + 40 : 0;
-    // v114：标题开头的 emoji 图标压矮一半（趋势分析图标过高）
-    const squash = s => String(s).replace(/^(\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*)/u, '<span style="display:inline-block;transform:scaleY(.5);transform-origin:center bottom;">$1</span>');
     return `
     <div class="mini-chart-card${c.wide ? ' wide' : ''}" style="background:white;border-radius:12px;padding:14px;border:1px solid var(--border);">
-      <div style="font-weight:700;font-size:13px;color:var(--text);">${squash(c.title)}</div>
+      <div style="font-weight:700;font-size:13px;color:var(--text);">${c.title}</div>
       <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;">${c.subtitle}</div>
-      <div style="position:relative;height:${c.wide ? 200 : 160}px;overflow-x:auto;" data-evscroll="1"><div style="position:relative;height:100%;${wPx ? `width:${wPx}px;min-width:100%;` : ''}"><canvas id="ev-chart-${c.id}"></canvas></div></div>
+      <div style="position:relative;height:${c.wide ? 100 : 80}px;overflow-x:auto;" data-evscroll="1"><div style="position:relative;height:100%;${wPx ? `width:${wPx}px;min-width:100%;` : ''}"><canvas id="ev-chart-${c.id}"></canvas></div></div>
     </div>
   `;
   }).join('');
