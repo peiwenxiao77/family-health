@@ -2,6 +2,6 @@
   "version_code": 6,
   "version_name": "1.5",
   "apk_url": "https://peiwenxiao77.github.io/family-health/releases/latest.apk",
-  "notes": "v112: 月经预测经期天数改为历史经期天数加权平均(最近6次权重6:5:4:3:2:1,无历史回退5天);最新一次未记完的经期不计入(待定窗用不含本轮的历史均值);早来/正常/迟来均按同一预存天数;上次经期≥预存天数才完整预测卵泡期等;网页+小组件+月报三端同步; APK versionCode 6/v1.5",
-  "updated_at": "2026-10-12T10:21:35Z"
+  "notes": "v112b: 修复APK签名冲突——build.gradle给debug/release构建类型都挂固定签名密钥库family-health.keystore(原CI临时debug密钥每次构建签名不同,覆盖安装必冲突)",
+  "updated_at": "2026-10-12T10:31:28Z"
 }
