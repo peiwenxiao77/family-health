@@ -17,7 +17,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="0.62"
+            android:layout_weight="0.66"
             android:text="" />
 
         <TextView
@@ -36,7 +36,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="0.30"
+            android:layout_weight="0.26"
             android:text="" />
     </LinearLayout>
 

@@ -1,33 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- v114：待确认状态——同一枚 3/5 圆角信封（路径绕中心缩放 0.6），封章爱心变浅粉 -->
+<!-- v116：待确认状态——同一枚 0.72 圆角信封（路径绕中心缩放 ×1.2），封章爱心变浅粉 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp"
     android:height="48dp"
     android:viewportWidth="48"
     android:viewportHeight="48">
 
-    <!-- 信封纸身（圆角矩形，占视口中央 60%） -->
+    <!-- 信封纸身（圆角矩形，占视口中央 72%） -->
     <path
         android:fillColor="#FFFBF5"
         android:strokeColor="#EC4899"
         android:strokeWidth="2"
-        android:pathData="M13.2,12.6 L33.5,12.6 Q37.5,12.6 37.5,16.6 L37.5,31.4 Q37.5,35.4 33.5,35.4 L14.5,35.4 Q10.5,35.4 10.5,31.4 L10.5,16.6 Q10.5,12.6 14.5,12.6 Z" />
+        android:pathData="M13.6,10.32 L34.4,10.32 Q40.2,10.32 40.2,16.12 L40.2,31.88 Q40.2,37.68 34.4,37.68 L13.6,37.68 Q7.8,37.68 7.8,31.88 L7.8,16.12 Q7.8,10.32 13.6,10.32 Z" />
 
     <!-- 盖下的信封盖（填充） -->
     <path
         android:fillColor="#FFE4EC"
-        android:pathData="M12,13.2 L24,25.2 L36,13.2 Z" />
+        android:pathData="M9.6,11.02 L24,25.44 L38.4,11.02 Z" />
 
     <!-- 信封盖折线（只描边） -->
     <path
         android:strokeColor="#EC4899"
         android:strokeWidth="2"
-        android:pathData="M12,13.2 L24,25.2 L36,13.2" />
+        android:pathData="M9.6,11.02 L24,25.44 L38.4,11.02" />
 
     <!-- 爱心封章（浅粉=等待第二击） -->
     <path
         android:fillColor="#F9A8D4"
         android:strokeColor="#FFFFFF"
         android:strokeWidth="1.5"
-        android:pathData="M24,28.2 C24,28.2 19.2,25.3 19.2,22.6 C19.2,20.8 20.5,19.8 21.7,19.8 C22.7,19.8 23.5,20.4 24,21.2 C24.5,20.4 25.3,19.8 26.3,19.8 C27.5,19.8 28.8,20.8 28.8,22.6 C28.8,25.3 24,28.2 24,28.2 Z" />
+        android:pathData="M24,29.04 C24,29.04 18.24,25.56 18.24,22.32 C18.24,20.16 19.8,18.96 21.24,18.96 C22.44,18.96 23.4,19.68 24,20.64 C24.6,19.68 25.56,18.96 26.76,18.96 C28.2,18.96 29.76,20.16 29.76,22.32 C29.76,25.56 24,29.04 24,29.04 Z" />
 </vector>

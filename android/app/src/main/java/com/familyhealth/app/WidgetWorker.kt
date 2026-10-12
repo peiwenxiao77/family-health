@@ -209,7 +209,9 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                         val dayIn = ((today0 - last0) / DAY).toInt() + 1
                         val next0 = last0 + avg * DAY
                         val daysLeft = ((next0 - today0) / DAY).toInt()
-                        val ovu = avg - 14
+                        // v116：与网页日历对齐——排卵日 = 下次月经前 14 天，即周期第 (avg-13) 天
+                        // （此前 avg-14 少算一天，且排卵窗是±2 与日历「前5后1」不同 → 圆点排列与日历不一致）
+                        val ovu = avg - 13
                         /* v112 预测规则（与网页同步）：
                            预存预测经期天数 = 历史经期天数加权平均（最近6次，权重同周期算法，回退5天）；
                            最新一次未记完的经期不计入 → 待定窗长用「不含本轮」的历史均值（predPrev）；
@@ -235,8 +237,8 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                             lastDur < PRED && dayIn >= avg -> "月经期"       // 简化模式：预测的下次月经窗
                             lastDur < PRED -> "经后期"                       // 简化模式：经期外、预测窗前
                             dayIn == ovu -> "排卵日"
-                            dayIn in (ovu - 2)..(ovu + 2) -> "排卵期"
-                            dayIn < ovu - 2 -> "卵泡期"
+                            dayIn in (ovu - 5)..(ovu - 1) -> "排卵期"   // v116：排卵窗=排卵日前5天到前1天（与日历一致）
+                            dayIn < ovu - 5 -> "卵泡期"
                             dayIn < avg -> "黄体期"
                             else -> "月经期"                                 // 记满预存天数且已进入预测窗（推迟）
                         }
@@ -344,7 +346,8 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
          * 环形点阵 Bitmap（v91 配色统一）：
          * - 点数 = 预计周期天数（加权平均，18~45）
          * - 颜色与网页身体日历统一为莫兰迪配色：月经期红 → 卵泡期黄 → 排卵期橙（排卵日当天深橙）→ 黄体期绿
-         *   （月经期天数取最近一次记录的实际经期天数，排卵窗口 = 排卵日±2，与顶部时期药丸同一套判定）
+         *   （v116 分区与日历完全一致：月经期取实际经期天数 → 卵泡期 → 排卵窗=排卵日前5天到前1天 → 排卵日 → 黄体期；
+         *    排卵日 = 下次月经前14天 = 周期第 n-13 天）
          * - 今天的位置放大高亮
          * - 圆环整体缩小（半径 0.40），点不再碰到边际
          * - v113：progDay/progTotal > 0 时切换为「经期进度图」——圆点数 = 当前预测经期天数，
@@ -390,7 +393,8 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             val n = cycleLen.coerceIn(18, 45)
             val baseR = size * (if (n > 34) 0.017f else 0.021f)
             val pDays = periodDays.coerceIn(1, 14)
-            val ovuStart = n - 14
+            // v116：与网页日历对齐——排卵日 = 周期第 (n-13) 天；排卵窗 = 排卵日前5天到前1天
+            val ovuStart = n - 13
 
             // v97：圆点恢复明亮配色——v93 的浅马卡龙（奶黄/开心果）在小组件浅色背景上几乎
             // 看不见（用户反馈"圆点全消失"）。日历格保持浅马卡龙，圆点单独用明亮马卡龙
@@ -427,8 +431,8 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                     p.color = when {
                         d <= pDays -> mensColor
                         d == ovuStart -> ovuDayColor
-                        d in (ovuStart - 2)..(ovuStart + 2) -> ovuColor
-                        d < ovuStart - 2 -> follicleColor
+                        d in (ovuStart - 5)..(ovuStart - 1) -> ovuColor
+                        d < ovuStart - 5 -> follicleColor
                         else -> lutealColor
                     }
                     canvas.drawCircle(x, y, baseR, p)
