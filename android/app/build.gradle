@@ -15,8 +15,25 @@ android {
         versionName "1.5"
     }
 
-    buildTypes {
+    // v112b：固定签名（修复「软件包与现有软件包存在冲突/签名有异常」）
+    // 此前 CI 用 assembleDebug——构建机临时 debug 密钥每次构建都不同 → 覆盖安装必冲突
+    // 现让 debug/release 都用本固定密钥库（PKCS12，有效期至 2056），CI 无需改动
+    signingConfigs {
         release {
+            storeFile file('family-health.keystore')
+            storePassword 'fh2026sign'
+            keyAlias 'familyhealth'
+            keyPassword 'fh2026sign'
+            storeType 'PKCS12'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.release   // 关键：CI 构建的 debug 包也用固定签名
+        }
+        release {
+            signingConfig signingConfigs.release
             minifyEnabled false
         }
     }
