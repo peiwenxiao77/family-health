@@ -1,7 +1,7 @@
 {
-  "version_code": 6,
-  "version_name": "1.5",
+  "version_code": 7,
+  "version_name": "1.6",
   "apk_url": "https://peiwenxiao77.github.io/family-health/releases/latest.apk",
-  "notes": "v112b: 修复APK签名冲突——build.gradle给debug/release构建类型都挂固定签名密钥库family-health.keystore(原CI临时debug密钥每次构建签名不同,覆盖安装必冲突)",
-  "updated_at": "2026-10-12T10:31:28Z"
+  "notes": "v113: 小组件——「经期将至」警告药丸缩小为3/5并保持胶囊圆角;月经期/预测月经期中天数位置显示「/」;点阵新增经期进度图(圆点数=当前预测经期天数,12点方向顺时针均布红点,每过一天走到下一个点,经期结束后恢复各时期彩色点阵); versionCode 7/v1.6",
+  "updated_at": "2026-10-12T11:18:04Z"
 }
