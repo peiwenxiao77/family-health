@@ -106,6 +106,9 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             var ringCycle = 28
             var ringDay = 0 // 0 = 不高亮任何点
             var ringPeriodDays = 5
+            // v113：经期进度图（phase=月经期时启用）——圆点数=预测经期天数，从12点顺时针均布全红，每天走到下一个点
+            var progDay = 0   // 经期内第几天（1 起）；0 = 用正常周期点阵
+            var progTotal = 0 // 预测经期天数
 
             if (url.isNotBlank() && key.isNotBlank()) {
                 try {
@@ -231,11 +234,20 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                             else -> R.color.w_luteal
                         }
                         infoText = "" // v89：正常状态不再显示「上次·周期约」
-                        preText = if (daysLeft < 0) "月经已推迟" else "距下次月经还有"
-                        dayText = abs(daysLeft).toString()
                         ringCycle = avg
                         ringDay = dayIn
                         ringPeriodDays = lastDur
+                        if (phase == "月经期") {
+                            // v113：月经期/预测月经期中 → 天数位置显示「/」，点阵切为经期进度图
+                            preText = "距下次月经还有"
+                            dayText = "/"
+                            val inPending = dayIn <= predPrev
+                            progTotal = if (inPending) predPrev else PRED
+                            progDay = if (inPending) dayIn else (dayIn - avg + 1).coerceAtLeast(1)
+                        } else {
+                            preText = if (daysLeft < 0) "月经已推迟" else "距下次月经还有"
+                            dayText = abs(daysLeft).toString()
+                        }
                         // 底部药丸：v89 只保留警告态，「周期规律」绿色药丸移除
                         if (daysLeft < 0) statusText = "该记录啦"
                         else if (daysLeft <= 2) statusText = "经期将至"
@@ -269,7 +281,7 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             }
             // 环形点阵单独兜底：即使绘制失败也不影响文字更新
             try {
-                views.setImageViewBitmap(R.id.iv_ring, buildRingBitmap(ringCycle, ringDay, pillText, ringPeriodDays))
+                views.setImageViewBitmap(R.id.iv_ring, buildRingBitmap(ringCycle, ringDay, pillText, ringPeriodDays, progDay, progTotal))
             } catch (_: Exception) {}
 
             // 点击小组件打开 APP
@@ -305,15 +317,46 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
          *   （月经期天数取最近一次记录的实际经期天数，排卵窗口 = 排卵日±2，与顶部时期药丸同一套判定）
          * - 今天的位置放大高亮
          * - 圆环整体缩小（半径 0.40），点不再碰到边际
+         * - v113：progDay/progTotal > 0 时切换为「经期进度图」——圆点数 = 当前预测经期天数，
+         *   从 12 点方向顺时针均匀分布、全部红色，每过一天走到下一个点；经期结束后恢复正常点阵
          * 256px（≈256KB，远小于 Binder 1MB 限制）
          */
-        private fun buildRingBitmap(cycleLen: Int, today: Int, phase: String, periodDays: Int): Bitmap {
+        private fun buildRingBitmap(cycleLen: Int, today: Int, phase: String, periodDays: Int, progDay: Int = 0, progTotal: Int = 0): Bitmap {
             val size = 256
             val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bmp)
             val cx = size / 2f
             val cy = size / 2f
             val radius = size * 0.40f
+            val mensColor = 0xFFF06A92.toInt()     // 月经期 亮粉
+            val todayMensColor = 0xFFD14D78.toInt() // 经期进度图·今天 深粉
+
+            // v113：经期进度图模式
+            if (progTotal >= 1 && progDay >= 1) {
+                val m = progTotal.coerceIn(1, 14)
+                val pr = size * (if (m > 8) 0.034f else 0.048f)
+                val hi = progDay.coerceIn(1, m)
+                for (d in 1..m) {
+                    val ang = Math.toRadians(-90.0 + 360.0 * (d - 1) / m)
+                    val x = cx + radius * cos(ang).toFloat()
+                    val y = cy + radius * sin(ang).toFloat()
+                    val p = Paint(Paint.ANTI_ALIAS_FLAG)
+                    if (d == hi) {
+                        p.style = Paint.Style.STROKE
+                        p.strokeWidth = pr * 0.8f
+                        p.color = 0x2E000000.toInt()
+                        canvas.drawCircle(x, y, pr * 1.9f, p)
+                        p.style = Paint.Style.FILL
+                        p.color = todayMensColor
+                        canvas.drawCircle(x, y, pr * 1.5f, p)
+                    } else {
+                        p.color = mensColor
+                        canvas.drawCircle(x, y, pr, p)
+                    }
+                }
+                return bmp
+            }
+
             val n = cycleLen.coerceIn(18, 45)
             val baseR = size * (if (n > 34) 0.017f else 0.021f)
             val pDays = periodDays.coerceIn(1, 14)
@@ -321,7 +364,7 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
 
             // v97：圆点恢复明亮配色——v93 的浅马卡龙（奶黄/开心果）在小组件浅色背景上几乎
             // 看不见（用户反馈"圆点全消失"）。日历格保持浅马卡龙，圆点单独用明亮马卡龙
-            val mensColor = 0xFFF06A92.toInt()     // 月经期 亮粉
+            // （mensColor 已在函数开头声明，v113 经期进度图共用）
             val follicleColor = 0xFFD9A93F.toInt() // 卵泡期 金黄
             val ovuColor = 0xFFE8944A.toInt()      // 排卵期 亮橙
             val ovuDayColor = 0xFFD9712E.toInt()   // 排卵日 深亮橙

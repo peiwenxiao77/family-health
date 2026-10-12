@@ -82,18 +82,18 @@
                 android:layout_marginBottom="6dp" />
         </LinearLayout>
 
-        <!-- v89：仅经期将至/已推迟警告时显示 -->
+        <!-- v89：仅经期将至/已推迟警告时显示；v113 缩小为原来的 3/5（7sp/7dp/2dp），胶囊圆角 -->
         <TextView
             android:id="@+id/tv_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:paddingLeft="12dp"
-            android:paddingRight="12dp"
-            android:paddingTop="3dp"
-            android:paddingBottom="3dp"
+            android:paddingLeft="7dp"
+            android:paddingRight="7dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
             android:text=""
-            android:textSize="11sp"
+            android:textSize="7sp"
             android:textStyle="bold"
             android:visibility="gone"
             android:textColor="#FFFFFF"
