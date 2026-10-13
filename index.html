@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v122: 修复云同步延迟感——SW对supabase API响应绝不再缓存(原stale-while-revalidate实际cache-first,删除/修改后APP启动被旧缓存遮蔽);deleteFromCloud失败改可见提示;sw缓存v36 -->
 <!-- v120: ①app_meta启动双向合并补传:云端缺/旧的key把本机推上去,修复v118之前旧数据(口腔溃疡+嘴巴图标)不同步 ②删除可填项同时清AI建议缓存,修复重开弹窗回弹(删除名存实亡) ③内置项目专属填项(痛经日期/发作部位/疼痛等级/触发食物/用药)可在编辑弹窗删除(停用)并在添加弹窗恢复,成员/时间固定;停用列表存_builtin_off随云同步,保存时跳过停用项 -->
 <!-- v118: ①管理项目编辑键样式对齐全部记录(ev-mini-btn同风格) ②身体页全部记录标题单独一行 ③云同步大补全:新增app_meta表同步成员/自定义项目+图标/自定义类别/可填项定义(含AI建议)/已删标记/AI建议缓存,改动即推+启动即拉+realtime实时收(后写覆盖) ④编辑可填项弹窗重做:AI建议字段自动合并,每项可改名/增删选项/填写⇄选项/删除,底部添加可填项独立弹窗 ⑤卧床时间→用药一次性迁移(定义+AI缓存+历史记录) ⑥本周记录去掉今天还没记录提示 ⑦AI/规则识别人名模糊匹配(龙龙体温37→龙龙,文体温37→文文)并自动选中 ⑧体温37判异常=预期行为:参考区间一律用AI按通用医学常识给出的区间(用户确认),AI给36-37.0则37判偏高 -->
 <!-- v117: 网页功能无变化(微增部署,sw缓存v31)——APK v1.10: APP内下载更新增加进度条+每源重试3次+HTTP状态码检查+文件完整性校验+jsDelivr备用源兜底,修复连续下载失败 -->
@@ -2289,7 +2290,10 @@ async function pushToCloud(record) {
 async function deleteFromCloud(id) {
   if (!dbClient || !id) return;
   const { error } = await dbClient.from('health_records').delete().eq('id', id);
-  if (error) console.error('删除失败', error);
+  if (error) {
+    console.error('删除失败', error);
+    showToast('⚠️ 云端删除失败，其它设备稍后可能仍看到这条记录', 'warning');
+  }
 }
 
 async function clearCloud() {

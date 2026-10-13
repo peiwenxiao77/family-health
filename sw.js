@@ -1,7 +1,7 @@
 /* 家庭健康记录 Service Worker
  * 缓存策略：network-first（HTML/JS/CSS，避免新版本被旧缓存遮蔽）+ stale-while-revalidate（CDN 资源）
  */
-const CACHE = 'family-health-v35';  // v118：全量云同步(app_meta)+可填项编辑器重做+AI人名识别+体温区间纠正
+const CACHE = 'family-health-v36';  // v122：修复云同步慢——supabase API 响应不再缓存（cache-first 导致删除/修改后 APP 启动读到旧数据）
 const CORE = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
@@ -33,8 +33,12 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // CDN：stale-while-revalidate
-  if (url.hostname.includes('jsdelivr') || url.hostname.includes('supabase')) {
+  // Supabase API：直接放行，绝不缓存——API 响应是动态数据（记录增删改），
+  // 缓存会导致其它设备的删除/修改在 APP 启动时被旧缓存遮蔽（离线由应用层 localStorage 兜底）
+  if (url.hostname.includes('supabase')) return;
+
+  // CDN 静态资源：stale-while-revalidate
+  if (url.hostname.includes('jsdelivr')) {
     e.respondWith(
       caches.open(CACHE).then(cache =>
         cache.match(e.request).then(cached => {
