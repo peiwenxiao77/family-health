@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v128: 「点击月历保存为」项目名按字数自动缩字号——≤3字不变(11px)；4-5字=3/5(6.6px,bts-t34)；6字及以上=4/7(6.3px,bts-t47)；btsTextCls挂类于自定义项目渲染+静态添加项目按钮(4字)；月经/痛风2字不受影响 -->
 <!-- v127: ①日历角标删除「已记录月经优先」顺序依赖拦截(老设计残留,时间戳巧合吞同日其他角标如9.24痛风)——月经底色仍由recordedKeys渲染,v110起渲染端本就支持同显 ②健康页各项趋势:收起键从tabs捆绑容器拆出独立钉标题行最右,范围tabs移到标题行下方单独一行(修复展开时收起键被挤到第二行) ③健康页全部记录:收起键从actions组拆出钉标题行最右,排序/筛选/删除留第二行右对齐(修复展开收起都在第二行) -->
 <!-- v126: ①修复刚添加的记录点删除无弹窗无效(云端换id后列表未重渲染,按钮挂旧pending-id)——id替换后立即renderEvents+找不到记录改提示并刷新 ②管理项目全部子弹窗移除AI建议字样 ③收起键统一移到标题行最右(健康页各项趋势/全部记录+身体页全部记录) ④时间弹窗改日期自动对齐:今天=当前时间,非今天=06:00,手动改过不覆盖 ⑤MENSTRUAL_PRED_DAYS未定义ReferenceError修复(改DEFAULT_PRED_DAYS) -->
 <!-- v125: ①触发食物选项化(预置海鲜/啤酒/动物内脏/浓肉汤∪历史∪覆盖层) ②发作部位改pill点击单选+手输框 ③统一编辑器:每行编辑+删除(弹窗确认),编辑弹窗含改名/填写⇄选项切换(暂存恢复)/选项增删;内置字段改名fh_builtin_labels随云同步;自定义字段改名迁移全部历史记录标签 ④关闭键沿用橙×样式略左下,移除旧静态modal-close ⑤月经弹窗删(在记录期内勾选) -->
@@ -681,6 +682,9 @@
   .mgr-fld-btn:hover { background: #e2e8f0; transform: scale(1.06); }
   .body-type-selector .bts-icon { font-size: 20px; line-height: 1; }
   .body-type-selector .bts-text { font-size: 11px; }
+  /* v128：项目名超长自动缩字号（基准11px）——4-5字=3/5，6字及以上=4/7 */
+  .body-type-selector .bts-text.bts-t34 { font-size: calc(11px * 3 / 5); }
+  .body-type-selector .bts-text.bts-t47 { font-size: calc(11px * 4 / 7); }
   .body-type-selector .bts-hint { margin-top: 8px; font-size: 11px; color: var(--text-3); text-align: center; }
   @media (max-width: 500px) {
     .body-type-selector .bts-grid { grid-template-columns: repeat(5, 1fr); gap: 6px; }
@@ -959,7 +963,7 @@
           </button>
           <button class="bts-btn bts-btn-add" data-action="add-custom" data-color="#64748b" title="点击添加新的自定义项目">
             <span class="bts-icon">＋</span>
-            <span class="bts-text">添加项目</span>
+            <span class="bts-text bts-t34">添加项目</span>
           </button>
         </div>
         <div class="bts-hint" id="btsHint">点击月历上的日期，弹出确认弹窗 → 保存为「月经」</div>
@@ -2832,6 +2836,12 @@ function getCustomEventType(id) {
   return customEventTypes.find(c => c.id === id);
 }
 
+// v128：项目名按字数缩字号——≤3字不变；4-5字=3/5档；6字及以上=4/7档
+function btsTextCls(name) {
+  const len = (name || '').length;
+  return len <= 3 ? '' : (len <= 5 ? ' bts-t34' : ' bts-t47');
+}
+
 function renderBodyTypeSelector() {
   const grid = document.getElementById('btsGrid');
   if (!grid) return;
@@ -2843,7 +2853,7 @@ function renderBodyTypeSelector() {
   const customs = customEventTypes.map(c => `
     <button class="bts-btn" data-type="${escapeHtml(c.id)}" data-custom="${escapeHtml(c.id)}" data-color="${escapeHtml(c.color)}" title="记录「${escapeHtml(c.name)}」">
       <span class="bts-icon">${escapeHtml(c.icon)}</span>
-      <span class="bts-text">${escapeHtml(c.name)}</span>
+      <span class="bts-text${btsTextCls(c.name)}">${escapeHtml(c.name)}</span>
     </button>
   `).join('');
   /* v97：内嵌删除键已删除——button 嵌套 button 是非法 HTML，浏览器解析时拆散导致
