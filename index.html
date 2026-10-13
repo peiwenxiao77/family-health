@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v118: ①管理项目编辑键样式对齐全部记录(ev-mini-btn同风格) ②身体页全部记录标题单独一行 ③云同步大补全:新增app_meta表同步成员/自定义项目+图标/自定义类别/可填项定义(含AI建议)/已删标记/AI建议缓存,改动即推+启动即拉+realtime实时收(后写覆盖) ④编辑可填项弹窗重做:AI建议字段自动合并,每项可改名/增删选项/填写⇄选项/删除,底部添加可填项独立弹窗 ⑤卧床时间→用药一次性迁移(定义+AI缓存+历史记录) ⑥本周记录去掉今天还没记录提示 ⑦AI/规则识别人名模糊匹配(龙龙体温37→龙龙,文体温37→文文)并自动选中 ⑧体温37判异常=预期行为:参考区间一律用AI按通用医学常识给出的区间(用户确认),AI给36-37.0则37判偏高 -->
 <!-- v117: 网页功能无变化(微增部署,sw缓存v31)——APK v1.10: APP内下载更新增加进度条+每源重试3次+HTTP状态码检查+文件完整性校验+jsDelivr备用源兜底,修复连续下载失败 -->
 <!-- v115: ①趋势分析恢复图标原高度,改为图表容器压矮1/2(200/160px→100/80px) ②APK v1.8: 修复信封小组件白底灰圈(v114误用RemoteViews不支持的Space控件致布局加载失败,改空TextView占位) + 新增跨天自动刷新链(每天00:02自动刷新小组件,无需打开APP;原3小时周期任务保留兜底) -->
 <!-- v109: ①全部记录按钮列移最右侧(健康:正常/删除;身体:编辑/删除) ②删两处导出键,设置弹窗重构为三板块(Supabase配置/AI配置/数据导出与导入),新增JSON完整备份导出+导入(按id合并),删「第一次用」「建表SQL」,云端备份恢复移入第三板块 ③删除弹窗新增「自选条目」多选批量删除模式(健康+身体页,batchBar悬浮操作条) ④身体页筛选/搜索框高度对齐人名框 ⑤新增自定义可填项系统(所有项目可增删字段,可选项点击即选,定义存localStorage fh_extra_fields,值存payload.extra_fields) -->
@@ -665,6 +666,9 @@
   .mgr-icon-btn:hover { background: #ede9fe; transform: scale(1.08); }
   .mgr-del-btn { width: 30px; height: 30px; font-size: 14px; border: none; background: transparent; border-radius: 8px; cursor: pointer; opacity: 0.55; transition: all 0.15s; }
   .mgr-del-btn:hover { background: #fee2e2; opacity: 1; }
+  /* v118：管理项目「编辑」键与全部记录的 ev-mini-btn 同风格 */
+  .mgr-fld-btn { background: #f8fafc; border: 1px solid var(--border); cursor: pointer; font-size: 12px; padding: 5px 10px; border-radius: 8px; color: var(--text); transition: all 0.15s; }
+  .mgr-fld-btn:hover { background: #e2e8f0; transform: scale(1.06); }
   .body-type-selector .bts-icon { font-size: 20px; line-height: 1; }
   .body-type-selector .bts-text { font-size: 11px; }
   .body-type-selector .bts-hint { margin-top: 8px; font-size: 11px; color: var(--text-3); text-align: center; }
@@ -985,9 +989,9 @@
 
       <!-- 全部记录（原"详细信息"，v75 改名 + 可收起）：大框（v50，同日历记录框样式） -->
       <div style="margin-top:16px;background:white;border-radius:12px;padding:14px;border:1px solid var(--border);">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-          <div style="font-weight:700;font-size:13px;color:var(--text);">📋 全部记录</div>
-          <div style="display:flex;gap:6px;">
+        <!-- v118：标题单独一行，控制键移到第二行右对齐 -->
+        <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:8px;">📋 全部记录</div>
+        <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-bottom:12px;">
             <select id="eventsSort" class="preview-input" style="width:auto;font-size:12px;padding:4px 8px;" title="排序方式">
               <option value="actual-desc">实际时间 新→旧</option>
               <option value="actual-asc">实际时间 旧→新</option>
@@ -997,7 +1001,6 @@
             <!-- v109：导出键移到 设置→数据导出与导入；新增批量删除 -->
             <button class="btn-danger" id="btnDeleteBody" style="font-size:11px;padding:4px 10px;">🗑 删除</button>
             <button class="btn-secondary" id="btnToggleEventsList" style="font-size:11px;padding:4px 10px;">⇕ 收起</button>
-          </div>
         </div>
 
         <div id="eventsListWrap">
@@ -1612,6 +1615,7 @@ let currentBodyType = 'menstrual'; // 类型选择器当前选中（menstrual/go
 let customEventTypes = JSON.parse(localStorage.getItem('wb_custom_event_types') || '[]'); // 用户自定义项目 [{id, name, icon, color}]
 let realtimeChannel = null;
 let realtimeEventsChannel = null;
+let realtimeMetaChannel = null;
 let currentParsed = null;
 let currentView = 'health';  // 'health' | 'events'
 let currentEventType = 'menstrual';
@@ -1786,8 +1790,8 @@ function loadLocalCache() {
 function saveLocalCache() {
   try { localStorage.setItem(STORAGE_KEYS.CACHE, JSON.stringify(records)); } catch (e) {}
 }
-function saveCustomCategories() { localStorage.setItem(STORAGE_KEYS.CATS, JSON.stringify(customCategories)); }
-function saveMembers() { localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(familyMembers)); }
+function saveCustomCategories() { localStorage.setItem(STORAGE_KEYS.CATS, JSON.stringify(customCategories)); syncMetaKey('custom_cats'); }
+function saveMembers() { localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(familyMembers)); syncMetaKey('members'); }
 
 /* ============================================================
    文字解析
@@ -1820,6 +1824,14 @@ function parseText(text) {
   const noteMatch = text.match(/\s*(早上|中午|下午|晚上|睡前|餐前|餐后|起床|空腹|饭后|服药后)$/);
   if (noteMatch) { ctx.note = noteMatch[1]; text = text.slice(0, noteMatch.index).trim(); }
 
+  // v118：先做人名模糊识别（支持「龙龙体温37」「文体温37」这类无空格写法），
+  // 识别到就剥离人名再走指标解析；带空格的旧写法仍由下方原有规则兜底
+  const fuzzy = detectMemberInText(text);
+  if (fuzzy && fuzzy.rest.trim()) {
+    ctx.member = normalizeMemberName(fuzzy.member);
+    if (!familyMembers.includes(ctx.member)) { familyMembers.push(ctx.member); saveMembers(); }
+    text = fuzzy.rest.trim();
+  }
   const memberMatch = text.match(/^([\u4e00-\u9fa5]{1,4})\s+(.+)$/);
   if (memberMatch && isLikelyMember(memberMatch[1])) {
     ctx.member = memberMatch[1];
@@ -2018,6 +2030,31 @@ function isLikelyMember(name) {
   if (name.length < 2 || name.length > 4) return false;
   if (['体温','血压','血糖','心率','体重','血氧','身高'].some(k => name.includes(k))) return false;
   return true;
+}
+
+// v118：从输入文本开头模糊识别人名——
+//  「龙龙体温37」→ { member:'龙龙', rest:'体温37' }（完整名，无需空格）
+//  「文体温37」  → { member:'文文', rest:'体温37' }（首字前缀，唯一命中才认）
+//  返回 null = 未识别到人名
+function detectMemberInText(text) {
+  text = (text || '').trim();
+  if (!text) return null;
+  const cands = familyMembers.filter(m => m && m !== '未分类').sort((a, b) => b.length - a.length);
+  // 1) 完整名前缀匹配（最长优先）
+  for (const m of cands) {
+    if (m.length >= 2 && text.startsWith(m)) return { member: m, rest: text.slice(m.length) };
+  }
+  // 2) 单字前缀模糊匹配：首字是某个成员名的开头且不与其它成员首字冲突
+  const first = text[0];
+  if (first && /[\u4e00-\u9fa5]/.test(first)) {
+    const hits = cands.filter(m => m.length >= 2 && m[0] === first);
+    if (hits.length === 1) {
+      // 防误判：首字若是常见指标词开头则不当作人名
+      const catWords = ['体温', '血压', '血糖', '心率', '体重', '血氧', '身高', '尿酸', '胆固', '甘油', '月经', '痛经'];
+      if (!catWords.some(w => w[0] === first)) return { member: hits[0], rest: text.slice(1) };
+    }
+  }
+  return null;
 }
 
 function parseTimeFromText(text) {
@@ -2414,6 +2451,126 @@ function saveCustomEventTypes() {
   try {
     localStorage.setItem('wb_custom_event_types', JSON.stringify(customEventTypes));
   } catch (e) { console.warn('localStorage save custom types failed', e); }
+  syncMetaKey('custom_types');
+}
+
+/* ============================================================
+   v118：全量云端同步（app_meta 表：id text 主键, value jsonb）
+   旧版只同步 health_records / body_events 两张表——以下数据都只存
+   本机 localStorage，换设备/重装即丢：
+     ①成员列表（含删除成员）②自定义项目+图标 ③健康自定义类别
+     ④全部可填项定义（含 AI 生成的字段建议）⑤已删项目标记
+     ⑥AI 字段建议缓存 ⑦AI 图标建议缓存
+   现在统一写入 app_meta（key→value+时间戳 t）：改动即推（防抖900ms）、
+   启动即拉、realtime 实时收；按时间戳「后写覆盖」解决多端冲突。
+   ⚠ 需要在 Supabase 建表（SQL 见设置→云端 或交付说明）。
+   ============================================================ */
+let metaPushTimers = {};
+let __applyingMeta = false;
+let __metaWarned = false;
+function collectMetaValue(key) {
+  try {
+    switch (key) {
+      case 'members': return familyMembers;
+      case 'custom_types': return customEventTypes;
+      case 'custom_cats': return customCategories;
+      case 'extra_fields': return getExtraFieldsMap();
+      case 'deleted_types': return JSON.parse(localStorage.getItem('deleted_custom_types') || '{}');
+      case 'ai_fields': return getAIFieldCache();
+      case 'ai_icons': return JSON.parse(localStorage.getItem(AI_ICON_SUGGEST_KEY) || '{}');
+    }
+  } catch (e) {}
+  return null;
+}
+function applyMetaValue(key, d) {
+  if (d == null) return;
+  try {
+    switch (key) {
+      case 'members':
+        if (Array.isArray(d)) { familyMembers = d.map(normalizeMemberName); saveMembers(); render(); }
+        break;
+      case 'custom_types':
+        if (Array.isArray(d)) { customEventTypes = d; saveCustomEventTypes(); if (typeof renderBodyTypeSelector === 'function') renderBodyTypeSelector(); syncEventsCategoryFilter(); renderEvents(); }
+        break;
+      case 'custom_cats':
+        if (d && typeof d === 'object') { customCategories = d; saveCustomCategories(); render(); }
+        break;
+      case 'extra_fields':
+        if (d && typeof d === 'object') { saveExtraFieldsMap(d); }
+        break;
+      case 'deleted_types':
+        if (d && typeof d === 'object') { localStorage.setItem('deleted_custom_types', JSON.stringify(d)); }
+        break;
+      case 'ai_fields':
+        if (d && typeof d === 'object') { localStorage.setItem(AI_FIELD_CACHE_KEY, JSON.stringify(d)); }
+        break;
+      case 'ai_icons':
+        if (d && typeof d === 'object') { localStorage.setItem(AI_ICON_SUGGEST_KEY, JSON.stringify(d)); }
+        break;
+    }
+  } catch (e) { console.warn('applyMetaValue failed', key, e); }
+}
+function syncMetaKey(key) {
+  if (__applyingMeta) return;  // 应用远端数据时不回推，避免乒乓
+  if (LOCAL_MODE || !isConfigured || !dbClient) return;
+  clearTimeout(metaPushTimers[key]);
+  metaPushTimers[key] = setTimeout(async () => {
+    try {
+      const t = Date.now();
+      const d = collectMetaValue(key);
+      if (d == null) return;
+      localStorage.setItem('meta_ts_' + key, String(t));
+      const { error } = await dbClient.from('app_meta').upsert({ id: key, value: { d, t } }, { onConflict: 'id' });
+      if (error && !__metaWarned) {
+        __metaWarned = true;
+        console.warn('[app_meta] 同步失败（表可能未建）:', error.message);
+        showToast('⚠ 配置云同步不可用：需在 Supabase 执行 app_meta 建表 SQL', 'warning', 5000);
+      }
+    } catch (e) {
+      if (!__metaWarned) { __metaWarned = true; console.warn('[app_meta] 同步失败', e); }
+    }
+  }, 900);
+}
+async function loadMetaFromCloud() {
+  if (LOCAL_MODE || !isConfigured || !dbClient) return;
+  try {
+    const { data, error } = await dbClient.from('app_meta').select('*');
+    if (error) {
+      if (!__metaWarned) { __metaWarned = true; console.warn('[app_meta] 读取失败（表可能未建）:', error.message); }
+      return;
+    }
+    __applyingMeta = true;
+    (data || []).forEach(row => {
+      const v = row.value || {};
+      const localT = Number(localStorage.getItem('meta_ts_' + row.id) || 0);
+      if ((v.t || 0) > localT) {
+        applyMetaValue(row.id, v.d);
+        localStorage.setItem('meta_ts_' + row.id, String(v.t || Date.now()));
+        console.log('[app_meta] 已应用云端配置:', row.id);
+      }
+    });
+  } catch (e) { console.warn('[app_meta] load failed', e); }
+  finally { __applyingMeta = false; }
+}
+function subscribeMeta() {
+  if (!dbClient || realtimeMetaChannel) return;
+  realtimeMetaChannel = dbClient.channel('app_meta_changes');
+  realtimeMetaChannel
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'app_meta' }, payload => {
+      const row = payload.new;
+      if (!row || !row.id) return;
+      const v = row.value || {};
+      const localT = Number(localStorage.getItem('meta_ts_' + row.id) || 0);
+      if ((v.t || 0) > localT) {
+        __applyingMeta = true;
+        applyMetaValue(row.id, v.d);
+        localStorage.setItem('meta_ts_' + row.id, String(v.t || Date.now()));
+        __applyingMeta = false;
+        const zh = { members: '成员列表', custom_types: '自定义项目', custom_cats: '自定义类别', extra_fields: '可填项定义', deleted_types: '已删项目标记', ai_fields: 'AI字段建议', ai_icons: 'AI图标建议' };
+        showToast(`🔔 已同步其它设备的${zh[row.id] || row.id}`);
+      }
+    })
+    .subscribe();
 }
 
 const CUSTOM_PALETTE = ['#8b5cf6', '#06b6d4', '#10b981', '#f97316', '#ec4899', '#3b82f6', '#14b8a6', '#a855f7', '#eab308', '#ef4444'];
@@ -2649,62 +2806,191 @@ function openTypesManager() {
   showModal('typesMgrMask');
 }
 // v111：可填项「编辑」弹窗——列表可删（两击确认）、下方可增，改动立即生效
+// v118：把 AI 建议字段合并进可填项定义（带 source:'ai' 标记），使其可在编辑弹窗中与自定义填项统一管理
+function mergeAISuggestionIntoDefs(key) {
+  const item = customEventTypes.find(c => c.id === key);
+  const projectName = item ? item.name : null;
+  if (!projectName) return;
+  const sug = getAIFieldCache()[projectName];
+  if (!sug || !Array.isArray(sug.fields)) return;
+  const m = getExtraFieldsMap();
+  const arr = m[key] || [];
+  sug.fields.forEach(f => {
+    if (f && f.label && !arr.some(x => x.label === f.label)) {
+      arr.push({ label: String(f.label), options: (f.options || []).map(s => String(s)).filter(Boolean).slice(0, 6), source: 'ai' });
+    }
+  });
+  m[key] = arr;
+  saveExtraFieldsMap(m);
+}
+function updateExtraFieldDefAt(key, i, patch) {
+  const m = getExtraFieldsMap();
+  const arr = m[key] || [];
+  if (!arr[i]) return;
+  Object.assign(arr[i], patch);
+  if (Array.isArray(arr[i].options) && !arr[i].options.length) delete arr[i].options;  // 空选项=自由填写
+  m[key] = arr;
+  saveExtraFieldsMap(m);
+}
+function removeExtraFieldDefAt(key, i) {
+  const m = getExtraFieldsMap();
+  const arr = m[key] || [];
+  arr.splice(i, 1);
+  m[key] = arr;
+  saveExtraFieldsMap(m);
+}
+
+// v118：「编辑可填项」弹窗重做——
+//  列表=AI建议字段+自定义可填项（打开时自动合并 AI 建议），每项可改名/增删选项/
+//  自由填写⇄选项选择/删除；底部「➕ 添加可填项」弹出独立添加弹窗
 function openFieldEditModal(key, name) {
   const old = document.getElementById('fldEditMask');
   if (old) old.remove();
   const mask = document.createElement('div');
   mask.className = 'modal-mask show';
   mask.id = 'fldEditMask';
+  mergeAISuggestionIntoDefs(key);
+
   const renderRows = () => {
     const defs = getExtraFieldDefsFor(key);
-    return defs.map(f => `
-      <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px dashed var(--border);font-size:13px;">
-        <div style="flex:1;min-width:0;">
-          <b>${escapeHtml(f.label)}</b>
-          <span style="color:var(--text-3);font-size:12px;">${(f.options && f.options.length) ? '可选：' + f.options.map(escapeHtml).join(' / ') : '自由填写'}</span>
+    return defs.map((f, i) => {
+      const chips = (f.options || []).map((o, oi) => `
+        <span class="fld-opt-chip" data-i="${i}" data-oi="${oi}" title="点击删除该选项">${escapeHtml(o)} <b style="opacity:.45;">×</b></span>`).join('');
+      return `
+      <div style="padding:9px 0;border-bottom:1px dashed var(--border);font-size:13px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input class="preview-input fld-ed-name" data-i="${i}" value="${escapeHtml(f.label)}" style="flex:1;min-width:0;height:30px;font-size:13px;font-weight:600;" title="字段名称，可直接修改">
+          <button class="fld-ed-mode" data-i="${i}" title="切换 自由填写 / 选项选择" style="flex-shrink:0;font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;cursor:pointer;">${(f.options && f.options.length) ? '🔘 选项' : '✍️ 填写'}</button>
+          <span class="fld-ed-del" data-i="${i}" style="cursor:pointer;font-size:15px;flex-shrink:0;" title="删除这个填项（永久）">🗑</span>
         </div>
-        <span class="fld-ed-del" data-label="${escapeHtml(f.label)}" style="cursor:pointer;font-size:15px;" title="删除这个填项（永久）">🗑</span>
-      </div>`).join('') || '<div style="font-size:12px;color:var(--text-3);padding:8px 0;">暂无可填项，在下方添加</div>';
+        ${(f.options && f.options.length) ? `
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;align-items:center;">
+            ${chips}
+            <input class="preview-input fld-opt-new" data-i="${i}" placeholder="新选项" style="width:78px;height:24px;font-size:11px;padding:2px 6px;">
+            <button class="fld-opt-add" data-i="${i}" style="font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:6px;background:#f8fafc;cursor:pointer;">➕</button>
+          </div>` : ''}
+        ${f.source === 'ai' ? '<div style="font-size:10px;color:#8b5cf6;margin-top:3px;">🤖 来自 AI 建议</div>' : ''}
+      </div>`;
+    }).join('') || '<div style="font-size:12px;color:var(--text-3);padding:8px 0;">暂无可填项，点下方「➕ 添加可填项」</div>';
   };
+
   mask.innerHTML = `
-    <div class="modal" style="max-width:430px;width:92%;">
-      <div style="font-weight:700;font-size:15px;margin-bottom:10px;">🧩 编辑可填项 · ${escapeHtml(name)}</div>
+    <div class="modal" style="max-width:440px;width:92%;max-height:80vh;overflow-y:auto;">
+      <div style="font-weight:700;font-size:15px;margin-bottom:4px;">🧩 编辑可填项 · ${escapeHtml(name)}</div>
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;">AI 建议字段已合并进来，可统一编辑；改动立即生效并同步云端</div>
       <div id="fldEdList">${renderRows()}</div>
-      <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
-        <input type="text" id="fldEdName" class="preview-input" placeholder="字段名称，如：卧床时间" style="flex:2;min-width:110px;font-size:12px;height:30px;">
-        <input type="text" id="fldEdOpts" class="preview-input" placeholder="可选项（逗号隔开，留空=自由填写）" style="flex:3;min-width:150px;font-size:12px;height:30px;">
-        <button class="btn-primary" id="fldEdAdd" style="font-size:12px;padding:4px 12px;height:30px;">✓ 添加</button>
-      </div>
+      <button id="fldEdOpenAdd" style="width:100%;margin-top:12px;padding:8px 0;font-size:13px;border:1.5px dashed #c4b5fd;border-radius:10px;background:#faf5ff;color:#7c3aed;cursor:pointer;font-weight:600;">➕ 添加可填项</button>
       <div style="display:flex;justify-content:flex-end;margin-top:12px;"><button class="btn-secondary" id="fldEdClose">关闭</button></div>
     </div>`;
   document.body.appendChild(mask);
   const close = () => mask.remove();
   mask.addEventListener('click', e => { if (e.target === mask) close(); });
   mask.querySelector('#fldEdClose').onclick = close;
-  const bindDel = () => {
+
+  const refresh = () => {
+    mask.querySelector('#fldEdList').innerHTML = renderRows();
+    bindAll();
+    if (typeof renderBodyTypeSelector === 'function') renderBodyTypeSelector();
+  };
+  const bindAll = () => {
+    // 改名
+    mask.querySelectorAll('.fld-ed-name').forEach(inp => {
+      inp.onchange = () => {
+        const i = parseInt(inp.dataset.i);
+        const val = inp.value.trim();
+        const defs = getExtraFieldDefsFor(key);
+        if (!val) { inp.value = defs[i] ? defs[i].label : ''; return; }
+        if (defs.some((f, j) => j !== i && f.label === val)) { showToast('已有同名填项', 'warning'); inp.value = defs[i].label; return; }
+        updateExtraFieldDefAt(key, i, { label: val });
+        showToast(`✓ 已改名为「${val}」`);
+      };
+    });
+    // 填写⇄选项 切换
+    mask.querySelectorAll('.fld-ed-mode').forEach(btn => {
+      btn.onclick = () => {
+        const i = parseInt(btn.dataset.i);
+        const defs = getExtraFieldDefsFor(key);
+        const f = defs[i];
+        if (!f) return;
+        if (f.options && f.options.length) {
+          updateExtraFieldDefAt(key, i, { options: [] });  // → 自由填写
+          showToast(`「${f.label}」已改为自由填写`);
+        } else {
+          updateExtraFieldDefAt(key, i, { options: ['选项1', '选项2'] });  // → 选项选择（示例，可删改）
+          showToast(`「${f.label}」已改为选项选择，点选项上的 × 可删除`);
+        }
+        refresh();
+      };
+    });
+    // 删除选项
+    mask.querySelectorAll('.fld-opt-chip').forEach(chip => {
+      chip.onclick = () => {
+        const i = parseInt(chip.dataset.i), oi = parseInt(chip.dataset.oi);
+        const defs = getExtraFieldDefsFor(key);
+        const opts = (defs[i] && defs[i].options) || [];
+        opts.splice(oi, 1);
+        updateExtraFieldDefAt(key, i, { options: opts });
+        refresh();
+      };
+    });
+    // 新增选项
+    mask.querySelectorAll('.fld-opt-add').forEach(btn => {
+      btn.onclick = () => {
+        const i = parseInt(btn.dataset.i);
+        const inp = mask.querySelector(`.fld-opt-new[data-i="${i}"]`);
+        const val = (inp.value || '').trim();
+        if (!val) return;
+        const defs = getExtraFieldDefsFor(key);
+        const opts = (defs[i] && defs[i].options) || [];
+        if (opts.includes(val)) { showToast('选项已存在', 'warning'); return; }
+        opts.push(val);
+        updateExtraFieldDefAt(key, i, { options: opts.slice(0, 8) });
+        refresh();
+      };
+    });
+    // 删除填项（两击确认）
     mask.querySelectorAll('.fld-ed-del').forEach(d => {
       d.onclick = () => {
         if (!d.dataset.arm) { d.dataset.arm = '1'; d.textContent = '❓'; setTimeout(() => { d.dataset.arm = ''; d.textContent = '🗑'; }, 2500); return; }
-        removeExtraFieldDefFor(key, d.dataset.label);
-        mask.querySelector('#fldEdList').innerHTML = renderRows();
-        bindDel();
-        if (typeof renderBodyTypeSelector === 'function') renderBodyTypeSelector();
-        showToast(`已删除填项「${d.dataset.label}」`);
+        const i = parseInt(d.dataset.i);
+        const defs = getExtraFieldDefsFor(key);
+        const label = defs[i] ? defs[i].label : '';
+        removeExtraFieldDefAt(key, i);
+        refresh();
+        showToast(`已删除填项「${label}」`);
       };
     });
   };
-  bindDel();
-  mask.querySelector('#fldEdAdd').onclick = () => {
-    const label = mask.querySelector('#fldEdName').value.trim();
-    if (!label) { showToast('请填写字段名称', 'warning'); return; }
-    if (getExtraFieldDefsFor(key).find(f => f.label === label)) { showToast('该填项已存在', 'warning'); return; }
-    const options = mask.querySelector('#fldEdOpts').value.split(/[,，;；]/).map(s => s.trim()).filter(Boolean).slice(0, 8);
-    putExtraFieldDefFor(key, { label, options });
-    mask.querySelector('#fldEdName').value = ''; mask.querySelector('#fldEdOpts').value = '';
-    mask.querySelector('#fldEdList').innerHTML = renderRows();
-    bindDel();
-    if (typeof renderBodyTypeSelector === 'function') renderBodyTypeSelector();
-    showToast(`✓ 已添加填项「${label}」${options.length ? `（${options.length} 个可选项）` : '（自由填写）'}`);
+  bindAll();
+
+  // 底部「➕ 添加可填项」→ 独立添加小弹窗
+  mask.querySelector('#fldEdOpenAdd').onclick = () => {
+    const addMask = document.createElement('div');
+    addMask.className = 'modal-mask show';
+    addMask.style.zIndex = '10001';
+    addMask.innerHTML = `
+      <div class="modal" style="max-width:360px;width:88%;">
+        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">➕ 添加可填项</div>
+        <input type="text" id="addFldName" class="preview-input" placeholder="字段名称，如：用药" style="width:100%;height:34px;font-size:13px;margin-bottom:8px;">
+        <input type="text" id="addFldOpts" class="preview-input" placeholder="可选项（逗号隔开，留空=自由填写）" style="width:100%;height:34px;font-size:12px;margin-bottom:12px;">
+        <div style="display:flex;justify-content:flex-end;gap:8px;">
+          <button class="btn-secondary" id="addFldCancel">取消</button>
+          <button class="btn-primary" id="addFldOk">✓ 添加</button>
+        </div>
+      </div>`;
+    document.body.appendChild(addMask);
+    addMask.addEventListener('click', e => { if (e.target === addMask) addMask.remove(); });
+    addMask.querySelector('#addFldCancel').onclick = () => addMask.remove();
+    addMask.querySelector('#addFldOk').onclick = () => {
+      const label = addMask.querySelector('#addFldName').value.trim();
+      if (!label) { showToast('请填写字段名称', 'warning'); return; }
+      if (getExtraFieldDefsFor(key).find(f => f.label === label)) { showToast('该填项已存在', 'warning'); return; }
+      const options = addMask.querySelector('#addFldOpts').value.split(/[,，;；]/).map(s => s.trim()).filter(Boolean).slice(0, 8);
+      putExtraFieldDefFor(key, { label, options });
+      addMask.remove();
+      refresh();
+      showToast(`✓ 已添加填项「${label}」${options.length ? `（${options.length} 个可选项）` : '（自由填写）'}`);
+    };
   };
 }
 function renderTypesMgrList() {
@@ -2803,6 +3089,7 @@ async function deleteCustomEventTypeFlow(id, after) {
     const del = JSON.parse(localStorage.getItem('deleted_custom_types') || '{}');
     del[id] = Date.now();
     localStorage.setItem('deleted_custom_types', JSON.stringify(del));
+    syncMetaKey('deleted_types');
   } catch (e) {}
   renderBodyTypeSelector();
   syncEventsCategoryFilter();
@@ -4296,6 +4583,8 @@ function computeRecordStatus(r) {
     };
   }
   // 2) 自动评估（数值类 + 定性类）
+  // v118b（用户确认）：一律沿用记录自带的参考区间（AI 按通用医学常识给出），
+  // 不用内置区间覆盖；手动标注（statusManual）仍最优先
   const item = {
     range: r.category.range,
     rangeText: r.rangeText,
@@ -4923,14 +5212,20 @@ function aiItemsToParsed(items) {
   const out = [];
   for (const it of items) {
     if (!it.name) continue;
+    const name = String(it.name).trim();
     const value = it.value;
     let numericValue = typeof value === 'number' ? value : (parseFloat(String(value)) || null);
     let isQualitative = numericValue === null || /[^\d.\-eE]/.test(String(value));
     let unit = it.unit || '';
     let lo = (it.rangeLow !== '' && it.rangeLow != null) ? parseFloat(it.rangeLow) : null;
     let hi = (it.rangeHigh !== '' && it.rangeHigh != null) ? parseFloat(it.rangeHigh) : null;
+    // v118b（用户确认）：参考区间【一律用 AI 按通用医学常识给出的】——
+    // 不再用内置区间覆盖（体温 37 按 AI 的 36-37.0 判「偏高」是预期行为）
+    const stdDef = STANDARD_CATEGORIES[name];
+    const range = (lo != null || hi != null) ? [lo, hi] : null;
+    const rangeText = it.range || '';
     out.push({
-      category: String(it.name).trim(),
+      category: name,
       values: [{
         label: '结果',
         value: isQualitative ? String(value) : numericValue,
@@ -4938,9 +5233,9 @@ function aiItemsToParsed(items) {
         isQualitative,
         displayValue: String(value)
       }],
-      range: (lo != null || hi != null) ? [lo, hi] : null,
-      rangeText: it.range || '',
-      isNewCategory: !STANDARD_CATEGORIES[it.name] && !customCategories[it.name]
+      range,
+      rangeText,
+      isNewCategory: !stdDef && !customCategories[name]
     });
   }
   return out;
@@ -4967,19 +5262,29 @@ async function doAI() {
     openAiConfig();
     return;
   }
+  // v118：AI 识别前先做人名模糊识别（「龙龙体温37」「文体温37」），剥离人名再发给 AI，
+  // 预览弹窗里自动选中对应成员；识别不到保持默认 文文
+  let aiText = text;
+  let aiMember = '文文';
+  const fuzzy = detectMemberInText(text);
+  if (fuzzy && fuzzy.rest.trim()) {
+    aiMember = normalizeMemberName(fuzzy.member);
+    aiText = fuzzy.rest.trim();
+    if (!familyMembers.includes(aiMember)) { familyMembers.push(aiMember); saveMembers(); }
+  }
   const btn = document.getElementById('btnAI');
   const oldLabel = btn ? btn.textContent : '';
   const restoreBtn = (label) => { if (btn) { btn.disabled = false; btn.textContent = label; } };
   if (btn) { btn.disabled = true; btn.textContent = '🌀 识别中…'; }
   try {
-    const items = await callLLM(text);
+    const items = await callLLM(aiText);
     const parsed = aiItemsToParsed(items);
     if (parsed.length === 0) throw new Error('AI 未能提取任何指标，请检查输入');
     currentParsed = {
       raw: text.slice(0, 80) + (text.length > 80 ? '…' : ''),
       multi: true,
       isLabReport: true,
-      member: '文文',
+      member: aiMember,
       time: Date.now(),
       note: '',
       items: parsed
@@ -5045,6 +5350,39 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
 /* ============================================================
    启动
    ============================================================ */
+// v118：字段更名「卧床时间」→「用药」——可填项定义/AI建议缓存/历史记录一次性迁移
+function migrateBedtimeField() {
+  if (localStorage.getItem('fh_renamed_bedtime_v1')) return;
+  try {
+    // ① 可填项定义
+    const m = getExtraFieldsMap();
+    let c1 = false;
+    Object.keys(m).forEach(k => (m[k] || []).forEach(f => { if (f.label === '卧床时间') { f.label = '用药'; c1 = true; } }));
+    if (c1) saveExtraFieldsMap(m);
+    // ② AI 字段建议缓存
+    let c2 = false;
+    const cache = getAIFieldCache();
+    Object.keys(cache).forEach(n => ((cache[n] && cache[n].fields) || []).forEach(f => { if (f.label === '卧床时间') { f.label = '用药'; c2 = true; } }));
+    if (c2) localStorage.setItem(AI_FIELD_CACHE_KEY, JSON.stringify(cache));
+    // ③ 历史身体记录 payload.extra_fields（本地+云端）
+    let c3 = false;
+    bodyEvents.forEach(ev => {
+      const ef = ev.payload && ev.payload.extra_fields;
+      if (Array.isArray(ef)) ef.forEach(x => { if (x && x.label === '卧床时间') { x.label = '用药'; c3 = true; } });
+    });
+    if (c3) {
+      saveBodyEventsCache();
+      renderEvents();
+      if (dbClient && !LOCAL_MODE) {
+        bodyEvents.filter(ev => Array.isArray(ev.payload && ev.payload.extra_fields) && ev.payload.extra_fields.some(x => x.label === '用药'))
+          .forEach(ev => { if (ev.id && !String(ev.id).startsWith('pending-')) { try { dbClient.from('body_events').update({ payload: ev.payload }).eq('id', ev.id).then(() => {}, () => {}); } catch (e) {} } });
+      }
+    }
+    localStorage.setItem('fh_renamed_bedtime_v1', '1');
+    if (c1 || c2 || c3) console.log('[v118] 已完成「卧床时间→用药」更名迁移');
+  } catch (e) { console.warn('bedtime rename migration failed', e); }
+}
+
 async function bootstrap() {
   loadLocalCache();
   render();
@@ -5075,6 +5413,9 @@ async function bootstrap() {
     } catch (e) {
       console.warn('body_events 加载失败（可能表还没建）', e);
     }
+    // v118：拉取并订阅全量配置同步（成员/自定义项目/可填项/AI建议等）
+    await loadMetaFromCloud();
+    subscribeMeta();
     render();
     renderEvents();
     updateSyncStatus();
@@ -5088,6 +5429,8 @@ async function bootstrap() {
 }
 
 bootstrap();
+// v118：脚本全部解析完成后执行「卧床时间→用药」迁移（依赖后面的常量定义）
+setTimeout(migrateBedtimeField, 0);
 
 // 全局错误捕获 - 显示在页面右下角（方便不打开 F12 也能看到）
 window.addEventListener('error', (e) => {
@@ -6137,12 +6480,14 @@ function getAIFieldCache() {
 }
 function cacheAISuggestion(name, sug) {
   try { const c = getAIFieldCache(); c[name] = sug; localStorage.setItem(AI_FIELD_CACHE_KEY, JSON.stringify(c)); } catch (e) {}
+  syncMetaKey('ai_fields');
 }
 function getAIIconSuggestion(name) {
   try { return JSON.parse(localStorage.getItem(AI_ICON_SUGGEST_KEY) || '{}')[name] || null; } catch (e) { return null; }
 }
 function setAIIconSuggestion(name, icon) {
   try { const c = JSON.parse(localStorage.getItem(AI_ICON_SUGGEST_KEY) || '{}'); c[name] = icon; localStorage.setItem(AI_ICON_SUGGEST_KEY, JSON.stringify(c)); } catch (e) {}
+  syncMetaKey('ai_icons');
 }
 
 async function fetchAISuggestedFields(name) {
@@ -6263,7 +6608,7 @@ function getExtraFieldsMap() {
   try { return JSON.parse(localStorage.getItem(EXTRA_FIELDS_KEY) || '{}') || {}; }
   catch (e) { return {}; }
 }
-function saveExtraFieldsMap(m) { localStorage.setItem(EXTRA_FIELDS_KEY, JSON.stringify(m)); }
+function saveExtraFieldsMap(m) { localStorage.setItem(EXTRA_FIELDS_KEY, JSON.stringify(m)); syncMetaKey('extra_fields'); }
 // v110：字段定义函数改为显式 key（管理弹窗里可操作任意项目，不依赖当前选中项）
 function getExtraFieldDefsFor(key) {
   if (!key) return [];
@@ -6697,7 +7042,8 @@ function renderEventsOverview() {
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
   const todayCount = bodyEvents.filter(e => e.ts >= todayStart.getTime()).length;
   const weekVal = `${weekEvents.length} 次`;
-  let weekSub = todayCount > 0 ? `今天已记录 ${todayCount} 条 ✓` : '今天还没记录，点 ➕ 补一条';
+  // v118：本周记录不再出现「今天还没记录」催促提示——今天有就报数，没有就静默
+  let weekSub = todayCount > 0 ? `今天已记录 ${todayCount} 条 ✓` : '';
   if (weekEvents.length === 0) weekSub = '本周还没有记录';
 
   // ④ ❤️（v110：主值改近 30 天统计总数，副行=距上次 + 今年）
@@ -6733,7 +7079,7 @@ function renderEventsOverview() {
         <div class="eo-stat" style="background:rgba(245,158,11,0.07);">
           <div class="eo-stat-label">📝 本周记录</div>
           <div class="eo-stat-val" style="color:#b45309;">${weekVal}</div>
-          <div class="eo-stat-sub" style="color:${todayCount > 0 ? 'var(--text-3)' : '#be123c'};font-weight:${todayCount > 0 ? 400 : 600};">${weekSub}</div>
+          <div class="eo-stat-sub" style="color:var(--text-3);">${weekSub}</div>
         </div>
         <div class="eo-stat" style="background:rgba(244,63,94,0.07);">
           <div class="eo-stat-label">❤️ 近30天</div>
