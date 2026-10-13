@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v125: ①触发食物选项化(预置海鲜/啤酒/动物内脏/浓肉汤∪历史∪覆盖层) ②发作部位改pill点击单选+手输框 ③统一编辑器:每行编辑+删除(弹窗确认),编辑弹窗含改名/填写⇄选项切换(暂存恢复)/选项增删;内置字段改名fh_builtin_labels随云同步;自定义字段改名迁移全部历史记录标签 ④关闭键沿用橙×样式略左下,移除旧静态modal-close ⑤月经弹窗删(在记录期内勾选) -->
 <!-- v124: ①月经合并卡片标题简化:第一行就月经,第二行 2天·10/12-10/13 等chips ②内置项(痛风发作部位/用药)选项可编辑:fh_builtin_opts覆盖层(add/del差集,随app_meta云同步key=builtin_opts),历史用过的选项只在记录里保留不再进快捷列表 ③AI建议字段与可填项去重(修口腔溃疡字段重复两遍):AI渲染跳过defs已有label+墓碑label ④删除字段统一在tombstoneExtraField清AI建议缓存(任何路径不留残影) ⑤所有弹窗注入固定右上角✕关闭键(sticky吸附,内容下滑不消失;uiConfirm✕=取消);sw缓存v38 -->
 <!-- v123: ①app_meta同步防丢三重加固:extra_fields改合并式应用(label并集+时间戳墓碑_tombs,任何设备旧map不再灭掉他端新字段如月经的用药) ②上传时间戳改为成功后写+失败记pending下次启动强制补传+防抖900→300ms+切后台立即冲刷 ③月经合并卡片聚合可填项(10.1用药布洛芬+10.2用药双氯芬酸钠→用药布洛芬、双氯芬酸钠),AI建议合并无新增时不再触发上传;sw缓存v37 -->
 <!-- v122: 修复云同步延迟感——SW对supabase API响应绝不再缓存(原stale-while-revalidate实际cache-first,删除/修改后APP启动被旧缓存遮蔽);deleteFromCloud失败改可见提示;sw缓存v36 -->
@@ -198,8 +199,8 @@
   .modal-mask.show { display: flex; }
   .modal { background: white; border-radius: 20px; padding: 24px; max-width: 460px; width: 100%; box-shadow: 0 25px 50px -12px rgba(120, 53, 15, 0.4); max-height: 90vh; overflow-y: auto; position: relative; z-index: 10000; animation: slideUp 0.25s; overflow-x: hidden; }
   /* v124：弹窗固定关闭键——sticky 吸附弹窗右上角，内容下滑也能看到 */
-  .modal-x-fixed { position: sticky; top: -18px; float: right; margin: -18px -16px 0 8px; width: 30px; height: 30px; border: none; background: #fff; border-radius: 50%; font-size: 14px; line-height: 30px; text-align: center; color: #9ca3af; cursor: pointer; z-index: 50; box-shadow: 0 1px 6px rgba(0,0,0,0.12); transition: all 0.15s; padding: 0; flex-shrink: 0; }
-  .modal-x-fixed:hover { color: #111827; background: #f3f4f6; transform: scale(1.06); }
+  .modal-x-fixed { position: sticky; top: -14px; float: right; margin: -14px -12px 0 8px; width: 30px; height: 30px; border: none; background: #fff7ed; border-radius: 50%; font-size: 15px; line-height: 30px; text-align: center; color: #9a3412; cursor: pointer; z-index: 50; box-shadow: 0 1px 6px rgba(0,0,0,0.12); transition: all 0.15s; padding: 0; flex-shrink: 0; }
+  .modal-x-fixed:hover { color: #fff; background: #fbbf24; transform: scale(1.06); }
   /* v75：弹窗美化——顶部渐变色条 + 确认弹窗主题化 */
   .modal::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 5px; background: linear-gradient(90deg, #fda4af, #fcd34d, #a5b4fc, #86efac); border-radius: 20px 20px 0 0; }
   .ui-confirm { text-align: center; padding-top: 30px; }
@@ -1053,7 +1054,6 @@
 <!-- ===== 添加/编辑 身体事件弹窗 ===== -->
 <div class="modal-mask" id="eventModalMask">
   <div class="modal" style="max-width:560px;">
-    <button class="modal-close" data-close="eventModalMask" title="关闭">×</button>
     <h3 id="eventModalTitle">➕ 添加身体情况</h3>
     <div class="modal-sub">按类型记录，可补充细节，后续可编辑</div>
 
@@ -1080,7 +1080,7 @@
 
     <!-- 月经专属字段：痛经日期勾选（在所选月经期内逐日勾选） -->
     <div class="event-fields" data-for="menstrual">
-      <div class="preview-row" data-bf="dys"><label>痛经日期 <span style="font-weight:400;color:var(--text-3);font-size:11px;">(在记录期内勾选)</span></label>
+      <div class="preview-row" data-bf="dys"><label>痛经日期</label>
         <div class="dysmenorrhea-day-list" id="eventDysmenorrheaDays"></div>
       </div>
     </div>
@@ -1088,23 +1088,14 @@
     <!-- 痛风专属字段 -->
     <div class="event-fields event-fields-hidden" data-for="gout">
       <div class="preview-row" data-bf="location"><label>发作部位</label>
-        <select id="eventGoutLocation" class="preview-input">
-          <option value="右脚大拇趾">右脚大拇趾</option>
-          <option value="左脚大拇趾">左脚大拇趾</option>
-          <option value="右脚踝">右脚踝</option>
-          <option value="左脚踝">左脚踝</option>
-          <option value="右膝">右膝</option>
-          <option value="左膝">左膝</option>
-          <option value="其他">其他...</option>
-        </select>
-      </div>
-      <div class="preview-row" id="eventGoutLocationOtherWrap" style="display:none;"><label>其他部位</label>
-        <input type="text" id="eventGoutLocationOther" class="preview-input" placeholder="输入部位">
+        <div class="med-pills" id="eventGoutLocationPills" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        <input type="text" id="eventGoutLocationOther" class="preview-input" placeholder="其他部位，直接输入" style="margin-top:6px;">
       </div>
       <div class="preview-row" data-bf="pain"><label>疼痛等级</label>
         <div class="severity-grid" id="eventPainLevel" data-max="10"></div>
       </div>
       <div class="preview-row" data-bf="triggers"><label>触发食物</label>
+        <div class="med-pills" id="eventGoutTriggersPills" style="margin-bottom:6px;display:flex;flex-wrap:wrap;gap:6px;"></div>
         <div class="tag-input-wrap" id="eventGoutTriggers">
           <input type="text" placeholder="海鲜/啤酒/内脏...">
         </div>
@@ -1169,7 +1160,6 @@
 <!-- ===== v97：项目管理弹窗（新建/换图标/删除所有项目） ===== -->
 <div class="modal-mask" id="typesMgrMask">
   <div class="modal" style="max-width:480px;">
-    <button class="modal-close" data-close="typesMgrMask" title="关闭">×</button>
     <h3>⚙ 管理项目</h3>
     <div class="modal-sub">新建项目 · 点图标可更换 · 删除自定义项目（内置项目不可删）</div>
     <div id="typesMgrList" style="max-height:52vh;overflow-y:auto;"></div>
@@ -1183,7 +1173,6 @@
 <!-- ===== 通用输入弹窗（替代浏览器原生 prompt，浏览器禁 prompt 时也能用） ===== -->
 <div class="modal-mask" id="promptModalMask">
   <div class="modal" style="max-width:420px;">
-    <button class="modal-close" data-close="promptModalMask" title="关闭">×</button>
     <h3 id="promptModalTitle">📝 输入</h3>
     <div class="modal-sub" id="promptModalSub">请输入内容</div>
     <div class="preview-row" style="margin-top:14px;"><label id="promptModalLabel">名称</label>
@@ -1199,7 +1188,6 @@
 <!-- ===== v104：自定义日期时间选择（替代 Chromium 原生 datetime picker——其「设置」按钮为内置文案无法修改） ===== -->
 <div class="modal-mask" id="dtPickerMask">
   <div class="modal" style="max-width:360px;">
-    <button class="modal-close" data-close="dtPickerMask" title="关闭">×</button>
     <h3>🕒 选择日期和时间</h3>
     <div style="display:flex;gap:6px;justify-content:center;margin:14px 0 6px;">
       <select id="dtY" class="preview-input" style="width:92px;"></select>
@@ -1220,7 +1208,6 @@
 <!-- ===== 月经预测弹窗 ===== -->
 <div class="modal-mask" id="predictModalMask">
   <div class="modal" style="max-width:480px;">
-    <button class="modal-close" data-close="predictModalMask" title="关闭">×</button>
     <h3>🔮 下次月经预测</h3>
     <div class="modal-sub">基于历史月经记录推算</div>
     <div id="predictContent" style="margin:16px 0;"></div>
@@ -1233,7 +1220,6 @@
 <!-- ===== 预览弹窗 ===== -->
 <div class="modal-mask" id="previewMask">
   <div class="modal" style="max-width:520px;">
-    <button class="modal-close" data-close="previewMask" title="关闭">×</button>
     <h3>📋 确认记录</h3>
     <div class="modal-sub" id="previewSub">原文：「--」</div>
 
@@ -1298,7 +1284,6 @@
 <!-- ===== 删除筛选弹窗 ===== -->
 <div class="modal-mask" id="deleteMask">
   <div class="modal" style="max-width:520px;">
-    <button class="modal-close" data-close="deleteMask" title="关闭">×</button>
     <h3>🗑 删除记录</h3>
     <div class="modal-sub">按筛选条件批量删除（误录数据清理）</div>
 
@@ -1363,7 +1348,6 @@
 <!-- ===== v110：设置弹窗（顺序：云端备份恢复 / 数据导出与导入 / Supabase 配置 / AI 配置） ===== -->
 <div class="modal-mask" id="configMask">
   <div class="modal" style="max-width:500px;">
-    <button class="modal-close" data-close="configMask" title="关闭">×</button>
     <h3>⚙ 设置</h3>
 
     <!-- 板块一：云端备份恢复 -->
@@ -1629,6 +1613,7 @@ let currentEventType = 'menstrual';
 let currentCustomTypeId = null;  // v98：currentEventType==='custom' 时具体选中的自定义项目 id（cust_xxx），null=旧记录未关联
 let currentEditingEventId = null;
 let eventPainLevel = 5;      // 0-9 (代表 1-10)
+let eventGoutLocation = '';  // v125：部位 pill 单选值；空=用「其他部位」输入框
 let eventGoutTriggers = [];
 let eventGoutMedications = [];
 let eventCharts = {};
@@ -2489,6 +2474,7 @@ function collectMetaValue(key) {
       case 'ai_fields': return getAIFieldCache();
       case 'ai_icons': return JSON.parse(localStorage.getItem(AI_ICON_SUGGEST_KEY) || '{}');
       case 'builtin_opts': return getBuiltinOptsOv();
+      case 'builtin_labels': return getBuiltinLabelsOv();
     }
   } catch (e) {}
   return null;
@@ -2523,7 +2509,15 @@ function applyMetaValue(key, d) {
         if (d && typeof d === 'object') { localStorage.setItem(AI_ICON_SUGGEST_KEY, JSON.stringify(d)); }
         break;
       case 'builtin_opts':
-        if (d && typeof d === 'object') { localStorage.setItem(BUILTIN_OPTS_KEY, JSON.stringify(d)); if (typeof renderGoutMedications === 'function') renderGoutMedications(); if (typeof renderGoutLocation === 'function') renderGoutLocation(); }
+        if (d && typeof d === 'object') { localStorage.setItem(BUILTIN_OPTS_KEY, JSON.stringify(d)); if (typeof refreshBuiltinPills === 'function') refreshBuiltinPills(); }
+        break;
+      case 'builtin_labels':
+        // v125：内置字段改名覆盖层——应用表单行标签并刷新 pill 区
+        if (d && typeof d === 'object') {
+          localStorage.setItem(BUILTIN_LABELS_KEY, JSON.stringify(d));
+          if (typeof applyBuiltinFieldVisibility === 'function') applyBuiltinFieldVisibility(typeof currentEventType !== 'undefined' ? currentEventType : 'gout');
+          if (typeof refreshBuiltinPills === 'function') refreshBuiltinPills();
+        }
         break;
     }
   } catch (e) { console.warn('applyMetaValue failed', key, e); }
@@ -2560,7 +2554,7 @@ async function uploadMetaKey(key) {
     if (!__metaWarned) { __metaWarned = true; console.warn('[app_meta] 同步失败', e); }
   }
 }
-const META_SYNC_KEYS = ['members', 'custom_types', 'custom_cats', 'extra_fields', 'deleted_types', 'ai_fields', 'ai_icons', 'builtin_opts'];
+const META_SYNC_KEYS = ['members', 'custom_types', 'custom_cats', 'extra_fields', 'deleted_types', 'ai_fields', 'ai_icons', 'builtin_opts', 'builtin_labels'];
 async function loadMetaFromCloud() {
   if (LOCAL_MODE || !isConfigured || !dbClient) return;
   try {
@@ -2629,6 +2623,8 @@ const CUSTOM_ICONS = ['📝', '🩹', '💊', '😴', '🏃', '🍵', '🧘', '�
 // 痛风常用部位（默认）+ 常用药
 const GOUT_LOCATIONS_DEFAULT = ['右脚大拇趾', '左脚大拇趾', '右脚踝', '左脚踝', '右膝', '左膝', '右脚跟', '左脚跟', '右手腕', '左手腕', '手指', '耳廓'];
 const GOUT_MED_PRESETS = ['秋水仙碱', '别嘌醇', '非布司他', '苯溴马隆', '糖皮质激素', 'NSAIDs', '碳酸氢钠', '双氯芬酸', '布洛芬', '依托考昔'];
+// v125：触发食物预置选项（用户选定 B 方案）
+const GOUT_TRIGGER_PRESETS = ['海鲜', '啤酒', '动物内脏', '浓肉汤'];
 
 // 表单默认值记忆：上次选择过的选项，下次打开弹窗自动预选
 const FORM_DEFAULTS_KEY = 'wb_form_defaults';
@@ -2645,12 +2641,11 @@ function saveFormDefaults(patch) {
 function applyFormDefaults(type) {
   const d = loadFormDefaults();
   if (type === 'gout') {
-    // 部位
-    const locSel = document.getElementById('eventGoutLocation');
-    if (locSel && d.gout_location && [...locSel.options].some(o => o.value === d.gout_location)) {
-      locSel.value = d.gout_location;
-      document.getElementById('eventGoutLocationOtherWrap').style.display = 'none';
-    }
+    // 部位（v125：pill 单选 + 手输框）
+    const locDef = d.gout_location || '';
+    const knownLocs = builtinOptsFor('gout.locations', goutLocationBaseList());
+    if (locDef && knownLocs.includes(locDef)) { eventGoutLocation = locDef; document.getElementById('eventGoutLocationOther').value = ''; }
+    else if (locDef) { eventGoutLocation = ''; document.getElementById('eventGoutLocationOther').value = locDef; }
     // 疼痛等级（默认最近一次值，未填则 5）
     if (typeof d.gout_pain_level === 'number') {
       eventPainLevel = Math.max(0, Math.min(9, d.gout_pain_level - 1));
@@ -2671,7 +2666,7 @@ function applyFormDefaults(type) {
   // 同房（intercourse）无专属选项，纯日期+备注，无需默认值
 }
 
-// 从 bodyEvents 提取历史上用过的部位/药（按使用次数排序）
+// 从 bodyEvents 提取历史上用过的部位/药/触发食物（按使用次数排序）
 function getHistoricalGoutLocations() {
   const counts = new Map();
   bodyEvents.filter(e => e.category === 'gout' && e.payload && e.payload.location).forEach(e => {
@@ -2691,34 +2686,96 @@ function getHistoricalGoutMedications() {
   });
   return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([m]) => m);
 }
+// v125：触发食物历史（自动沉淀为快捷选项）
+function getHistoricalGoutTriggers() {
+  const counts = new Map();
+  bodyEvents.filter(e => e.category === 'gout' && e.payload && Array.isArray(e.payload.trigger_foods)).forEach(e => {
+    e.payload.trigger_foods.forEach(t => {
+      if (!t) return;
+      counts.set(t, (counts.get(t) || 0) + 1);
+    });
+  });
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t);
+}
+// v125：三个内置选项集的 base（历史 ∪ 预设），编辑弹窗与渲染共用
+function goutLocationBaseList() {
+  const h = getHistoricalGoutLocations(); const seen = new Set(h);
+  return h.concat(GOUT_LOCATIONS_DEFAULT.filter(loc => !seen.has(loc)));
+}
+function goutMedBaseList() {
+  const h = getHistoricalGoutMedications(); const seen = new Set(h);
+  return h.concat(GOUT_MED_PRESETS.filter(m => !seen.has(m)));
+}
+function goutTriggerBaseList() {
+  const h = getHistoricalGoutTriggers(); const seen = new Set(h);
+  return h.concat(GOUT_TRIGGER_PRESETS.filter(t => !seen.has(t)));
+}
+// v125：内置字段「填写⇄选项」模式（存 fh_builtin_opts.__modes，随云同步）
+function getBuiltinFieldMode(key, id) {
+  const o = getBuiltinOptsOv().__modes || {};
+  return o[key + '.' + id] || 'opts';
+}
+function setBuiltinFieldMode(key, id, mode) {
+  const o = getBuiltinOptsOv();
+  o.__modes = o.__modes || {};
+  if (!mode || mode === 'opts') delete o.__modes[key + '.' + id];
+  else o.__modes[key + '.' + id] = mode;
+  if (!Object.keys(o.__modes).length) delete o.__modes;
+  saveBuiltinOptsOv(o);
+}
+function isBuiltinOptsMode(key, id) { return getBuiltinFieldMode(key, id) === 'opts'; }
 
-// 渲染发作部位 select：历史置顶 → 默认 → 其他
+// 渲染发作部位：v125 改为 pill 点击单选（不再用下拉框）+ 手输框补充
 function renderGoutLocation() {
-  const sel = document.getElementById('eventGoutLocation');
-  if (!sel) return;
-  const historical = getHistoricalGoutLocations();
-  const seen = new Set();
-  const all = [];
-  historical.forEach(loc => { if (!seen.has(loc)) { seen.add(loc); all.push(loc); } });
-  GOUT_LOCATIONS_DEFAULT.forEach(loc => { if (!seen.has(loc)) { seen.add(loc); all.push(loc); } });
-  // v124：应用内置项选项覆盖（编辑弹窗里用户增删过的快捷部位）
-  const locFinal = builtinOptsFor('gout.locations', all).filter(loc => all.includes(loc) || !historical.includes(loc));
-  const locCur = sel.value;
-  sel.innerHTML = locFinal.map(loc => `<option value="${escapeHtml(loc)}">${escapeHtml(loc)}${historical.includes(loc) ? ' ★' : ''}</option>`).join('') + '<option value="其他">其他...</option>';
-  if (locCur && [...sel.options].some(o => o.value === locCur)) sel.value = locCur;
+  const wrap = document.getElementById('eventGoutLocationPills');
+  if (!wrap) return;
+  const finalAll = builtinOptsFor('gout.locations', goutLocationBaseList());
+  if (!isBuiltinOptsMode('gout', 'location')) { wrap.innerHTML = ''; wrap.style.display = 'none'; return; }
+  wrap.style.display = 'flex';
+  wrap.innerHTML = finalAll.map(loc => {
+    const active = eventGoutLocation === loc;
+    return `<span class="pill${active ? ' active' : ''}" data-loc="${escapeHtml(loc)}" title="${active ? '点击取消' : '点击选择'}">${escapeHtml(loc)}${active ? ' <span class="x">×</span>' : ''}</span>`;
+  }).join('');
+  wrap.querySelectorAll('.pill').forEach(p => {
+    p.addEventListener('click', () => {
+      const loc = p.dataset.loc;
+      eventGoutLocation = (eventGoutLocation === loc) ? '' : loc;
+      if (eventGoutLocation) document.getElementById('eventGoutLocationOther').value = '';
+      renderGoutLocation();
+    });
+  });
+}
+
+// v125：触发食物快捷 pill（多选）——与用药同款交互
+function renderGoutTriggers() {
+  const wrap = document.getElementById('eventGoutTriggersPills');
+  if (!wrap) return;
+  const finalAll = builtinOptsFor('gout.triggers', goutTriggerBaseList());
+  if (!isBuiltinOptsMode('gout', 'triggers')) { wrap.innerHTML = ''; wrap.style.display = 'none'; return; }
+  wrap.style.display = 'flex';
+  wrap.innerHTML = finalAll.map(t => {
+    const active = eventGoutTriggers.includes(t);
+    return `<span class="pill${active ? ' active' : ''}" data-trg="${escapeHtml(t)}" title="${active ? '点击取消' : '点击加入'}">${escapeHtml(t)}${active ? ' <span class="x">×</span>' : ''}</span>`;
+  }).join('');
+  wrap.querySelectorAll('.pill').forEach(p => {
+    p.addEventListener('click', () => {
+      const t = p.dataset.trg;
+      const idx = eventGoutTriggers.indexOf(t);
+      if (idx >= 0) eventGoutTriggers.splice(idx, 1);
+      else eventGoutTriggers.push(t);
+      renderTags();
+      renderGoutTriggers();
+    });
+  });
 }
 
 // 渲染用药快捷 pill：已选高亮 + 历史 + 默认 preset
 function renderGoutMedications() {
   const wrap = document.getElementById('eventGoutMedicationsPills');
   if (!wrap) return;
-  const historical = getHistoricalGoutMedications();
-  const seen = new Set();
-  const all = [];
-  historical.forEach(m => { if (!seen.has(m)) { seen.add(m); all.push(m); } });
-  GOUT_MED_PRESETS.forEach(m => { if (!seen.has(m)) { seen.add(m); all.push(m); } });
-  // v124：应用内置项选项覆盖（编辑弹窗里用户增删过的快捷用药：del 屏蔽 + add 追加）
-  const finalAll = builtinOptsFor('gout.medications', all);
+  const finalAll = builtinOptsFor('gout.medications', goutMedBaseList());
+  if (!isBuiltinOptsMode('gout', 'medications')) { wrap.innerHTML = ''; wrap.style.display = 'none'; return; }
+  wrap.style.display = 'flex';
   wrap.innerHTML = finalAll.map(m => {
     const active = eventGoutMedications.includes(m);
     return `<span class="pill${active ? ' active' : ''}" data-med="${escapeHtml(m)}" title="${active ? '点击取消' : '点击加入'}">${escapeHtml(m)}${active ? ' <span class="x">×</span>' : ''}</span>`;
@@ -2886,6 +2943,7 @@ function updateExtraFieldDefAt(key, i, patch) {
   if (!arr[i]) return;
   Object.assign(arr[i], patch);
   if (Array.isArray(arr[i].options) && !arr[i].options.length) delete arr[i].options;  // 空选项=自由填写
+  arr[i]._at = Date.now();  // v125：每次编辑都刷新时间戳，多端合并时新编辑胜出
   m[key] = arr;
   saveExtraFieldsMap(m);
 }
@@ -2897,15 +2955,40 @@ function updateExtraFieldDefAt(key, i, patch) {
      { menstrual: ['痛经日期'], gout: ['疼痛等级'] }
    ============================================================ */
 const BUILTIN_FIELDS = {
-  menstrual: [{ id: 'dys', label: '痛经日期' }],  // 日期勾选型，无固定选项集，不支持选项编辑
+  menstrual: [{ id: 'dys', label: '痛经日期', noEdit: true }],  // 日期勾选型，每次填写都不同：仅可停用/恢复
   gout: [
     { id: 'location', label: '发作部位', optsKey: 'gout.locations' },
-    { id: 'pain', label: '疼痛等级' },  // 1-10 固定，不支持选项编辑
-    { id: 'triggers', label: '触发食物' },  // 自由输入，无预设选项
+    { id: 'pain', label: '疼痛等级', noOpts: true },  // 1-10 网格固定（存量数据兼容）：可改名/停用，不切换选项
+    { id: 'triggers', label: '触发食物', optsKey: 'gout.triggers' },  // v125：选项化（预置4项∪历史∪覆盖层）
     { id: 'medications', label: '用药', optsKey: 'gout.medications' },
   ],
   intercourse: [],  // ❤️ 无内置可填项（成员/时间为固定项）
 };
+// v125：内置字段显示名覆盖层——用户可在编辑弹窗给内置项改名（如「发作部位」→「部位」）。
+// 记录按 key 存储，改名只影响显示，历史记录自动跟随，无需迁移。
+// 存 { gout: { location: '部位' } }，随 app_meta 云同步（key: builtin_labels）。
+const BUILTIN_LABELS_KEY = 'fh_builtin_labels';
+function getBuiltinLabelsOv() {
+  try { return JSON.parse(localStorage.getItem(BUILTIN_LABELS_KEY) || '{}') || {}; }
+  catch (e) { return {}; }
+}
+function saveBuiltinLabelsOv(o) { localStorage.setItem(BUILTIN_LABELS_KEY, JSON.stringify(o)); syncMetaKey('builtin_labels'); }
+function builtinFieldLabel(typeKey, def) {
+  if (!typeKey || !def) return '';
+  const o = getBuiltinLabelsOv()[typeKey] || {};
+  return o[def.id] || def.label;
+}
+function bfLabel(typeKey, id) { return builtinFieldLabel(typeKey, builtinDefById(typeKey, id) || { id, label: id }); }
+function setBuiltinFieldLabel(typeKey, id, label) {
+  const def = builtinDefById(typeKey, id); if (!def) return;
+  const o = getBuiltinLabelsOv();
+  o[typeKey] = o[typeKey] || {};
+  const val = String(label || '').trim();
+  if (!val || val === def.label) delete o[typeKey][id]; else o[typeKey][id] = val;
+  if (!Object.keys(o[typeKey]).length) delete o[typeKey];
+  saveBuiltinLabelsOv(o);
+}
+function builtinDefById(key, id) { return (BUILTIN_FIELDS[key] || []).find(d => d.id === id) || null; }
 // v124：内置项选项覆盖层——用户可在编辑弹窗给「发作部位/用药」增删快捷选项。
 // 存差集：add=追加的自定义选项，del=屏蔽的选项（历史记录里用过的仍可在覆盖后过滤）。
 // 随 app_meta 云同步（key: builtin_opts）。
@@ -2931,11 +3014,11 @@ function builtinOptRemove(optsKey, val, baseList) {
   if (!cur.add.length && !cur.del.length) delete o[optsKey];
   saveBuiltinOptsOv(o);
 }
-function builtinOptAdd(optsKey, val) {
+function builtinOptAdd(optsKey, val, baseList) {
   const o = getBuiltinOptsOv();
   const cur = o[optsKey] = o[optsKey] || { add: [], del: [] };
   if (cur.del.includes(val)) cur.del = cur.del.filter(x => x !== val);  // 恢复被屏蔽的
-  else if (!(cur.add || []).includes(val) && !baseList.includes(val)) cur.add.push(val);
+  else if (!(cur.add || []).includes(val) && !(Array.isArray(baseList) && baseList.includes(val))) cur.add.push(val);
   if (!cur.add.length && !cur.del.length) delete o[optsKey];
   saveBuiltinOptsOv(o);
 }
@@ -2948,25 +3031,41 @@ function saveBuiltinOffMap(off) {
   m._builtin_off = off;
   saveExtraFieldsMap(m);
 }
-function isBuiltinFieldOff(key, label) { return (getBuiltinOffMap()[key] || []).includes(label); }
-function setBuiltinFieldOff(key, label, off) {
+// v125：停用列表改按字段 id 存储（改名后停用状态不漂移）；兼容读取旧的 label 条目
+function isBuiltinFieldOffId(key, id) {
+  const off = getBuiltinOffMap()[key] || [];
+  if (off.includes(id)) return true;
+  const def = builtinDefById(key, id);
+  return !!(def && off.includes(def.label));
+}
+function setBuiltinFieldOffId(key, id, off) {
+  const def = builtinDefById(key, id); if (!def) return;
   const o = getBuiltinOffMap();
-  const arr = o[key] || [];
-  const next = off ? (arr.includes(label) ? arr : arr.concat(label)) : arr.filter(l => l !== label);
-  if (next.length) o[key] = next; else delete o[key];
+  let arr = (o[key] || []).slice();
+  arr = arr.filter(x => x !== id && x !== def.label);  // 清掉同字段的 id/旧 label 条目
+  if (off) arr.push(id);
+  if (arr.length) o[key] = arr; else delete o[key];
   saveBuiltinOffMap(o);
 }
-// 按停用列表显隐弹窗里的内置填项行（行上打 data-bf=id）
+// 兼容包装：按 label（当前显示名或默认名均可）查停用状态
+function isBuiltinFieldOff(key, label) {
+  const def = (BUILTIN_FIELDS[key] || []).find(d => d.label === label || builtinFieldLabel(key, d) === label);
+  if (def) return isBuiltinFieldOffId(key, def.id);
+  return (getBuiltinOffMap()[key] || []).includes(label);
+}
+// 按停用列表显隐弹窗里的内置填项行（行上打 data-bf=id）；v125：同时应用改名标签
 function applyBuiltinFieldVisibility(type) {
   const defs = BUILTIN_FIELDS[type] || [];
   defs.forEach(d => {
     document.querySelectorAll(`.event-fields .preview-row[data-bf="${d.id}"]`).forEach(row => {
-      row.style.display = isBuiltinFieldOff(type, d.label) ? 'none' : '';
+      const lb = row.querySelector('label');
+      if (lb) lb.textContent = builtinFieldLabel(type, d);
+      row.style.display = isBuiltinFieldOffId(type, d.id) ? 'none' : '';
     });
   });
   const copyBtn = document.getElementById('btnCopyLastGout');
   if (copyBtn && type === 'gout') {
-    const anyOn = ['发作部位', '触发食物', '用药'].some(l => !isBuiltinFieldOff(type, l));
+    const anyOn = ['location', 'triggers', 'medications'].some(id => !isBuiltinFieldOffId(type, id));
     copyBtn.style.display = anyOn ? '' : 'none';
   }
 }
@@ -2992,64 +3091,33 @@ function openFieldEditModal(key, name) {
   mask.id = 'fldEditMask';
   mergeAISuggestionIntoDefs(key);
 
-  // v120：内置项目的专属填项（痛经日期/发作部位等）也进入编辑列表——可删（停用），
-  // 在「➕ 添加可填项」弹窗可恢复；成员/时间为固定项不列出
+  // v120：内置项目的专属填项也进入编辑列表；v125：每行=字段名+[编辑]+[删除]
   const builtinDefs = BUILTIN_FIELDS[key] || [];
-  // v124：内置项的预设选项 base（历史用过 ∪ 默认预设），供选项编辑用
-  const builtinOptsBase = (optsKey) => {
-    if (optsKey === 'gout.medications') { const h = getHistoricalGoutMedications(); const seen = new Set(h); return h.concat(GOUT_MED_PRESETS.filter(m => !seen.has(m))); }
-    if (optsKey === 'gout.locations') { const h = getHistoricalGoutLocations(); const seen = new Set(h); return h.concat(GOUT_LOCATIONS_DEFAULT.filter(loc => !seen.has(loc))); }
-    return [];
-  };
   const renderRows = () => {
+    const editBtnStyle = 'flex-shrink:0;font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;cursor:pointer;';
     const builtinRows = builtinDefs.map((d, bi) => {
-      // v124：有预设选项集的内置项（发作部位/用药）支持选项编辑
-      const optEdit = d.optsKey ? (() => {
-        const base = builtinOptsBase(d.optsKey);
-        const cur = builtinOptsFor(d.optsKey, base);
-        const chips = cur.map(o => `<span class="fld-biopt-chip" data-bi="${bi}" data-val="${escapeHtml(o)}" title="点击从快捷选项中移除">${escapeHtml(o)} <b style="opacity:.45;">×</b></span>`).join('');
-        return `
-          <button class="fld-bi-ed" data-bi="${bi}" style="flex-shrink:0;font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;cursor:pointer;">✏️ 选项</button>
-          <div class="fld-bi-ed-area" data-bi="${bi}" style="display:none;margin-top:6px;">
-            <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
-              ${chips}
-              <input class="preview-input fld-biopt-new" data-bi="${bi}" placeholder="新选项" style="width:78px;height:24px;font-size:11px;padding:2px 6px;">
-              <button class="fld-biopt-add" data-bi="${bi}" style="font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:6px;background:#f8fafc;cursor:pointer;">➕</button>
-            </div>
-            <div style="font-size:10px;color:var(--text-3);margin-top:3px;">点选项移除、输入新选项添加；历史记录里已用过的选项会保留在记录里，只是不再出现在快捷选项中</div>
-          </div>`;
-      })() : '';
+      const editBtn = d.noEdit ? '' : `<button class="fld-row-edit" data-kind="bi" data-bi="${bi}" style="${editBtnStyle}">编辑</button>`;
       return `
       <div style="padding:9px 0;border-bottom:1px dashed var(--border);font-size:13px;">
         <div style="display:flex;align-items:center;gap:8px;">
-          <div style="flex:1;min-width:0;font-weight:600;">${escapeHtml(d.label)}
+          <div style="flex:1;min-width:0;font-weight:600;">${escapeHtml(builtinFieldLabel(key, d))}
             <span style="font-size:10px;color:var(--text-3);background:#f1f5f9;padding:2px 8px;border-radius:999px;margin-left:6px;">内置</span>
           </div>
-          ${optEdit}
+          ${editBtn}
           <span class="fld-bi-del" data-bi="${bi}" style="cursor:pointer;font-size:15px;flex-shrink:0;" title="删除这个内置填项（可在添加弹窗随时恢复）">🗑</span>
         </div>
       </div>`;
     }).join('');
     const defs = getExtraFieldDefsFor(key);
-    const extraRows = defs.map((f, i) => {
-      const chips = (f.options || []).map((o, oi) => `
-        <span class="fld-opt-chip" data-i="${i}" data-oi="${oi}" title="点击删除该选项">${escapeHtml(o)} <b style="opacity:.45;">×</b></span>`).join('');
-      return `
+    const extraRows = defs.map((f, i) => `
       <div style="padding:9px 0;border-bottom:1px dashed var(--border);font-size:13px;">
         <div style="display:flex;align-items:center;gap:8px;">
-          <input class="preview-input fld-ed-name" data-i="${i}" value="${escapeHtml(f.label)}" style="flex:1;min-width:0;height:30px;font-size:13px;font-weight:600;" title="字段名称，可直接修改">
-          <button class="fld-ed-mode" data-i="${i}" title="切换 自由填写 / 选项选择" style="flex-shrink:0;font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;cursor:pointer;">${(f.options && f.options.length) ? '🔘 选项' : '✍️ 填写'}</button>
+          <div style="flex:1;min-width:0;font-weight:600;">${escapeHtml(f.label)}</div>
+          <button class="fld-row-edit" data-kind="ex" data-i="${i}" style="${editBtnStyle}">编辑</button>
           <span class="fld-ed-del" data-i="${i}" style="cursor:pointer;font-size:15px;flex-shrink:0;" title="删除这个填项（永久）">🗑</span>
         </div>
-        ${(f.options && f.options.length) ? `
-          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;align-items:center;">
-            ${chips}
-            <input class="preview-input fld-opt-new" data-i="${i}" placeholder="新选项" style="width:78px;height:24px;font-size:11px;padding:2px 6px;">
-            <button class="fld-opt-add" data-i="${i}" style="font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:6px;background:#f8fafc;cursor:pointer;">➕</button>
-          </div>` : ''}
         ${f.source === 'ai' ? '<div style="font-size:10px;color:#8b5cf6;margin-top:3px;">🤖 来自 AI 建议</div>' : ''}
-      </div>`;
-    }).join('');
+      </div>`).join('');
     return (builtinRows + extraRows) || '<div style="font-size:12px;color:var(--text-3);padding:8px 0;">暂无可填项，点下方「➕ 添加可填项」</div>';
   };
 
@@ -3069,115 +3137,58 @@ function openFieldEditModal(key, name) {
   const refresh = () => {
     mask.querySelector('#fldEdList').innerHTML = renderRows();
     bindAll();
+    applyBuiltinFieldVisibility(key);
+    if (key === 'gout') refreshBuiltinPills();
     if (typeof renderBodyTypeSelector === 'function') renderBodyTypeSelector();
   };
   const bindAll = () => {
-    // 改名
-    mask.querySelectorAll('.fld-ed-name').forEach(inp => {
-      inp.onchange = () => {
-        const i = parseInt(inp.dataset.i);
-        const val = inp.value.trim();
-        const defs = getExtraFieldDefsFor(key);
-        if (!val) { inp.value = defs[i] ? defs[i].label : ''; return; }
-        if (defs.some((f, j) => j !== i && f.label === val)) { showToast('已有同名填项', 'warning'); inp.value = defs[i].label; return; }
-        updateExtraFieldDefAt(key, i, { label: val });
-        showToast(`✓ 已改名为「${val}」`);
+    // v125：每行「编辑」→ 打开该字段专属编辑弹窗（改名/填写⇄选项/选项增删）
+    mask.querySelectorAll('.fld-row-edit').forEach(btn => {
+      btn.onclick = () => {
+        const kind = btn.dataset.kind;
+        if (kind === 'bi') {
+          const def = builtinDefs[parseInt(btn.dataset.bi)];
+          if (def) openFieldEditorModal(key, name, def, null, refresh);
+        } else {
+          const i = parseInt(btn.dataset.i);
+          const defs = getExtraFieldDefsFor(key);
+          if (defs[i]) openFieldEditorModal(key, name, null, defs[i].label, refresh);
+        }
       };
     });
-    // 填写⇄选项 切换
-    mask.querySelectorAll('.fld-ed-mode').forEach(btn => {
-      btn.onclick = () => {
-        const i = parseInt(btn.dataset.i);
+    // v125：删除改为弹窗确认——内置=停用（可恢复）
+    mask.querySelectorAll('.fld-bi-del').forEach(d => {
+      d.onclick = async () => {
+        const def = builtinDefs[parseInt(d.dataset.bi)];
+        if (!def) return;
+        const ok = await uiConfirm({
+          title: `删除「${builtinFieldLabel(key, def)}」？`,
+          message: '删除后添加记录时不再显示这一项，随时可在「➕ 添加可填项」里恢复。',
+          okText: '删除',
+        });
+        if (!ok) return;
+        setBuiltinFieldOffId(key, def.id, true);
+        refresh();
+        showToast(`已删除内置填项「${builtinFieldLabel(key, def)}」，可在「➕ 添加可填项」恢复`);
+      };
+    });
+    // v125：删除改为弹窗确认——自定义/AI=永久删除（含全部记录里的标签改写不了，仅删定义）
+    mask.querySelectorAll('.fld-ed-del').forEach(d => {
+      d.onclick = async () => {
+        const i = parseInt(d.dataset.i);
         const defs = getExtraFieldDefsFor(key);
         const f = defs[i];
         if (!f) return;
-        if (f.options && f.options.length) {
-          updateExtraFieldDefAt(key, i, { options: [] });  // → 自由填写
-          showToast(`「${f.label}」已改为自由填写`);
-        } else {
-          updateExtraFieldDefAt(key, i, { options: ['选项1', '选项2'] });  // → 选项选择（示例，可删改）
-          showToast(`「${f.label}」已改为选项选择，点选项上的 × 可删除`);
-        }
-        refresh();
-      };
-    });
-    // 删除选项
-    mask.querySelectorAll('.fld-opt-chip').forEach(chip => {
-      chip.onclick = () => {
-        const i = parseInt(chip.dataset.i), oi = parseInt(chip.dataset.oi);
-        const defs = getExtraFieldDefsFor(key);
-        const opts = (defs[i] && defs[i].options) || [];
-        opts.splice(oi, 1);
-        updateExtraFieldDefAt(key, i, { options: opts });
-        refresh();
-      };
-    });
-    // 新增选项
-    mask.querySelectorAll('.fld-opt-add').forEach(btn => {
-      btn.onclick = () => {
-        const i = parseInt(btn.dataset.i);
-        const inp = mask.querySelector(`.fld-opt-new[data-i="${i}"]`);
-        const val = (inp.value || '').trim();
-        if (!val) return;
-        const defs = getExtraFieldDefsFor(key);
-        const opts = (defs[i] && defs[i].options) || [];
-        if (opts.includes(val)) { showToast('选项已存在', 'warning'); return; }
-        opts.push(val);
-        updateExtraFieldDefAt(key, i, { options: opts.slice(0, 8) });
-        refresh();
-      };
-    });
-    // 删除填项（两击确认）
-    mask.querySelectorAll('.fld-ed-del').forEach(d => {
-      d.onclick = () => {
-        if (!d.dataset.arm) { d.dataset.arm = '1'; d.textContent = '❓'; setTimeout(() => { d.dataset.arm = ''; d.textContent = '🗑'; }, 2500); return; }
-        const i = parseInt(d.dataset.i);
-        const defs = getExtraFieldDefsFor(key);
-        const label = defs[i] ? defs[i].label : '';
+        const ok = await uiConfirm({
+          title: `删除「${f.label}」？`,
+          message: '该填项将被永久删除（历史记录里已填的内容仍保留，只是不再出现这个字段）。',
+          okText: '删除',
+        });
+        if (!ok) return;
+        const label = f.label;
         removeExtraFieldDefAt(key, i);
         refresh();
         showToast(`已删除填项「${label}」`);
-      };
-    });
-    // v120：删除内置填项（两击确认）——停用而非物理删除，添加弹窗可恢复
-    mask.querySelectorAll('.fld-bi-del').forEach(d => {
-      d.onclick = () => {
-        if (!d.dataset.arm) { d.dataset.arm = '1'; d.textContent = '❓'; setTimeout(() => { d.dataset.arm = ''; d.textContent = '🗑'; }, 2500); return; }
-        const bi = parseInt(d.dataset.bi);
-        const def = (BUILTIN_FIELDS[key] || [])[bi];
-        if (!def) return;
-        setBuiltinFieldOff(key, def.label, true);
-        refresh();
-        showToast(`已删除内置填项「${def.label}」，可在「➕ 添加可填项」恢复`);
-      };
-    });
-    // v124：内置项选项编辑——展开/收起 + 移除/添加快捷选项
-    mask.querySelectorAll('.fld-bi-ed').forEach(btn => {
-      btn.onclick = () => {
-        const area = mask.querySelector(`.fld-bi-ed-area[data-bi="${btn.dataset.bi}"]`);
-        if (area) area.style.display = area.style.display === 'none' ? '' : 'none';
-      };
-    });
-    mask.querySelectorAll('.fld-biopt-chip').forEach(chip => {
-      chip.onclick = () => {
-        const bi = parseInt(chip.dataset.bi);
-        const def = (BUILTIN_FIELDS[key] || [])[bi];
-        if (!def || !def.optsKey) return;
-        builtinOptRemove(def.optsKey, chip.dataset.val, builtinOptsBase(def.optsKey));
-        refresh();
-      };
-    });
-    mask.querySelectorAll('.fld-biopt-add').forEach(btn => {
-      btn.onclick = () => {
-        const bi = parseInt(btn.dataset.bi);
-        const def = (BUILTIN_FIELDS[key] || [])[bi];
-        if (!def || !def.optsKey) return;
-        const inp = mask.querySelector(`.fld-biopt-new[data-bi="${bi}"]`);
-        const val = (inp.value || '').trim();
-        if (!val) { showToast('请输入选项名称', 'warning'); return; }
-        builtinOptAdd(def.optsKey, val);
-        refresh();
-        showToast(`✓ 已添加「${val}」`);
       };
     });
   };
@@ -3209,7 +3220,8 @@ function openFieldEditModal(key, name) {
     addMask.addEventListener('click', e => { if (e.target === addMask) addMask.remove(); });
     addMask.querySelectorAll('.bf-restore').forEach(r => {
       r.onclick = () => {
-        setBuiltinFieldOff(key, r.dataset.label, false);
+        const def = builtinDefs.find(x => x.label === r.dataset.label || builtinFieldLabel(key, x) === r.dataset.label);
+        if (def) setBuiltinFieldOffId(key, def.id, false);
         addMask.remove();
         refresh();
         showToast(`✓ 已恢复内置填项「${r.dataset.label}」`);
@@ -3227,6 +3239,267 @@ function openFieldEditModal(key, name) {
       showToast(`✓ 已添加填项「${label}」${options.length ? `（${options.length} 个可选项）` : '（自由填写）'}`);
     };
   };
+}
+
+// v125：刷新三个内置 pill 区（部位/触发食物/用药），改名/模式切换/选项增删后调用
+function refreshBuiltinPills() {
+  if (typeof renderGoutLocation === 'function') renderGoutLocation();
+  if (typeof renderGoutTriggers === 'function') renderGoutTriggers();
+  if (typeof renderGoutMedications === 'function') renderGoutMedications();
+}
+
+// v125：自定义/AI 字段改名——同步改写全部历史记录中的该字段标签（本地+云端），
+// 并同步 AI 建议缓存与墓碑，杜绝「定义改名了、旧记录还是旧标签」的割裂
+function renameExtraFieldEverywhere(key, oldLabel, newLabel) {
+  if (!key || !oldLabel || !newLabel || oldLabel === newLabel) return;
+  // 1. 定义
+  const m = getExtraFieldsMap();
+  const arr = m[key] || [];
+  const def = arr.find(f => f.label === oldLabel);
+  if (!def) return;
+  def.label = newLabel;
+  def._at = Date.now();
+  // 2. 墓碑跟随改名
+  if (m._tombs && m._tombs[key] && m._tombs[key][oldLabel]) {
+    m._tombs[key][newLabel] = m._tombs[key][oldLabel];
+    delete m._tombs[key][oldLabel];
+  }
+  saveExtraFieldsMap(m);
+  // 3. AI 建议缓存
+  try {
+    const item = customEventTypes.find(c => c.id === key);
+    const projectName = item ? item.name : null;
+    if (projectName) {
+      const cache = getAIFieldCache();
+      const sug = cache[projectName];
+      if (sug && Array.isArray(sug.fields)) {
+        let hit = false;
+        sug.fields.forEach(f => { if (f && f.label === oldLabel) { f.label = newLabel; hit = true; } });
+        if (hit) cacheAISuggestion(projectName, sug);
+      }
+    }
+  } catch (e) {}
+  // 4. 全部历史记录（本地 + 云端）
+  migrateEventFieldLabel(oldLabel, newLabel);
+}
+function migrateEventFieldLabel(oldLabel, newLabel) {
+  const touched = [];
+  bodyEvents.forEach(ev => {
+    const p = ev.payload;
+    if (!p || typeof p !== 'object') return;
+    let mod = false;
+    ['extra_fields', 'ai_fields'].forEach(fk => {
+      if (Array.isArray(p[fk])) p[fk].forEach(f => { if (f && f.label === oldLabel) { f.label = newLabel; mod = true; } });
+    });
+    if (mod) touched.push(ev);
+  });
+  if (!touched.length) return;
+  saveBodyEventsCache();
+  try { renderEvents(); } catch (e) {}
+  if (dbClient) {
+    touched.forEach(ev => {
+      if (!ev.id || String(ev.id).startsWith('pending-')) return;
+      dbClient.from('body_events').update({ payload: ev.payload }).eq('id', ev.id)
+        .then(({ error }) => { if (error) console.warn('rename label cloud sync failed', ev.id, error); })
+        .catch(e => console.warn('rename label cloud sync failed', ev.id, e));
+    });
+  }
+  showToast(`✓ 已同步改名 ${touched.length} 条历史记录`);
+}
+
+// v125：单个可填项的专属编辑弹窗——内置与自定义/AI 字段同一套：
+// 改名、填写⇄选项双向切换、选项增删（删除在列表行上）
+function openFieldEditorModal(key, listName, biDef, exLabel, onDone) {
+  const old = document.getElementById('fldEdOneMask');
+  if (old) old.remove();
+  const mask = document.createElement('div');
+  mask.className = 'modal-mask show';
+  mask.id = 'fldEdOneMask';
+  mask.style.zIndex = '10001';
+  const isBuiltin = !!biDef;
+  const def = biDef || null;
+  const curBuiltinLabel = () => def ? builtinFieldLabel(key, def) : '';
+  const getExDef = () => { const arr = getExtraFieldDefsFor(key); return arr.find(f => f.label === curExLabel) || null; };
+  let curExLabel = exLabel;
+
+  const title = () => isBuiltin ? curBuiltinLabel() : (getExDef() ? getExDef().label : (curExLabel || ''));
+  const renderBody = () => {
+    if (isBuiltin) {
+      const mode = getBuiltinFieldMode(key, def.id);
+      const hasOpts = !!def.optsKey;
+      const optsSec = hasOpts && mode === 'opts' ? (() => {
+        const base = def.optsKey === 'gout.medications' ? goutMedBaseList() : def.optsKey === 'gout.locations' ? goutLocationBaseList() : def.optsKey === 'gout.triggers' ? goutTriggerBaseList() : [];
+        const cur = builtinOptsFor(def.optsKey, base);
+        const chips = cur.map(o => `<span class="fe1-biopt-chip" data-val="${escapeHtml(o)}" title="点击移除该选项">${escapeHtml(o)} <b style="opacity:.45;">×</b></span>`).join('');
+        return `
+          <div style="margin-top:10px;">
+            <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;">快捷选项（点击移除；历史记录里已用过的仍保留在记录里）</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+              ${chips || '<span style="font-size:11px;color:var(--text-3);">暂无选项</span>'}
+            </div>
+            <div style="display:flex;gap:6px;margin-top:8px;">
+              <input class="preview-input fe1-biopt-new" placeholder="新选项" style="flex:1;height:32px;font-size:12px;">
+              <button class="fe1-biopt-add" style="font-size:12px;padding:0 12px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;cursor:pointer;">➕ 添加</button>
+            </div>
+          </div>`;
+      })() : '';
+      const modeBtn = hasOpts ? `
+        <button class="fe1-mode" style="margin-top:10px;width:100%;padding:8px 0;font-size:12px;border:1px solid var(--border);border-radius:10px;background:#f8fafc;cursor:pointer;">
+          ${mode === 'opts' ? '🔘 当前：选项选择 → 改为自由填写' : '✍️ 当前：自由填写 → 改为选项选择'}
+        </button>` : '';
+      const note = def.noOpts ? '<div style="font-size:11px;color:var(--text-3);margin-top:6px;">此项为 1-10 固定等级（已有存量数据），仅支持改名与删除，不提供选项编辑</div>' : '';
+      return `
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;">字段名称</div>
+        <input type="text" class="preview-input fe1-name" value="${escapeHtml(curBuiltinLabel())}" style="width:100%;height:34px;font-size:13px;">
+        ${note}
+        ${modeBtn}
+        ${optsSec}
+        <div style="font-size:10px;color:var(--text-3);margin-top:10px;">改名后所有设备的显示同步更新；历史记录按字段存储，自动跟随新名称</div>`;
+    }
+    // 自定义 / AI 字段
+    const f = getExDef();
+    if (!f) return '<div style="color:#dc2626;font-size:12px;">字段不存在（可能已被删除）</div>';
+    const hasOpts = f.options && f.options.length;
+    const chips = hasOpts ? f.options.map((o, oi) => `<span class="fe1-opt-chip" data-oi="${oi}" title="点击删除该选项">${escapeHtml(o)} <b style="opacity:.45;">×</b></span>`).join('') : '';
+    return `
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;">字段名称</div>
+      <input type="text" class="preview-input fe1-name" value="${escapeHtml(f.label)}" style="width:100%;height:34px;font-size:13px;">
+      <button class="fe1-mode" style="margin-top:10px;width:100%;padding:8px 0;font-size:12px;border:1px solid var(--border);border-radius:10px;background:#f8fafc;cursor:pointer;">
+        ${hasOpts ? '🔘 当前：选项选择 → 改为自由填写' : '✍️ 当前：自由填写 → 改为选项选择'}
+      </button>
+      ${hasOpts ? `
+        <div style="margin-top:10px;">
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;">选项（点击删除，最多 8 个）</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">${chips}</div>
+          <div style="display:flex;gap:6px;margin-top:8px;">
+            <input class="preview-input fe1-opt-new" placeholder="新选项" style="flex:1;height:32px;font-size:12px;">
+            <button class="fe1-opt-add" style="font-size:12px;padding:0 12px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;cursor:pointer;">➕ 添加</button>
+          </div>
+        </div>` : ''}
+      ${f.source === 'ai' ? '<div style="font-size:10px;color:#8b5cf6;margin-top:8px;">🤖 来自 AI 建议</div>' : ''}
+      <div style="font-size:10px;color:var(--text-3);margin-top:10px;">切到自由填写时选项会暂存，切回选项即恢复；改名会同步更新所有历史记录</div>`;
+  };
+
+  mask.innerHTML = `
+    <div class="modal" style="max-width:380px;width:90%;">
+      <div style="font-weight:700;font-size:15px;margin-bottom:10px;">✏️ 编辑可填项 · <span class="fe1-title">${escapeHtml(title())}</span></div>
+      <div class="fe1-body">${renderBody()}</div>
+      <div style="display:flex;justify-content:flex-end;margin-top:14px;"><button class="btn-secondary fe1-close">关闭</button></div>
+    </div>`;
+  document.body.appendChild(mask);
+  const close = () => { mask.remove(); if (onDone) onDone(); };
+  mask.addEventListener('click', e => { if (e.target === mask) close(); });
+  mask.querySelector('.fe1-close').onclick = close;
+
+  const rerender = () => {
+    mask.querySelector('.fe1-title').textContent = title();
+    mask.querySelector('.fe1-body').innerHTML = renderBody();
+    bind();
+  };
+  const bind = () => {
+    // 改名
+    const nameInp = mask.querySelector('.fe1-name');
+    if (nameInp) nameInp.onchange = () => {
+      const val = nameInp.value.trim();
+      if (!val) { rerender(); return; }
+      if (isBuiltin) {
+        if (val === def.label) { setBuiltinFieldLabel(key, def.id, ''); }
+        else setBuiltinFieldLabel(key, def.id, val);
+        applyBuiltinFieldVisibility(key);
+        if (key === 'gout') refreshBuiltinPills();
+        showToast(`✓ 已改名为「${val}」，所有设备同步`);
+        rerender();
+      } else {
+        const f = getExDef();
+        if (!f) return;
+        if (getExtraFieldDefsFor(key).some(x => x.label === val && x !== f)) { showToast('已有同名填项', 'warning'); rerender(); return; }
+        const old = f.label;
+        renameExtraFieldEverywhere(key, old, val);
+        curExLabel = val;
+        rerender();
+      }
+    };
+    // 填写⇄选项切换
+    const modeBtn = mask.querySelector('.fe1-mode');
+    if (modeBtn) modeBtn.onclick = () => {
+      if (isBuiltin) {
+        const mode = getBuiltinFieldMode(key, def.id);
+        setBuiltinFieldMode(key, def.id, mode === 'opts' ? 'fill' : 'opts');
+        if (key === 'gout') refreshBuiltinPills();
+        rerender();
+      } else {
+        const f = getExDef();
+        if (!f) return;
+        const i = getExtraFieldDefsFor(key).findIndex(x => x.label === f.label);
+        if (i < 0) return;
+        if (f.options && f.options.length) {
+          // → 自由填写：暂存原选项，切回时恢复
+          updateExtraFieldDefAt(key, i, { options: [], _options_backup: f.options.slice() });
+          showToast(`「${f.label}」已改为自由填写（选项已暂存）`);
+        } else {
+          const backup = f._options_backup;
+          if (Array.isArray(backup) && backup.length) {
+            updateExtraFieldDefAt(key, i, { options: backup.slice(0, 8), _options_backup: null });
+            showToast(`「${f.label}」已改为选项选择（已恢复暂存的 ${backup.length} 个选项）`);
+          } else {
+            updateExtraFieldDefAt(key, i, { options: ['选项1', '选项2'] });
+            showToast(`「${f.label}」已改为选项选择`);
+          }
+        }
+        rerender();
+      }
+    };
+    // 内置选项增删
+    mask.querySelectorAll('.fe1-biopt-chip').forEach(chip => {
+      chip.onclick = () => {
+        if (!def || !def.optsKey) return;
+        const base = def.optsKey === 'gout.medications' ? goutMedBaseList() : def.optsKey === 'gout.locations' ? goutLocationBaseList() : def.optsKey === 'gout.triggers' ? goutTriggerBaseList() : [];
+        builtinOptRemove(def.optsKey, chip.dataset.val, base);
+        if (key === 'gout') refreshBuiltinPills();
+        rerender();
+      };
+    });
+    const bioptAdd = mask.querySelector('.fe1-biopt-add');
+    if (bioptAdd) bioptAdd.onclick = () => {
+      const inp = mask.querySelector('.fe1-biopt-new');
+      const val = (inp.value || '').trim();
+      if (!val) { showToast('请输入选项名称', 'warning'); return; }
+      if (!def || !def.optsKey) return;
+      const base = def.optsKey === 'gout.medications' ? goutMedBaseList() : def.optsKey === 'gout.locations' ? goutLocationBaseList() : def.optsKey === 'gout.triggers' ? goutTriggerBaseList() : [];
+      builtinOptAdd(def.optsKey, val, base);
+      if (key === 'gout') refreshBuiltinPills();
+      showToast(`✓ 已添加「${val}」`);
+      rerender();
+    };
+    // 自定义选项增删
+    mask.querySelectorAll('.fe1-opt-chip').forEach(chip => {
+      chip.onclick = () => {
+        const f = getExDef();
+        if (!f || !f.options) return;
+        const i = getExtraFieldDefsFor(key).findIndex(x => x.label === f.label);
+        if (i < 0) return;
+        const opts = f.options.slice();
+        opts.splice(parseInt(chip.dataset.oi), 1);
+        updateExtraFieldDefAt(key, i, { options: opts });
+        rerender();
+      };
+    });
+    const optAdd = mask.querySelector('.fe1-opt-add');
+    if (optAdd) optAdd.onclick = () => {
+      const f = getExDef();
+      if (!f) return;
+      const inp = mask.querySelector('.fe1-opt-new');
+      const val = (inp.value || '').trim();
+      if (!val) return;
+      if ((f.options || []).includes(val)) { showToast('选项已存在', 'warning'); return; }
+      const i = getExtraFieldDefsFor(key).findIndex(x => x.label === f.label);
+      if (i < 0) return;
+      const opts = (f.options || []).concat(val).slice(0, 8);
+      updateExtraFieldDefAt(key, i, { options: opts });
+      rerender();
+    };
+  };
+  bind();
 }
 function renderTypesMgrList() {
   const wrap = document.getElementById('typesMgrList');
@@ -4320,7 +4593,6 @@ function openMemberManager() {
   mask.id = 'memberMgrMask';
   mask.innerHTML = `
     <div class="modal" style="max-width:480px;">
-      <button class="modal-close" data-close="memberMgrMask" title="关闭">×</button>
       <h3>👨‍👩‍👧 家庭成员管理</h3>
       <div class="modal-sub">修改成员名字、添加新成员、删除成员</div>
       <div id="memberList" style="display:flex;flex-direction:column;gap:8px;margin:12px 0;max-height:50vh;overflow-y:auto;"></div>
@@ -4939,7 +5211,6 @@ function openTimeRecordsModal(range) {
   mask.id = 'timeRecordsMask';
   mask.innerHTML = `
     <div class="modal" style="max-width:640px;">
-      <button class="modal-close" data-close="timeRecordsMask" title="关闭">×</button>
       <h3>${range === 'today' ? '📝' : '📅'} ${label}记录</h3>
       <div class="modal-sub">${rangeText} · 共 ${totalCount} 条 · ${members.size} 位成员 · ${cats.size} 个类别</div>
       <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
@@ -5004,7 +5275,6 @@ function openCategoryManager() {
   mask.id = 'catMgrMask';
   mask.innerHTML = `
     <div class="modal" style="max-width:520px;">
-      <button class="modal-close" data-close="catMgrMask" title="关闭">×</button>
       <h3>🏷 类别管理</h3>
       <div class="modal-sub">编辑类别名称、图标、单位、参考区间；删除自定义类别</div>
       <div id="catList" style="display:flex;flex-direction:column;gap:8px;margin:12px 0;max-height:50vh;overflow-y:auto;"></div>
@@ -5785,10 +6055,7 @@ function initEventsView() {
   // 严重程度
   buildSeverityGrids();
 
-  // 痛风部位切换"其他"
-  document.getElementById('eventGoutLocation').addEventListener('change', e => {
-    document.getElementById('eventGoutLocationOtherWrap').style.display = e.target.value === '其他' ? 'flex' : 'none';
-  });
+  // v125：部位已改 pill 点击选择，select 切换"其他"的监听器移除
 
   // 复制上次痛风
   document.getElementById('btnCopyLastGout').addEventListener('click', copyLastGout);
@@ -6688,8 +6955,9 @@ function renderTags() {
   // 重渲染（触发 setupTagInput 的 closure）
   setupTagInput('eventGoutTriggers', eventGoutTriggers);
   setupTagInput('eventGoutMedications', eventGoutMedications);
-  // 同步刷新用药 pill 高亮
+  // 同步刷新 pill 高亮（用药 + v125 触发食物）
   if (typeof renderGoutMedications === 'function') renderGoutMedications();
+  if (typeof renderGoutTriggers === 'function') renderGoutTriggers();
 }
 
 function setEventType(type, customId) {
@@ -7028,16 +7296,17 @@ function openEventModal(ev) {
       renderDysmenorrheaDayList(ev.ts, ev.end_ts, dysDates);
     }
     if (ev.category === 'gout') {
-      const loc = ev.payload.location || '右脚大拇趾';
-      const sel = document.getElementById('eventGoutLocation');
-      const known = Array.from(sel.options).map(o => o.value);
-      if (known.includes(loc)) { sel.value = loc; document.getElementById('eventGoutLocationOtherWrap').style.display = 'none'; }
-      else { sel.value = '其他'; document.getElementById('eventGoutLocationOther').value = loc; document.getElementById('eventGoutLocationOtherWrap').style.display = 'flex'; }
+      // v125：部位=pill 单选或手输框
+      const loc = ev.payload.location || '';
+      const known = builtinOptsFor('gout.locations', goutLocationBaseList());
+      if (loc && known.includes(loc)) { eventGoutLocation = loc; document.getElementById('eventGoutLocationOther').value = ''; }
+      else { eventGoutLocation = ''; document.getElementById('eventGoutLocationOther').value = loc; }
       eventPainLevel = Math.max(0, Math.min(9, (ev.payload.pain_level || 5) - 1));
       document.querySelectorAll('#eventPainLevel .severity-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.val) === eventPainLevel));
       eventGoutTriggers = (ev.payload.trigger_foods || []).slice();
       eventGoutMedications = (ev.payload.medications || []).slice();
       renderGoutMedications();
+      renderGoutTriggers();
     }
     if (ev.category === 'anomaly') {
       document.getElementById('eventAnomalyType').value = ev.payload.anomaly_type || '';
@@ -7068,8 +7337,8 @@ function openEventModal(ev) {
     eventPainLevel = 5;
     document.querySelectorAll('#eventPainLevel .severity-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.val) === 5));
     eventGoutTriggers = []; eventGoutMedications = [];
-    document.getElementById('eventGoutLocation').value = '右脚大拇趾';
-    document.getElementById('eventGoutLocationOtherWrap').style.display = 'none';
+    eventGoutLocation = builtinOptsFor('gout.locations', goutLocationBaseList())[0] || '';  // 默认选第一个部位
+    document.getElementById('eventGoutLocationOther').value = '';
     document.getElementById('eventAnomalyType').value = '';
     document.getElementById('eventAnomalyTreatment').value = '';
     document.getElementById('eventCustomName').value = '';
@@ -7147,14 +7416,14 @@ function copyLastGout() {
   const last = bodyEvents.find(e => e.category === 'gout');
   if (!last) { showToast('还没有历史痛风记录可复制', 'warning'); return; }
   const p = last.payload || {};
-  const loc = p.location || '右脚大拇趾';
-  const sel = document.getElementById('eventGoutLocation');
-  const known = Array.from(sel.options).map(o => o.value);
-  if (known.includes(loc)) { sel.value = loc; document.getElementById('eventGoutLocationOtherWrap').style.display = 'none'; }
-  else { sel.value = '其他'; document.getElementById('eventGoutLocationOther').value = loc; document.getElementById('eventGoutLocationOtherWrap').style.display = 'flex'; }
+  const loc = p.location || '';
+  const known = builtinOptsFor('gout.locations', goutLocationBaseList());
+  if (loc && known.includes(loc)) { eventGoutLocation = loc; document.getElementById('eventGoutLocationOther').value = ''; }
+  else { eventGoutLocation = ''; document.getElementById('eventGoutLocationOther').value = loc; }
   eventGoutTriggers = (p.trigger_foods || []).slice();
   eventGoutMedications = (p.medications || []).slice();
   renderTags();
+  renderGoutLocation();
   showToast('✓ 已复制上次发作信息');
 }
 
@@ -7170,7 +7439,7 @@ function saveEventFromForm() {
   let payload = {};
   if (currentEventType === 'menstrual') {
     // 从弹窗里收集勾选的痛经日期（v120：该内置项被删除则不收集不保存）
-    const dysOff = isBuiltinFieldOff('menstrual', '痛经日期');
+    const dysOff = isBuiltinFieldOffId('menstrual', 'dys');
     const dysDates = dysOff ? [] : Array.from(document.querySelectorAll('#eventDysmenorrheaDays .dys-day.active')).map(el => el.dataset.datekey);
     payload = {
       dysmenorrhea_dates: dysDates,
@@ -7178,15 +7447,15 @@ function saveEventFromForm() {
       is_period_start: true,
     };
   } else if (currentEventType === 'gout') {
-    // v120：被删除的内置项不写入 payload（卡片/标题同步为空）
+    // v120：被删除的内置项不写入 payload；v125：停用判断按字段 id，部位=pill 单选或手输
     payload = {};
-    if (!isBuiltinFieldOff('gout', '发作部位')) {
-      const loc = document.getElementById('eventGoutLocation').value;
-      payload.location = loc === '其他' ? (document.getElementById('eventGoutLocationOther').value.trim() || '其他') : loc;
+    if (!isBuiltinFieldOffId('gout', 'location')) {
+      const loc = (eventGoutLocation || document.getElementById('eventGoutLocationOther').value.trim()).trim();
+      if (loc) payload.location = loc;
     }
-    if (!isBuiltinFieldOff('gout', '疼痛等级')) payload.pain_level = eventPainLevel + 1;
-    if (!isBuiltinFieldOff('gout', '触发食物')) payload.trigger_foods = eventGoutTriggers.slice();
-    if (!isBuiltinFieldOff('gout', '用药')) payload.medications = eventGoutMedications.slice();
+    if (!isBuiltinFieldOffId('gout', 'pain')) payload.pain_level = eventPainLevel + 1;
+    if (!isBuiltinFieldOffId('gout', 'triggers')) payload.trigger_foods = eventGoutTriggers.slice();
+    if (!isBuiltinFieldOffId('gout', 'medications')) payload.medications = eventGoutMedications.slice();
   } else if (currentEventType === 'anomaly') {
     payload = {
       anomaly_type: document.getElementById('eventAnomalyType').value.trim(),
