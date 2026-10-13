@@ -1,7 +1,7 @@
 /* 家庭健康记录 Service Worker
  * 缓存策略：network-first（HTML/JS/CSS，避免新版本被旧缓存遮蔽）+ stale-while-revalidate（CDN 资源）
  */
-const CACHE = 'family-health-v42';  // v128：点击月历保存为项目名按字数缩字号(4-5字=3/5,6字+=4/7)
+const CACHE = 'family-health-v43';  // v129：保存为按钮字号行盒固定+内容垂直居中(修缩字后基线偏移)
 const CORE = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {

@@ -218,7 +218,8 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                            预存预测经期天数 = 历史经期天数加权平均（最近6次，权重同周期算法，回退5天）；
                            最新一次未记完的经期不计入 → 待定窗长用「不含本轮」的历史均值（predPrev）；
                            待定结束后：本轮记满 ≥ 预存天数 → 正常卵泡期/排卵日/排卵期/黄体期预测；
-                           不足 → 只预测下次月经窗（无各期预测，中间显示「经后期」） */
+                           待定结束后：一律给出完整四期预测（v129 与网页 v114 对齐，
+                           删除 v111 简化模式——原「不足→只预测月经窗/中间显示经后期」已删） */
                         fun avgDur(list: List<Int>): Int = when {
                             list.isEmpty() -> 5
                             list.size >= 3 -> {
@@ -237,13 +238,15 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                         val phase = when {
                             dayIn <= lastDur -> "月经期"                    // 已记录的经期
                             dayIn <= predPrev -> "月经期"                   // 待定窗内（本轮未判定结束）
-                            lastDur < PRED && dayIn >= avg -> "月经期"       // 简化模式：预测的下次月经窗
-                            lastDur < PRED -> "经后期"                       // 简化模式：经期外、预测窗前
+                            // v129：删除 v111 简化模式（「本轮没记满预存天数→只预测月经窗/显示经后期」）
+                            // —— v114 起网页端一律给完整四期预测，此处分叉导致小组件显示「经后期」（
+                            //    发明的词，且掉进点阵颜色表死角变灰）。现与网页逐字对齐：
+                            //    经后中间段按周期均值正常进入卵泡期→排卵日/排卵期→黄体期
                             dayIn == ovu -> "排卵日"
                             dayIn in (ovu - 5)..(ovu - 1) -> "排卵期"   // v116：排卵窗=排卵日前5天到前1天（与日历一致）
                             dayIn < ovu - 5 -> "卵泡期"
                             dayIn < avg -> "黄体期"
-                            else -> "月经期"                                 // 记满预存天数且已进入预测窗（推迟）
+                            else -> "月经期"                                 // 已进入预测窗（下次月经开始/推迟）
                         }
                         // 顶部药丸 = 时期（按时期配色）
                         pillText = phase
@@ -406,14 +409,13 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             val ovuColor = 0xFFE8944A.toInt()      // 排卵期 亮橙
             val ovuDayColor = 0xFFD9712E.toInt()   // 排卵日 深亮橙
             val lutealColor = 0xFF7FB069.toInt()   // 黄体期 草绿
-            // 今天高亮用深一档
+            // 今天高亮用深一档（v129：phase 上游已穷尽五态，无未知兜底——else 语义上=黄体期）
             val todayColor = when (phase) {
                 "月经期" -> 0xFFD14D78.toInt()
                 "排卵日" -> 0xFFB85A1E.toInt()
                 "排卵期" -> 0xFFD97B2E.toInt()
                 "卵泡期" -> 0xFFB8892B.toInt()
-                "黄体期" -> 0xFF5E9450.toInt()
-                else -> 0xFF9C948B.toInt()
+                else -> 0xFF5E9450.toInt()   // 黄体期
             }
             val highlight = if (today >= 1) ((today - 1) % n) + 1 else 0
 

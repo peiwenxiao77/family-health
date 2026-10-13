@@ -11,8 +11,8 @@ android {
         applicationId "com.familyhealth.app"
         minSdk 26
         targetSdk 34
-        versionCode 12
-        versionName "1.11"
+        versionCode 13
+        versionName "1.12"
     }
 
     // v112b：固定签名（修复「软件包与现有软件包存在冲突/签名有异常」）
