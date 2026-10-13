@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v124: ①月经合并卡片标题简化:第一行就月经,第二行 2天·10/12-10/13 等chips ②内置项(痛风发作部位/用药)选项可编辑:fh_builtin_opts覆盖层(add/del差集,随app_meta云同步key=builtin_opts),历史用过的选项只在记录里保留不再进快捷列表 ③AI建议字段与可填项去重(修口腔溃疡字段重复两遍):AI渲染跳过defs已有label+墓碑label ④删除字段统一在tombstoneExtraField清AI建议缓存(任何路径不留残影) ⑤所有弹窗注入固定右上角✕关闭键(sticky吸附,内容下滑不消失;uiConfirm✕=取消);sw缓存v38 -->
 <!-- v123: ①app_meta同步防丢三重加固:extra_fields改合并式应用(label并集+时间戳墓碑_tombs,任何设备旧map不再灭掉他端新字段如月经的用药) ②上传时间戳改为成功后写+失败记pending下次启动强制补传+防抖900→300ms+切后台立即冲刷 ③月经合并卡片聚合可填项(10.1用药布洛芬+10.2用药双氯芬酸钠→用药布洛芬、双氯芬酸钠),AI建议合并无新增时不再触发上传;sw缓存v37 -->
 <!-- v122: 修复云同步延迟感——SW对supabase API响应绝不再缓存(原stale-while-revalidate实际cache-first,删除/修改后APP启动被旧缓存遮蔽);deleteFromCloud失败改可见提示;sw缓存v36 -->
 <!-- v120: ①app_meta启动双向合并补传:云端缺/旧的key把本机推上去,修复v118之前旧数据(口腔溃疡+嘴巴图标)不同步 ②删除可填项同时清AI建议缓存,修复重开弹窗回弹(删除名存实亡) ③内置项目专属填项(痛经日期/发作部位/疼痛等级/触发食物/用药)可在编辑弹窗删除(停用)并在添加弹窗恢复,成员/时间固定;停用列表存_builtin_off随云同步,保存时跳过停用项 -->
@@ -196,6 +197,9 @@
   .modal-mask#uiConfirmMask { z-index: 10060; }
   .modal-mask.show { display: flex; }
   .modal { background: white; border-radius: 20px; padding: 24px; max-width: 460px; width: 100%; box-shadow: 0 25px 50px -12px rgba(120, 53, 15, 0.4); max-height: 90vh; overflow-y: auto; position: relative; z-index: 10000; animation: slideUp 0.25s; overflow-x: hidden; }
+  /* v124：弹窗固定关闭键——sticky 吸附弹窗右上角，内容下滑也能看到 */
+  .modal-x-fixed { position: sticky; top: -18px; float: right; margin: -18px -16px 0 8px; width: 30px; height: 30px; border: none; background: #fff; border-radius: 50%; font-size: 14px; line-height: 30px; text-align: center; color: #9ca3af; cursor: pointer; z-index: 50; box-shadow: 0 1px 6px rgba(0,0,0,0.12); transition: all 0.15s; padding: 0; flex-shrink: 0; }
+  .modal-x-fixed:hover { color: #111827; background: #f3f4f6; transform: scale(1.06); }
   /* v75：弹窗美化——顶部渐变色条 + 确认弹窗主题化 */
   .modal::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 5px; background: linear-gradient(90deg, #fda4af, #fcd34d, #a5b4fc, #86efac); border-radius: 20px 20px 0 0; }
   .ui-confirm { text-align: center; padding-top: 30px; }
@@ -2484,6 +2488,7 @@ function collectMetaValue(key) {
       case 'deleted_types': return JSON.parse(localStorage.getItem('deleted_custom_types') || '{}');
       case 'ai_fields': return getAIFieldCache();
       case 'ai_icons': return JSON.parse(localStorage.getItem(AI_ICON_SUGGEST_KEY) || '{}');
+      case 'builtin_opts': return getBuiltinOptsOv();
     }
   } catch (e) {}
   return null;
@@ -2516,6 +2521,9 @@ function applyMetaValue(key, d) {
         break;
       case 'ai_icons':
         if (d && typeof d === 'object') { localStorage.setItem(AI_ICON_SUGGEST_KEY, JSON.stringify(d)); }
+        break;
+      case 'builtin_opts':
+        if (d && typeof d === 'object') { localStorage.setItem(BUILTIN_OPTS_KEY, JSON.stringify(d)); if (typeof renderGoutMedications === 'function') renderGoutMedications(); if (typeof renderGoutLocation === 'function') renderGoutLocation(); }
         break;
     }
   } catch (e) { console.warn('applyMetaValue failed', key, e); }
@@ -2552,7 +2560,7 @@ async function uploadMetaKey(key) {
     if (!__metaWarned) { __metaWarned = true; console.warn('[app_meta] 同步失败', e); }
   }
 }
-const META_SYNC_KEYS = ['members', 'custom_types', 'custom_cats', 'extra_fields', 'deleted_types', 'ai_fields', 'ai_icons'];
+const META_SYNC_KEYS = ['members', 'custom_types', 'custom_cats', 'extra_fields', 'deleted_types', 'ai_fields', 'ai_icons', 'builtin_opts'];
 async function loadMetaFromCloud() {
   if (LOCAL_MODE || !isConfigured || !dbClient) return;
   try {
@@ -2608,7 +2616,7 @@ function subscribeMeta() {
         applyMetaValue(row.id, v.d);
         localStorage.setItem('meta_ts_' + row.id, String(v.t || Date.now()));
         __applyingMeta = false;
-        const zh = { members: '成员列表', custom_types: '自定义项目', custom_cats: '自定义类别', extra_fields: '可填项定义', deleted_types: '已删项目标记', ai_fields: 'AI字段建议', ai_icons: 'AI图标建议' };
+        const zh = { members: '成员列表', custom_types: '自定义项目', custom_cats: '自定义类别', extra_fields: '可填项定义', deleted_types: '已删项目标记', ai_fields: 'AI字段建议', ai_icons: 'AI图标建议', builtin_opts: '内置项快捷选项' };
         showToast(`🔔 已同步其它设备的${zh[row.id] || row.id}`);
       }
     })
@@ -2693,9 +2701,11 @@ function renderGoutLocation() {
   const all = [];
   historical.forEach(loc => { if (!seen.has(loc)) { seen.add(loc); all.push(loc); } });
   GOUT_LOCATIONS_DEFAULT.forEach(loc => { if (!seen.has(loc)) { seen.add(loc); all.push(loc); } });
-  const currentVal = sel.value;
-  sel.innerHTML = all.map(loc => `<option value="${escapeHtml(loc)}">${escapeHtml(loc)}${historical.includes(loc) ? ' ★' : ''}</option>`).join('') + '<option value="其他">其他...</option>';
-  if (currentVal && [...sel.options].some(o => o.value === currentVal)) sel.value = currentVal;
+  // v124：应用内置项选项覆盖（编辑弹窗里用户增删过的快捷部位）
+  const locFinal = builtinOptsFor('gout.locations', all).filter(loc => all.includes(loc) || !historical.includes(loc));
+  const locCur = sel.value;
+  sel.innerHTML = locFinal.map(loc => `<option value="${escapeHtml(loc)}">${escapeHtml(loc)}${historical.includes(loc) ? ' ★' : ''}</option>`).join('') + '<option value="其他">其他...</option>';
+  if (locCur && [...sel.options].some(o => o.value === locCur)) sel.value = locCur;
 }
 
 // 渲染用药快捷 pill：已选高亮 + 历史 + 默认 preset
@@ -2707,7 +2717,9 @@ function renderGoutMedications() {
   const all = [];
   historical.forEach(m => { if (!seen.has(m)) { seen.add(m); all.push(m); } });
   GOUT_MED_PRESETS.forEach(m => { if (!seen.has(m)) { seen.add(m); all.push(m); } });
-  wrap.innerHTML = all.map(m => {
+  // v124：应用内置项选项覆盖（编辑弹窗里用户增删过的快捷用药：del 屏蔽 + add 追加）
+  const finalAll = builtinOptsFor('gout.medications', all);
+  wrap.innerHTML = finalAll.map(m => {
     const active = eventGoutMedications.includes(m);
     return `<span class="pill${active ? ' active' : ''}" data-med="${escapeHtml(m)}" title="${active ? '点击取消' : '点击加入'}">${escapeHtml(m)}${active ? ' <span class="x">×</span>' : ''}</span>`;
   }).join('');
@@ -2885,15 +2897,48 @@ function updateExtraFieldDefAt(key, i, patch) {
      { menstrual: ['痛经日期'], gout: ['疼痛等级'] }
    ============================================================ */
 const BUILTIN_FIELDS = {
-  menstrual: [{ id: 'dys', label: '痛经日期' }],
+  menstrual: [{ id: 'dys', label: '痛经日期' }],  // 日期勾选型，无固定选项集，不支持选项编辑
   gout: [
-    { id: 'location', label: '发作部位' },
-    { id: 'pain', label: '疼痛等级' },
-    { id: 'triggers', label: '触发食物' },
-    { id: 'medications', label: '用药' },
+    { id: 'location', label: '发作部位', optsKey: 'gout.locations' },
+    { id: 'pain', label: '疼痛等级' },  // 1-10 固定，不支持选项编辑
+    { id: 'triggers', label: '触发食物' },  // 自由输入，无预设选项
+    { id: 'medications', label: '用药', optsKey: 'gout.medications' },
   ],
   intercourse: [],  // ❤️ 无内置可填项（成员/时间为固定项）
 };
+// v124：内置项选项覆盖层——用户可在编辑弹窗给「发作部位/用药」增删快捷选项。
+// 存差集：add=追加的自定义选项，del=屏蔽的选项（历史记录里用过的仍可在覆盖后过滤）。
+// 随 app_meta 云同步（key: builtin_opts）。
+const BUILTIN_OPTS_KEY = 'fh_builtin_opts';
+function getBuiltinOptsOv() {
+  try { return JSON.parse(localStorage.getItem(BUILTIN_OPTS_KEY) || '{}') || {}; }
+  catch (e) { return {}; }
+}
+function saveBuiltinOptsOv(o) { localStorage.setItem(BUILTIN_OPTS_KEY, JSON.stringify(o)); syncMetaKey('builtin_opts'); }
+function builtinOptsFor(optsKey, baseList) {
+  const ov = getBuiltinOptsOv()[optsKey] || {};
+  const del = new Set(ov.del || []);
+  const seen = new Set(), out = [];
+  (baseList || []).forEach(x => { if (!del.has(x) && !seen.has(x)) { seen.add(x); out.push(x); } });
+  (ov.add || []).forEach(x => { if (!del.has(x) && !seen.has(x)) { seen.add(x); out.push(x); } });
+  return out;
+}
+function builtinOptRemove(optsKey, val, baseList) {
+  const o = getBuiltinOptsOv();
+  const cur = o[optsKey] = o[optsKey] || { add: [], del: [] };
+  if ((cur.add || []).includes(val)) cur.add = cur.add.filter(x => x !== val);  // 自己加的→直接移除
+  else if (!cur.del.includes(val)) cur.del.push(val);
+  if (!cur.add.length && !cur.del.length) delete o[optsKey];
+  saveBuiltinOptsOv(o);
+}
+function builtinOptAdd(optsKey, val) {
+  const o = getBuiltinOptsOv();
+  const cur = o[optsKey] = o[optsKey] || { add: [], del: [] };
+  if (cur.del.includes(val)) cur.del = cur.del.filter(x => x !== val);  // 恢复被屏蔽的
+  else if (!(cur.add || []).includes(val) && !baseList.includes(val)) cur.add.push(val);
+  if (!cur.add.length && !cur.del.length) delete o[optsKey];
+  saveBuiltinOptsOv(o);
+}
 function getBuiltinOffMap() {
   const m = getExtraFieldsMap();
   return (m && m._builtin_off && typeof m._builtin_off === 'object') ? m._builtin_off : {};
@@ -2933,20 +2978,7 @@ function removeExtraFieldDefAt(key, i) {
   m[key] = arr;
   saveExtraFieldsMap(m);
   if (removed && removed.label) tombstoneExtraField(key, removed.label);
-  // v120：同时从 AI 建议缓存移除同名项——否则重开编辑弹窗时
-  // mergeAISuggestionIntoDefs 会把它重新合并进来（删除名存实亡）
-  if (removed && removed.label) {
-    const item = customEventTypes.find(c => c.id === key);
-    const projectName = item ? item.name : null;
-    if (projectName) {
-      const cache = getAIFieldCache();
-      const sug = cache[projectName];
-      if (sug && Array.isArray(sug.fields) && sug.fields.some(f => f && f.label === removed.label)) {
-        sug.fields = sug.fields.filter(f => !f || f.label !== removed.label);
-        cacheAISuggestion(projectName, sug);
-      }
-    }
-  }
+  // v124：AI 建议缓存清理已统一移入 tombstoneExtraField（任何删除路径都不留残影）
 }
 
 // v118：「编辑可填项」弹窗重做——
@@ -2963,16 +2995,41 @@ function openFieldEditModal(key, name) {
   // v120：内置项目的专属填项（痛经日期/发作部位等）也进入编辑列表——可删（停用），
   // 在「➕ 添加可填项」弹窗可恢复；成员/时间为固定项不列出
   const builtinDefs = BUILTIN_FIELDS[key] || [];
+  // v124：内置项的预设选项 base（历史用过 ∪ 默认预设），供选项编辑用
+  const builtinOptsBase = (optsKey) => {
+    if (optsKey === 'gout.medications') { const h = getHistoricalGoutMedications(); const seen = new Set(h); return h.concat(GOUT_MED_PRESETS.filter(m => !seen.has(m))); }
+    if (optsKey === 'gout.locations') { const h = getHistoricalGoutLocations(); const seen = new Set(h); return h.concat(GOUT_LOCATIONS_DEFAULT.filter(loc => !seen.has(loc))); }
+    return [];
+  };
   const renderRows = () => {
-    const builtinRows = builtinDefs.map((d, bi) => `
+    const builtinRows = builtinDefs.map((d, bi) => {
+      // v124：有预设选项集的内置项（发作部位/用药）支持选项编辑
+      const optEdit = d.optsKey ? (() => {
+        const base = builtinOptsBase(d.optsKey);
+        const cur = builtinOptsFor(d.optsKey, base);
+        const chips = cur.map(o => `<span class="fld-biopt-chip" data-bi="${bi}" data-val="${escapeHtml(o)}" title="点击从快捷选项中移除">${escapeHtml(o)} <b style="opacity:.45;">×</b></span>`).join('');
+        return `
+          <button class="fld-bi-ed" data-bi="${bi}" style="flex-shrink:0;font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;cursor:pointer;">✏️ 选项</button>
+          <div class="fld-bi-ed-area" data-bi="${bi}" style="display:none;margin-top:6px;">
+            <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+              ${chips}
+              <input class="preview-input fld-biopt-new" data-bi="${bi}" placeholder="新选项" style="width:78px;height:24px;font-size:11px;padding:2px 6px;">
+              <button class="fld-biopt-add" data-bi="${bi}" style="font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:6px;background:#f8fafc;cursor:pointer;">➕</button>
+            </div>
+            <div style="font-size:10px;color:var(--text-3);margin-top:3px;">点选项移除、输入新选项添加；历史记录里已用过的选项会保留在记录里，只是不再出现在快捷选项中</div>
+          </div>`;
+      })() : '';
+      return `
       <div style="padding:9px 0;border-bottom:1px dashed var(--border);font-size:13px;">
         <div style="display:flex;align-items:center;gap:8px;">
           <div style="flex:1;min-width:0;font-weight:600;">${escapeHtml(d.label)}
             <span style="font-size:10px;color:var(--text-3);background:#f1f5f9;padding:2px 8px;border-radius:999px;margin-left:6px;">内置</span>
           </div>
+          ${optEdit}
           <span class="fld-bi-del" data-bi="${bi}" style="cursor:pointer;font-size:15px;flex-shrink:0;" title="删除这个内置填项（可在添加弹窗随时恢复）">🗑</span>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
     const defs = getExtraFieldDefsFor(key);
     const extraRows = defs.map((f, i) => {
       const chips = (f.options || []).map((o, oi) => `
@@ -3092,6 +3149,35 @@ function openFieldEditModal(key, name) {
         setBuiltinFieldOff(key, def.label, true);
         refresh();
         showToast(`已删除内置填项「${def.label}」，可在「➕ 添加可填项」恢复`);
+      };
+    });
+    // v124：内置项选项编辑——展开/收起 + 移除/添加快捷选项
+    mask.querySelectorAll('.fld-bi-ed').forEach(btn => {
+      btn.onclick = () => {
+        const area = mask.querySelector(`.fld-bi-ed-area[data-bi="${btn.dataset.bi}"]`);
+        if (area) area.style.display = area.style.display === 'none' ? '' : 'none';
+      };
+    });
+    mask.querySelectorAll('.fld-biopt-chip').forEach(chip => {
+      chip.onclick = () => {
+        const bi = parseInt(chip.dataset.bi);
+        const def = (BUILTIN_FIELDS[key] || [])[bi];
+        if (!def || !def.optsKey) return;
+        builtinOptRemove(def.optsKey, chip.dataset.val, builtinOptsBase(def.optsKey));
+        refresh();
+      };
+    });
+    mask.querySelectorAll('.fld-biopt-add').forEach(btn => {
+      btn.onclick = () => {
+        const bi = parseInt(btn.dataset.bi);
+        const def = (BUILTIN_FIELDS[key] || [])[bi];
+        if (!def || !def.optsKey) return;
+        const inp = mask.querySelector(`.fld-biopt-new[data-bi="${bi}"]`);
+        const val = (inp.value || '').trim();
+        if (!val) { showToast('请输入选项名称', 'warning'); return; }
+        builtinOptAdd(def.optsKey, val);
+        refresh();
+        showToast(`✓ 已添加「${val}」`);
       };
     });
   };
@@ -5759,6 +5845,36 @@ document.addEventListener('click', e => {
   }
 });
 
+// v124：给每个弹窗注入固定右上角的 ✕ 关闭键（静态弹窗初始化一次，动态弹窗由
+// MutationObserver 自动注入）。uiConfirm 的 ✕ 等价于「取消」。
+function __ensureFixedClose(mask, dynamic) {
+  if (!mask || mask.dataset.xFixedDone) return;
+  mask.dataset.xFixedDone = '1';
+  mask.querySelectorAll('.modal').forEach(m => {
+    if (m.querySelector(':scope > .modal-x-fixed')) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'modal-x-fixed';
+    btn.innerHTML = '✕';
+    btn.title = '关闭';
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      if (mask.id === 'uiConfirmMask') { _settleUiConfirm(false); return; }
+      const dc = m.querySelector('[data-close]');
+      if (dc) { dc.click(); return; }  // 静态弹窗：走统一关闭委托
+      mask.classList.remove('show');
+      if (dynamic) setTimeout(() => mask.remove(), 150);
+    };
+    m.insertBefore(btn, m.firstChild);
+  });
+}
+document.querySelectorAll('.modal-mask').forEach(m => __ensureFixedClose(m, false));
+new MutationObserver(muts => {
+  muts.forEach(mu => mu.addedNodes.forEach(n => {
+    if (n.nodeType === 1 && n.classList && n.classList.contains('modal-mask')) __ensureFixedClose(n, true);
+  }));
+}).observe(document.body, { childList: true });
+
 // v75：美化版确认弹窗（替代原生 confirm）——Promise 化，await uiConfirm({...})
 // danger=true（默认）显示红色删除主题；false 显示普通确认主题
 let _uiConfirmResolve = null;
@@ -6716,7 +6832,15 @@ function renderAISuggestedFields(name, existing) {
   const renderInputs = (sug) => {
     if (tok !== aiFieldsToken) return;
     if (sug.icon) setAIIconSuggestion(name, sug.icon);
-    wrap.innerHTML = `<div style="font-size:11px;color:var(--text-3);margin-bottom:4px;">🤖 AI 建议记录（选填，点选项可快速填入）：</div>` + sug.fields.map(f => {
+    // v124：AI 建议字段与自定义可填项合并管理后，可填项定义（extra_fields）里
+    // 已有的同名字段只渲染可填项那份——否则日历添加弹窗里同一字段出现两遍
+    // （如口腔溃疡：疼痛等级/发生位置/持续时间 × 2）
+    const defLabels = new Set(getExtraFieldDefsFor(currentCustomTypeId || '').map(f => f && f.label).filter(Boolean));
+    const tombs = Object.keys((getExtraFieldsMap()._tombs || {})[currentCustomTypeId || ''] || {});
+    const tombSet = new Set(tombs);
+    const fields = (sug.fields || []).filter(f => f && f.label && !defLabels.has(f.label) && !tombSet.has(f.label));
+    if (!fields.length) { wrap.innerHTML = ''; return; }
+    wrap.innerHTML = `<div style="font-size:11px;color:var(--text-3);margin-bottom:4px;">🤖 AI 建议记录（选填，点选项可快速填入）：</div>` + fields.map(f => {
       const prev = (existing || []).find(x => x.label === f.label);
       const optChips = (f.options || []).map(o =>
         `<span class="ai-opt-chip" data-val="${escapeHtml(o)}" title="点击填入">${escapeHtml(o)}</span>`
@@ -6809,7 +6933,8 @@ function putExtraFieldDefFor(key, def) {
   }
   saveExtraFieldsMap(m);
 }
-// v123：删除墓碑（带删除时间戳）——合并时：字段._at 晚于墓碑时间则重加胜出，否则不复活
+// v124：删除墓碑（带删除时间戳）——合并时：字段._at 晚于墓碑时间则重加胜出，否则不复活。
+// 同时清理 AI 建议缓存中的同名项（统一入口，任何删除路径都不留残影）。
 function tombstoneExtraField(key, label) {
   if (!key || !label) return;
   const m = getExtraFieldsMap();
@@ -6817,6 +6942,18 @@ function tombstoneExtraField(key, label) {
   if (!m._tombs[key]) m._tombs[key] = {};
   m._tombs[key][label] = Date.now();
   saveExtraFieldsMap(m);
+  try {
+    const item = customEventTypes.find(c => c.id === key);
+    const projectName = item ? item.name : null;
+    if (projectName) {
+      const cache = getAIFieldCache();
+      const sug = cache[projectName];
+      if (sug && Array.isArray(sug.fields) && sug.fields.some(f => f && f.label === label)) {
+        sug.fields = sug.fields.filter(f => !f || f.label !== label);
+        cacheAISuggestion(projectName, sug);
+      }
+    }
+  } catch (e) {}
 }
 function removeExtraFieldDefFor(key, label) {
   if (!key) return;
@@ -7369,8 +7506,9 @@ function renderEventCard(ev, spanInfo) {
   // v111：连续月经记录合并显示——「10.1 开始的 5 天月经」（痛经天数跨同次经期合并统计）
   if (ev.category === 'menstrual' && spanInfo) {
     const sD = new Date(spanInfo.ts), eD = new Date(spanInfo.end_ts);
-    projectName = `${meta.label}（${sD.getMonth() + 1}/${sD.getDate()} 开始的 ${spanInfo.days} 天）`;
-    chips.push(`<span class="event-meta-chip">⏱ ${sD.getMonth() + 1}/${sD.getDate()}–${eD.getMonth() + 1}/${eD.getDate()}</span>`);
+    // v124：标题就「月经」，时长与日期范围放第二行（时间列已显示开始时间，不再重复）
+    projectName = meta.label;
+    chips.push(`<span class="event-meta-chip">⏱ ${spanInfo.days}天 · ${sD.getMonth() + 1}/${sD.getDate()}–${eD.getMonth() + 1}/${eD.getDate()}</span>`);
     const dysSet = new Set();
     spanInfo.events.forEach(se => {
       if (se.payload && Array.isArray(se.payload.dysmenorrhea_dates)) se.payload.dysmenorrhea_dates.forEach(k => dysSet.add(k));
