@@ -1,7 +1,7 @@
 /* 家庭健康记录 Service Worker
  * 缓存策略：network-first（HTML/JS/CSS，避免新版本被旧缓存遮蔽）+ stale-while-revalidate（CDN 资源）
  */
-const CACHE = 'family-health-v32';  // v118：全量云同步(app_meta)+可填项编辑器重做+AI人名识别+体温区间纠正
+const CACHE = 'family-health-v34';  // v118：全量云同步(app_meta)+可填项编辑器重做+AI人名识别+体温区间纠正
 const CORE = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {

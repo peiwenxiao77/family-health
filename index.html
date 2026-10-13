@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v120: ①app_meta启动双向合并补传:云端缺/旧的key把本机推上去,修复v118之前旧数据(口腔溃疡+嘴巴图标)不同步 ②删除可填项同时清AI建议缓存,修复重开弹窗回弹(删除名存实亡) ③内置项目专属填项(痛经日期/发作部位/疼痛等级/触发食物/用药)可在编辑弹窗删除(停用)并在添加弹窗恢复,成员/时间固定;停用列表存_builtin_off随云同步,保存时跳过停用项 -->
 <!-- v118: ①管理项目编辑键样式对齐全部记录(ev-mini-btn同风格) ②身体页全部记录标题单独一行 ③云同步大补全:新增app_meta表同步成员/自定义项目+图标/自定义类别/可填项定义(含AI建议)/已删标记/AI建议缓存,改动即推+启动即拉+realtime实时收(后写覆盖) ④编辑可填项弹窗重做:AI建议字段自动合并,每项可改名/增删选项/填写⇄选项/删除,底部添加可填项独立弹窗 ⑤卧床时间→用药一次性迁移(定义+AI缓存+历史记录) ⑥本周记录去掉今天还没记录提示 ⑦AI/规则识别人名模糊匹配(龙龙体温37→龙龙,文体温37→文文)并自动选中 ⑧体温37判异常=预期行为:参考区间一律用AI按通用医学常识给出的区间(用户确认),AI给36-37.0则37判偏高 -->
 <!-- v117: 网页功能无变化(微增部署,sw缓存v31)——APK v1.10: APP内下载更新增加进度条+每源重试3次+HTTP状态码检查+文件完整性校验+jsDelivr备用源兜底,修复连续下载失败 -->
 <!-- v115: ①趋势分析恢复图标原高度,改为图表容器压矮1/2(200/160px→100/80px) ②APK v1.8: 修复信封小组件白底灰圈(v114误用RemoteViews不支持的Space控件致布局加载失败,改空TextView占位) + 新增跨天自动刷新链(每天00:02自动刷新小组件,无需打开APP;原3小时周期任务保留兜底) -->
@@ -1073,14 +1074,14 @@
 
     <!-- 月经专属字段：痛经日期勾选（在所选月经期内逐日勾选） -->
     <div class="event-fields" data-for="menstrual">
-      <div class="preview-row"><label>痛经日期 <span style="font-weight:400;color:var(--text-3);font-size:11px;">(在记录期内勾选)</span></label>
+      <div class="preview-row" data-bf="dys"><label>痛经日期 <span style="font-weight:400;color:var(--text-3);font-size:11px;">(在记录期内勾选)</span></label>
         <div class="dysmenorrhea-day-list" id="eventDysmenorrheaDays"></div>
       </div>
     </div>
 
     <!-- 痛风专属字段 -->
     <div class="event-fields event-fields-hidden" data-for="gout">
-      <div class="preview-row"><label>发作部位</label>
+      <div class="preview-row" data-bf="location"><label>发作部位</label>
         <select id="eventGoutLocation" class="preview-input">
           <option value="右脚大拇趾">右脚大拇趾</option>
           <option value="左脚大拇趾">左脚大拇趾</option>
@@ -1094,15 +1095,15 @@
       <div class="preview-row" id="eventGoutLocationOtherWrap" style="display:none;"><label>其他部位</label>
         <input type="text" id="eventGoutLocationOther" class="preview-input" placeholder="输入部位">
       </div>
-      <div class="preview-row"><label>疼痛等级</label>
+      <div class="preview-row" data-bf="pain"><label>疼痛等级</label>
         <div class="severity-grid" id="eventPainLevel" data-max="10"></div>
       </div>
-      <div class="preview-row"><label>触发食物</label>
+      <div class="preview-row" data-bf="triggers"><label>触发食物</label>
         <div class="tag-input-wrap" id="eventGoutTriggers">
           <input type="text" placeholder="海鲜/啤酒/内脏...">
         </div>
       </div>
-      <div class="preview-row"><label>用药</label>
+      <div class="preview-row" data-bf="medications"><label>用药</label>
         <div class="tag-input-wrap" id="eventGoutMedications">
           <input type="text" placeholder="秋水仙碱/别嘌醇...">
         </div>
@@ -2531,6 +2532,7 @@ function syncMetaKey(key) {
     }
   }, 900);
 }
+const META_SYNC_KEYS = ['members', 'custom_types', 'custom_cats', 'extra_fields', 'deleted_types', 'ai_fields', 'ai_icons'];
 async function loadMetaFromCloud() {
   if (LOCAL_MODE || !isConfigured || !dbClient) return;
   try {
@@ -2548,6 +2550,16 @@ async function loadMetaFromCloud() {
         localStorage.setItem('meta_ts_' + row.id, String(v.t || Date.now()));
         console.log('[app_meta] 已应用云端配置:', row.id);
       }
+    });
+    __applyingMeta = false;
+    // v120：启动「补传」——云端没有的 key（首次建表/v118 之前的旧数据）或云端更旧的
+    // key，把本机推上去。修复：app_meta 只在「改动时」上传，建表前就存在的数据
+    // （如另一设备昨天添加的「口腔溃疡」+嘴巴图标）从未上过云，导致换设备看不到。
+    META_SYNC_KEYS.forEach(key => {
+      const localT = Number(localStorage.getItem('meta_ts_' + key) || 0);
+      const row = (data || []).find(r => r.id === key);
+      const cloudT = row ? Number((row.value || {}).t || 0) : 0;
+      if (localT > cloudT || (localT === 0 && cloudT === 0)) syncMetaKey(key);
     });
   } catch (e) { console.warn('[app_meta] load failed', e); }
   finally { __applyingMeta = false; }
@@ -2832,12 +2844,75 @@ function updateExtraFieldDefAt(key, i, patch) {
   m[key] = arr;
   saveExtraFieldsMap(m);
 }
+/* ============================================================
+   v120：内置项目专属可填项注册表——除「成员」「时间」固定外，
+   内置项目的专属填项（痛经日期/发作部位/疼痛等级/触发食物/用药）
+   全部可在「✏️ 编辑」弹窗中删除（停用）与恢复。
+   停用列表存 extra_fields map 的保留键 _builtin_off（随 app_meta 云同步）：
+     { menstrual: ['痛经日期'], gout: ['疼痛等级'] }
+   ============================================================ */
+const BUILTIN_FIELDS = {
+  menstrual: [{ id: 'dys', label: '痛经日期' }],
+  gout: [
+    { id: 'location', label: '发作部位' },
+    { id: 'pain', label: '疼痛等级' },
+    { id: 'triggers', label: '触发食物' },
+    { id: 'medications', label: '用药' },
+  ],
+  intercourse: [],  // ❤️ 无内置可填项（成员/时间为固定项）
+};
+function getBuiltinOffMap() {
+  const m = getExtraFieldsMap();
+  return (m && m._builtin_off && typeof m._builtin_off === 'object') ? m._builtin_off : {};
+}
+function saveBuiltinOffMap(off) {
+  const m = getExtraFieldsMap();
+  m._builtin_off = off;
+  saveExtraFieldsMap(m);
+}
+function isBuiltinFieldOff(key, label) { return (getBuiltinOffMap()[key] || []).includes(label); }
+function setBuiltinFieldOff(key, label, off) {
+  const o = getBuiltinOffMap();
+  const arr = o[key] || [];
+  const next = off ? (arr.includes(label) ? arr : arr.concat(label)) : arr.filter(l => l !== label);
+  if (next.length) o[key] = next; else delete o[key];
+  saveBuiltinOffMap(o);
+}
+// 按停用列表显隐弹窗里的内置填项行（行上打 data-bf=id）
+function applyBuiltinFieldVisibility(type) {
+  const defs = BUILTIN_FIELDS[type] || [];
+  defs.forEach(d => {
+    document.querySelectorAll(`.event-fields .preview-row[data-bf="${d.id}"]`).forEach(row => {
+      row.style.display = isBuiltinFieldOff(type, d.label) ? 'none' : '';
+    });
+  });
+  const copyBtn = document.getElementById('btnCopyLastGout');
+  if (copyBtn && type === 'gout') {
+    const anyOn = ['发作部位', '触发食物', '用药'].some(l => !isBuiltinFieldOff(type, l));
+    copyBtn.style.display = anyOn ? '' : 'none';
+  }
+}
 function removeExtraFieldDefAt(key, i) {
   const m = getExtraFieldsMap();
   const arr = m[key] || [];
+  const removed = arr[i];
   arr.splice(i, 1);
   m[key] = arr;
   saveExtraFieldsMap(m);
+  // v120：同时从 AI 建议缓存移除同名项——否则重开编辑弹窗时
+  // mergeAISuggestionIntoDefs 会把它重新合并进来（删除名存实亡）
+  if (removed && removed.label) {
+    const item = customEventTypes.find(c => c.id === key);
+    const projectName = item ? item.name : null;
+    if (projectName) {
+      const cache = getAIFieldCache();
+      const sug = cache[projectName];
+      if (sug && Array.isArray(sug.fields) && sug.fields.some(f => f && f.label === removed.label)) {
+        sug.fields = sug.fields.filter(f => !f || f.label !== removed.label);
+        cacheAISuggestion(projectName, sug);
+      }
+    }
+  }
 }
 
 // v118：「编辑可填项」弹窗重做——
@@ -2851,9 +2926,21 @@ function openFieldEditModal(key, name) {
   mask.id = 'fldEditMask';
   mergeAISuggestionIntoDefs(key);
 
+  // v120：内置项目的专属填项（痛经日期/发作部位等）也进入编辑列表——可删（停用），
+  // 在「➕ 添加可填项」弹窗可恢复；成员/时间为固定项不列出
+  const builtinDefs = BUILTIN_FIELDS[key] || [];
   const renderRows = () => {
+    const builtinRows = builtinDefs.map((d, bi) => `
+      <div style="padding:9px 0;border-bottom:1px dashed var(--border);font-size:13px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="flex:1;min-width:0;font-weight:600;">${escapeHtml(d.label)}
+            <span style="font-size:10px;color:var(--text-3);background:#f1f5f9;padding:2px 8px;border-radius:999px;margin-left:6px;">内置</span>
+          </div>
+          <span class="fld-bi-del" data-bi="${bi}" style="cursor:pointer;font-size:15px;flex-shrink:0;" title="删除这个内置填项（可在添加弹窗随时恢复）">🗑</span>
+        </div>
+      </div>`).join('');
     const defs = getExtraFieldDefsFor(key);
-    return defs.map((f, i) => {
+    const extraRows = defs.map((f, i) => {
       const chips = (f.options || []).map((o, oi) => `
         <span class="fld-opt-chip" data-i="${i}" data-oi="${oi}" title="点击删除该选项">${escapeHtml(o)} <b style="opacity:.45;">×</b></span>`).join('');
       return `
@@ -2871,13 +2958,14 @@ function openFieldEditModal(key, name) {
           </div>` : ''}
         ${f.source === 'ai' ? '<div style="font-size:10px;color:#8b5cf6;margin-top:3px;">🤖 来自 AI 建议</div>' : ''}
       </div>`;
-    }).join('') || '<div style="font-size:12px;color:var(--text-3);padding:8px 0;">暂无可填项，点下方「➕ 添加可填项」</div>';
+    }).join('');
+    return (builtinRows + extraRows) || '<div style="font-size:12px;color:var(--text-3);padding:8px 0;">暂无可填项，点下方「➕ 添加可填项」</div>';
   };
 
   mask.innerHTML = `
     <div class="modal" style="max-width:440px;width:92%;max-height:80vh;overflow-y:auto;">
       <div style="font-weight:700;font-size:15px;margin-bottom:4px;">🧩 编辑可填项 · ${escapeHtml(name)}</div>
-      <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;">AI 建议字段已合并进来，可统一编辑；改动立即生效并同步云端</div>
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;">AI 建议字段已合并进来统一管理；内置项（标「内置」）也可删除，在「➕ 添加可填项」可恢复；改动立即生效并同步云端</div>
       <div id="fldEdList">${renderRows()}</div>
       <button id="fldEdOpenAdd" style="width:100%;margin-top:12px;padding:8px 0;font-size:13px;border:1.5px dashed #c4b5fd;border-radius:10px;background:#faf5ff;color:#7c3aed;cursor:pointer;font-weight:600;">➕ 添加可填项</button>
       <div style="display:flex;justify-content:flex-end;margin-top:12px;"><button class="btn-secondary" id="fldEdClose">关闭</button></div>
@@ -2960,17 +3048,36 @@ function openFieldEditModal(key, name) {
         showToast(`已删除填项「${label}」`);
       };
     });
+    // v120：删除内置填项（两击确认）——停用而非物理删除，添加弹窗可恢复
+    mask.querySelectorAll('.fld-bi-del').forEach(d => {
+      d.onclick = () => {
+        if (!d.dataset.arm) { d.dataset.arm = '1'; d.textContent = '❓'; setTimeout(() => { d.dataset.arm = ''; d.textContent = '🗑'; }, 2500); return; }
+        const bi = parseInt(d.dataset.bi);
+        const def = (BUILTIN_FIELDS[key] || [])[bi];
+        if (!def) return;
+        setBuiltinFieldOff(key, def.label, true);
+        refresh();
+        showToast(`已删除内置填项「${def.label}」，可在「➕ 添加可填项」恢复`);
+      };
+    });
   };
   bindAll();
 
-  // 底部「➕ 添加可填项」→ 独立添加小弹窗
+  // 底部「➕ 添加可填项」→ 独立添加小弹窗（v120：顶部附已删内置项的恢复区）
   mask.querySelector('#fldEdOpenAdd').onclick = () => {
+    const offBuiltins = builtinDefs.filter(d => isBuiltinFieldOff(key, d.label));
+    const restoreHtml = offBuiltins.length ? `
+      <div style="font-size:12px;color:var(--text-3);margin:2px 0 6px;">已删除的内置项（点击恢复）：</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+        ${offBuiltins.map(d => `<span class="bf-restore" data-label="${escapeHtml(d.label)}" style="cursor:pointer;font-size:12px;padding:4px 10px;border:1px solid var(--border);border-radius:999px;background:#f8fafc;">↩ ${escapeHtml(d.label)}</span>`).join('')}
+      </div>` : '';
     const addMask = document.createElement('div');
     addMask.className = 'modal-mask show';
     addMask.style.zIndex = '10001';
     addMask.innerHTML = `
       <div class="modal" style="max-width:360px;width:88%;">
         <div style="font-weight:700;font-size:14px;margin-bottom:10px;">➕ 添加可填项</div>
+        ${restoreHtml}
         <input type="text" id="addFldName" class="preview-input" placeholder="字段名称，如：用药" style="width:100%;height:34px;font-size:13px;margin-bottom:8px;">
         <input type="text" id="addFldOpts" class="preview-input" placeholder="可选项（逗号隔开，留空=自由填写）" style="width:100%;height:34px;font-size:12px;margin-bottom:12px;">
         <div style="display:flex;justify-content:flex-end;gap:8px;">
@@ -2980,6 +3087,14 @@ function openFieldEditModal(key, name) {
       </div>`;
     document.body.appendChild(addMask);
     addMask.addEventListener('click', e => { if (e.target === addMask) addMask.remove(); });
+    addMask.querySelectorAll('.bf-restore').forEach(r => {
+      r.onclick = () => {
+        setBuiltinFieldOff(key, r.dataset.label, false);
+        addMask.remove();
+        refresh();
+        showToast(`✓ 已恢复内置填项「${r.dataset.label}」`);
+      };
+    });
     addMask.querySelector('#addFldCancel').onclick = () => addMask.remove();
     addMask.querySelector('#addFldOk').onclick = () => {
       const label = addMask.querySelector('#addFldName').value.trim();
@@ -6438,6 +6553,8 @@ function setEventType(type, customId) {
     : null;
   document.querySelectorAll('.event-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === (currentCustomTypeId || norm)));
   document.querySelectorAll('.event-fields').forEach(f => f.classList.toggle('event-fields-hidden', f.dataset.for !== norm));
+  // v120：内置专属可填项若被用户删除（_builtin_off），逐行隐藏
+  applyBuiltinFieldVisibility(norm);
   // v98：选中具体自定义项目 → 直接用缓存/AI 渲染该项目的建议字段（新建项目时已预生成，通常秒显）
   const wrap = document.getElementById('aiFieldsWrap');
   if (wrap) {
@@ -6835,21 +6952,24 @@ function saveEventFromForm() {
 
   let payload = {};
   if (currentEventType === 'menstrual') {
-    // 从弹窗里收集勾选的痛经日期
-    const dysDates = Array.from(document.querySelectorAll('#eventDysmenorrheaDays .dys-day.active')).map(el => el.dataset.datekey);
+    // 从弹窗里收集勾选的痛经日期（v120：该内置项被删除则不收集不保存）
+    const dysOff = isBuiltinFieldOff('menstrual', '痛经日期');
+    const dysDates = dysOff ? [] : Array.from(document.querySelectorAll('#eventDysmenorrheaDays .dys-day.active')).map(el => el.dataset.datekey);
     payload = {
       dysmenorrhea_dates: dysDates,
       duration_days: end_ts ? (Math.round((startOfDay(end_ts) - startOfDay(ts)) / 86400000) + 1) : null,  // v68：结束日算在内（9.5~9.9 = 5 天）
       is_period_start: true,
     };
   } else if (currentEventType === 'gout') {
-    const loc = document.getElementById('eventGoutLocation').value;
-    payload = {
-      location: loc === '其他' ? (document.getElementById('eventGoutLocationOther').value.trim() || '其他') : loc,
-      pain_level: eventPainLevel + 1,
-      trigger_foods: eventGoutTriggers.slice(),
-      medications: eventGoutMedications.slice(),
-    };
+    // v120：被删除的内置项不写入 payload（卡片/标题同步为空）
+    payload = {};
+    if (!isBuiltinFieldOff('gout', '发作部位')) {
+      const loc = document.getElementById('eventGoutLocation').value;
+      payload.location = loc === '其他' ? (document.getElementById('eventGoutLocationOther').value.trim() || '其他') : loc;
+    }
+    if (!isBuiltinFieldOff('gout', '疼痛等级')) payload.pain_level = eventPainLevel + 1;
+    if (!isBuiltinFieldOff('gout', '触发食物')) payload.trigger_foods = eventGoutTriggers.slice();
+    if (!isBuiltinFieldOff('gout', '用药')) payload.medications = eventGoutMedications.slice();
   } else if (currentEventType === 'anomaly') {
     payload = {
       anomaly_type: document.getElementById('eventAnomalyType').value.trim(),
