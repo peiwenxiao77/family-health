@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v123: ①app_meta同步防丢三重加固:extra_fields改合并式应用(label并集+时间戳墓碑_tombs,任何设备旧map不再灭掉他端新字段如月经的用药) ②上传时间戳改为成功后写+失败记pending下次启动强制补传+防抖900→300ms+切后台立即冲刷 ③月经合并卡片聚合可填项(10.1用药布洛芬+10.2用药双氯芬酸钠→用药布洛芬、双氯芬酸钠),AI建议合并无新增时不再触发上传;sw缓存v37 -->
 <!-- v122: 修复云同步延迟感——SW对supabase API响应绝不再缓存(原stale-while-revalidate实际cache-first,删除/修改后APP启动被旧缓存遮蔽);deleteFromCloud失败改可见提示;sw缓存v36 -->
 <!-- v120: ①app_meta启动双向合并补传:云端缺/旧的key把本机推上去,修复v118之前旧数据(口腔溃疡+嘴巴图标)不同步 ②删除可填项同时清AI建议缓存,修复重开弹窗回弹(删除名存实亡) ③内置项目专属填项(痛经日期/发作部位/疼痛等级/触发食物/用药)可在编辑弹窗删除(停用)并在添加弹窗恢复,成员/时间固定;停用列表存_builtin_off随云同步,保存时跳过停用项 -->
 <!-- v118: ①管理项目编辑键样式对齐全部记录(ev-mini-btn同风格) ②身体页全部记录标题单独一行 ③云同步大补全:新增app_meta表同步成员/自定义项目+图标/自定义类别/可填项定义(含AI建议)/已删标记/AI建议缓存,改动即推+启动即拉+realtime实时收(后写覆盖) ④编辑可填项弹窗重做:AI建议字段自动合并,每项可改名/增删选项/填写⇄选项/删除,底部添加可填项独立弹窗 ⑤卧床时间→用药一次性迁移(定义+AI缓存+历史记录) ⑥本周记录去掉今天还没记录提示 ⑦AI/规则识别人名模糊匹配(龙龙体温37→龙龙,文体温37→文文)并自动选中 ⑧体温37判异常=预期行为:参考区间一律用AI按通用医学常识给出的区间(用户确认),AI给36-37.0则37判偏高 -->
@@ -2501,7 +2502,11 @@ function applyMetaValue(key, d) {
         if (d && typeof d === 'object') { customCategories = d; saveCustomCategories(); render(); }
         break;
       case 'extra_fields':
-        if (d && typeof d === 'object') { saveExtraFieldsMap(d); }
+        // v123：改为合并式应用——整键覆盖会让任何一台持有旧 map 的设备
+        // 灭掉其它端新增的字段（如月经的「用药」第二次打开就消失）。
+        // 合并规则：字段按 label 并集（云端同 label 覆盖本地=最新定义优先）；
+        // _builtin_off / _tombs 墓碑按并集合并，删除过的字段不复活。
+        if (d && typeof d === 'object') { saveExtraFieldsMap(mergeExtraFieldsMaps(getExtraFieldsMap(), d)); }
         break;
       case 'deleted_types':
         if (d && typeof d === 'object') { localStorage.setItem('deleted_custom_types', JSON.stringify(d)); }
@@ -2519,22 +2524,33 @@ function syncMetaKey(key) {
   if (__applyingMeta) return;  // 应用远端数据时不回推，避免乒乓
   if (LOCAL_MODE || !isConfigured || !dbClient) return;
   clearTimeout(metaPushTimers[key]);
-  metaPushTimers[key] = setTimeout(async () => {
-    try {
-      const t = Date.now();
-      const d = collectMetaValue(key);
-      if (d == null) return;
-      localStorage.setItem('meta_ts_' + key, String(t));
-      const { error } = await dbClient.from('app_meta').upsert({ id: key, value: { d, t } }, { onConflict: 'id' });
-      if (error && !__metaWarned) {
+  metaPushTimers[key] = setTimeout(() => uploadMetaKey(key), 300);
+}
+// v123：实际上传——时间戳只在「上传成功后」写本地（旧版先写后传，
+// 上传失败会让本机自以为已同步、云端却永远收不到）；失败记 pending，
+// 下次启动强制补传。防抖 900→300ms，页面切后台时立即冲刷全部待传键。
+async function uploadMetaKey(key) {
+  if (LOCAL_MODE || !isConfigured || !dbClient) return;
+  try {
+    const t = Date.now();
+    const d = collectMetaValue(key);
+    if (d == null) return;
+    const { error } = await dbClient.from('app_meta').upsert({ id: key, value: { d, t } }, { onConflict: 'id' });
+    if (error) {
+      localStorage.setItem('meta_pending_' + key, '1');
+      if (!__metaWarned) {
         __metaWarned = true;
         console.warn('[app_meta] 同步失败（表可能未建）:', error.message);
         showToast('⚠ 配置云同步不可用：需在 Supabase 执行 app_meta 建表 SQL', 'warning', 5000);
       }
-    } catch (e) {
-      if (!__metaWarned) { __metaWarned = true; console.warn('[app_meta] 同步失败', e); }
+      return;
     }
-  }, 900);
+    localStorage.removeItem('meta_pending_' + key);
+    localStorage.setItem('meta_ts_' + key, String(t));
+  } catch (e) {
+    localStorage.setItem('meta_pending_' + key, '1');
+    if (!__metaWarned) { __metaWarned = true; console.warn('[app_meta] 同步失败', e); }
+  }
 }
 const META_SYNC_KEYS = ['members', 'custom_types', 'custom_cats', 'extra_fields', 'deleted_types', 'ai_fields', 'ai_icons'];
 async function loadMetaFromCloud() {
@@ -2563,11 +2579,21 @@ async function loadMetaFromCloud() {
       const localT = Number(localStorage.getItem('meta_ts_' + key) || 0);
       const row = (data || []).find(r => r.id === key);
       const cloudT = row ? Number((row.value || {}).t || 0) : 0;
-      if (localT > cloudT || (localT === 0 && cloudT === 0)) syncMetaKey(key);
+      // v123：pending（上次上传失败）也强制补传
+      const pending = localStorage.getItem('meta_pending_' + key) === '1';
+      if (pending || localT > cloudT || (localT === 0 && cloudT === 0)) syncMetaKey(key);
     });
   } catch (e) { console.warn('[app_meta] load failed', e); }
   finally { __applyingMeta = false; }
 }
+// v123：页面切后台/关闭前立即冲刷所有待上传的 meta 键（防抖期间退出会丢改动）
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'hidden') return;
+  META_SYNC_KEYS.forEach(key => {
+    if (metaPushTimers[key]) { clearTimeout(metaPushTimers[key]); delete metaPushTimers[key]; }
+    if (!__applyingMeta) uploadMetaKey(key);
+  });
+});
 function subscribeMeta() {
   if (!dbClient || realtimeMetaChannel) return;
   realtimeMetaChannel = dbClient.channel('app_meta_changes');
@@ -2831,11 +2857,14 @@ function mergeAISuggestionIntoDefs(key) {
   if (!sug || !Array.isArray(sug.fields)) return;
   const m = getExtraFieldsMap();
   const arr = m[key] || [];
+  let added = false;
   sug.fields.forEach(f => {
     if (f && f.label && !arr.some(x => x.label === f.label)) {
       arr.push({ label: String(f.label), options: (f.options || []).map(s => String(s)).filter(Boolean).slice(0, 6), source: 'ai' });
+      added = true;
     }
   });
+  if (!added) return;  // v123：无新建议不保存，避免打开弹窗就触发一次云上传
   m[key] = arr;
   saveExtraFieldsMap(m);
 }
@@ -2903,6 +2932,7 @@ function removeExtraFieldDefAt(key, i) {
   arr.splice(i, 1);
   m[key] = arr;
   saveExtraFieldsMap(m);
+  if (removed && removed.label) tombstoneExtraField(key, removed.label);
   // v120：同时从 AI 建议缓存移除同名项——否则重开编辑弹窗时
   // mergeAISuggestionIntoDefs 会把它重新合并进来（删除名存实亡）
   if (removed && removed.label) {
@@ -6730,6 +6760,35 @@ function getExtraFieldsMap() {
   catch (e) { return {}; }
 }
 function saveExtraFieldsMap(m) { localStorage.setItem(EXTRA_FIELDS_KEY, JSON.stringify(m)); syncMetaKey('extra_fields'); }
+// v123：两份 extra_fields map 合并——字段按 label 并集（b 侧同 label 覆盖 a 侧），
+// 墓碑（_tombs）和内置停用（_builtin_off）按并集，删除过的字段不复活
+function mergeExtraFieldsMaps(a, b) {
+  a = a || {}; b = b || {};
+  const out = {};
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  keys.forEach(k => {
+    if (k === '_builtin_off') { out[k] = Object.assign({}, a._builtin_off || {}, b._builtin_off || {}); return; }
+    if (k === '_tombs') {
+      out[k] = {};
+      new Set([...Object.keys(a._tombs || {}), ...Object.keys(b._tombs || {})]).forEach(tk => {
+        out[k][tk] = Object.assign({}, (a._tombs || {})[tk] || {}, (b._tombs || {})[tk] || {});
+        Object.keys(out[k][tk]).forEach(l => { out[k][tk][l] = Math.max(Number((a._tombs || {})[tk] && (a._tombs || {})[tk][l] || 0), Number((b._tombs || {})[tk] && (b._tombs || {})[tk][l] || 0)); });
+      });
+      return;
+    }
+    const av = Array.isArray(a[k]) ? a[k] : [], bv = Array.isArray(b[k]) ? b[k] : [];
+    const tombs = Object.assign({}, (a._tombs || {})[k] || {}, (b._tombs || {})[k] || {});
+    const arr = [], seen = new Set();
+    av.concat(bv).forEach(f => {
+      if (!f || !f.label) return;
+      if (!seen.has(f.label)) { seen.add(f.label); arr.push(f); }
+      else { const i = arr.findIndex(x => x.label === f.label); if (i >= 0 && (f._at || 0) >= (arr[i]._at || 0)) arr[i] = f; }  // 较新定义胜出
+    });
+    // 墓碑过滤：字段时间戳晚于删除时间 → 重加胜出，保留
+    out[k] = arr.filter(f => !(tombs[f.label] && (f._at || 0) < Number(tombs[f.label] || 0)));
+  });
+  return out;
+}
 // v110：字段定义函数改为显式 key（管理弹窗里可操作任意项目，不依赖当前选中项）
 function getExtraFieldDefsFor(key) {
   if (!key) return [];
@@ -6739,8 +6798,24 @@ function putExtraFieldDefFor(key, def) {
   if (!key || !def.label) return;
   const m = getExtraFieldsMap();
   const arr = m[key] || [];
+  def._at = Date.now();  // v123：字段时间戳——重加的字段要能胜过其它端的旧墓碑
   if (!arr.find(f => f.label === def.label)) arr.push(def);
+  else { const i = arr.findIndex(f => f.label === def.label); arr[i] = def; }
   m[key] = arr;
+  // v123：重新添加时清掉本地墓碑
+  if (m._tombs && m._tombs[key]) {
+    delete m._tombs[key][def.label];
+    if (!Object.keys(m._tombs[key]).length) delete m._tombs[key];
+  }
+  saveExtraFieldsMap(m);
+}
+// v123：删除墓碑（带删除时间戳）——合并时：字段._at 晚于墓碑时间则重加胜出，否则不复活
+function tombstoneExtraField(key, label) {
+  if (!key || !label) return;
+  const m = getExtraFieldsMap();
+  if (!m._tombs) m._tombs = {};
+  if (!m._tombs[key]) m._tombs[key] = {};
+  m._tombs[key][label] = Date.now();
   saveExtraFieldsMap(m);
 }
 function removeExtraFieldDefFor(key, label) {
@@ -6748,6 +6823,7 @@ function removeExtraFieldDefFor(key, label) {
   const m = getExtraFieldsMap();
   m[key] = (m[key] || []).filter(f => f.label !== label);
   saveExtraFieldsMap(m);
+  tombstoneExtraField(key, label);
 }
 // 兼容包装：添加弹窗里的字段按「当前选中项目」存取
 function getExtraFieldDefs() { return getExtraFieldDefsFor(currentCustomTypeId || currentEventType); }
@@ -7300,6 +7376,20 @@ function renderEventCard(ev, spanInfo) {
       if (se.payload && Array.isArray(se.payload.dysmenorrhea_dates)) se.payload.dysmenorrhea_dates.forEach(k => dysSet.add(k));
     });
     if (dysSet.size) chips.push(`<span class="event-meta-chip" style="background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b;">🔥 痛经 ${dysSet.size} 天</span>`);
+    // v123：跨经期聚合可填项（如 10.1 用药布洛芬 + 10.2 用药双氯芬酸钠 → 用药 布洛芬、双氯芬酸钠）
+    const agg = {};
+    spanInfo.events.forEach(se => {
+      const fs = ((se.payload && se.payload.extra_fields) || []).concat((se.payload && se.payload.ai_fields) || []);
+      fs.forEach(f => {
+        if (!f || !f.label || f.value === undefined || f.value === null || String(f.value).trim() === '') return;
+        const k = String(f.label), v = String(f.value).trim();
+        if (!agg[k]) agg[k] = [];
+        if (!agg[k].includes(v)) agg[k].push(v);
+      });
+    });
+    Object.keys(agg).forEach(label => {
+      chips.push(`<span class="event-meta-chip tag">${escapeHtml(label)} ${escapeHtml(agg[label].join('、'))}</span>`);
+    });
   } else {
     if (dur) chips.push(`<span class="event-meta-chip">⏱ ${dur}</span>`);
     if (ev.category === 'menstrual') {
@@ -7322,13 +7412,13 @@ function renderEventCard(ev, spanInfo) {
     if (ev.payload.anomaly_type) chips.push(`<span class="event-meta-chip">${escapeHtml(ev.payload.anomaly_type)}</span>`);
     if (ev.payload.treatment) chips.push(`<span class="event-meta-chip tag">${escapeHtml(ev.payload.treatment)}</span>`);
   }
-  if (ev.payload.ai_fields && ev.payload.ai_fields.length) {
+  if (ev.payload.ai_fields && ev.payload.ai_fields.length && !(ev.category === 'menstrual' && spanInfo)) {
     ev.payload.ai_fields.forEach(f => {
       chips.push(`<span class="event-meta-chip tag">${escapeHtml(f.label)} ${escapeHtml(f.value)}</span>`);
     });
   }
-  // v109：自定义可填项标签
-  if (ev.payload.extra_fields && ev.payload.extra_fields.length) {
+  // v109：自定义可填项标签（v123：月经合并卡片已在上方聚合展示，此处跳过避免重复）
+  if (ev.payload.extra_fields && ev.payload.extra_fields.length && !(ev.category === 'menstrual' && spanInfo)) {
     ev.payload.extra_fields.forEach(f => {
       chips.push(`<span class="event-meta-chip tag">${escapeHtml(f.label)} ${escapeHtml(f.value)}</span>`);
     });
