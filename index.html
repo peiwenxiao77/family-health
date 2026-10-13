@@ -6737,7 +6737,7 @@ async function onMenstrualDayClick(ts, el) {
   // 弹窗：日期预填为点击日（类型已在上方选过，隐藏弹窗里的类型格 v60）
   openEventModal();
   document.getElementById('eventTypeGrid').style.display = 'none';
-  document.getElementById('eventTs').value = toLocalDatetimeInput(ts);
+  document.getElementById('eventTs').value = smartDayTimeStr(ts);  // v130：当天=当前时间，非当天=06:00
   document.getElementById('eventEndTs').value = '';
   // 切换弹窗里的类型按钮
   // 对于固定 3 类 + 同房，直接对应；对于自定义项目 cust_xxx，弹 custom 字段 + 填入项目名
@@ -6838,8 +6838,8 @@ function confirmMenstrualSelection() {
   // 弹窗（月经范围保存，类型固定 menstrual，隐藏类型格 v60）
   openEventModal();
   document.getElementById('eventTypeGrid').style.display = 'none';
-  document.getElementById('eventTs').value = toLocalDatetimeInput(startTs);
-  document.getElementById('eventEndTs').value = toLocalDatetimeInput(endTs);
+  document.getElementById('eventTs').value = smartDayTimeStr(startTs);  // v130：当天=当前时间，非当天=06:00
+  document.getElementById('eventEndTs').value = smartDayTimeStr(endTs);  // v130：同上
   if (currentEventType !== 'menstrual') {
     document.querySelectorAll('.event-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === 'menstrual'));
     setEventType('menstrual');
@@ -6933,6 +6933,14 @@ function toLocalDatetimeInput(ts) {
   const d = new Date(ts);
   const pad = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// v130：日历点击预填时间——当天=当前时间，非当天=那天 06:00（与时间弹窗 autoAdjustTime 规则一致）
+function smartDayTimeStr(ts) {
+  const day = startOfDay(ts);
+  const now = new Date();
+  const d = day.getTime() === startOfDay(now).getTime() ? now : new Date(day.getTime() + 6 * 3600 * 1000);
+  return toLocalDatetimeInput(d.getTime());
 }
 
 function formatMd(d) {
@@ -7329,8 +7337,8 @@ function openEventModal(ev) {
   if (ev) {
     ms.value = ev.member;
     setEventType(ev.category);
-    document.getElementById('eventTs').value = new Date(ev.ts).toISOString().slice(0, 16);
-    document.getElementById('eventEndTs').value = ev.end_ts ? new Date(ev.end_ts).toISOString().slice(0, 16) : '';
+    document.getElementById('eventTs').value = toLocalDatetimeInput(ev.ts);  // v130：原 toISOString 是 UTC，会差 8 小时
+    document.getElementById('eventEndTs').value = ev.end_ts ? toLocalDatetimeInput(ev.end_ts) : '';  // v130：同上
     document.getElementById('eventNote').value = ev.note || '';
     // 类型特定字段
     if (ev.category === 'menstrual') {
