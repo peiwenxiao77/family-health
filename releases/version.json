@@ -1,7 +1,7 @@
 {
-  "version_code": 12,
-  "version_name": "1.11",
+  "version_code": 13,
+  "version_name": "1.12",
   "apk_url": "https://peiwenxiao77.github.io/family-health/releases/latest.apk",
-  "notes": "v126: ①修复刚添加记录删除无效(云端换id后列表未重渲染,按钮挂旧pending-id)——id替换后立即renderEvents+找不到记录改提示并刷新 ②管理项目全部子弹窗移除AI建议字样 ③收起键统一移到标题行最右(健康各项趋势/健康全部记录/身体全部记录) ④时间弹窗改日期自动对齐:今天=当前时间,非今天=06:00,手动改过不覆盖 ⑤MENSTRUAL_PRED_DAYS未定义ReferenceError修复(改DEFAULT_PRED_DAYS) ⑥小组件经期天数/周期均值toInt截断改四舍五入对齐网页(红点数与日历一致); APK versionCode 12/v1.11; sw v40",
-  "updated_at": "2026-10-13T14:01:26Z"
+  "notes": "v129: ①小组件删v111简化模式(经后期)与网页v114对齐——数据不足也完整四期预测:待定窗内月经期+经期进度图红点不变,预测窗由else月经期兜住(行为同前),唯一变化=经后中间段从经后期+灰点改为四期判定 ②点阵todayColor五态列全,else语义=黄体期绿,消灭9C948B灰色兜底 ③保存为按钮字号行盒固定line-height:14px+按钮内容垂直居中(修v128缩字后基线偏上); APK versionCode 13/v1.12; sw v43",
+  "updated_at": "2026-10-13T15:13:34Z"
 }
