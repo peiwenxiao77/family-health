@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v126: ①修复刚添加的记录点删除无弹窗无效(云端换id后列表未重渲染,按钮挂旧pending-id)——id替换后立即renderEvents+找不到记录改提示并刷新 ②管理项目全部子弹窗移除AI建议字样 ③收起键统一移到标题行最右(健康页各项趋势/全部记录+身体页全部记录) ④时间弹窗改日期自动对齐:今天=当前时间,非今天=06:00,手动改过不覆盖 ⑤MENSTRUAL_PRED_DAYS未定义ReferenceError修复(改DEFAULT_PRED_DAYS) -->
 <!-- v125: ①触发食物选项化(预置海鲜/啤酒/动物内脏/浓肉汤∪历史∪覆盖层) ②发作部位改pill点击单选+手输框 ③统一编辑器:每行编辑+删除(弹窗确认),编辑弹窗含改名/填写⇄选项切换(暂存恢复)/选项增删;内置字段改名fh_builtin_labels随云同步;自定义字段改名迁移全部历史记录标签 ④关闭键沿用橙×样式略左下,移除旧静态modal-close ⑤月经弹窗删(在记录期内勾选) -->
 <!-- v124: ①月经合并卡片标题简化:第一行就月经,第二行 2天·10/12-10/13 等chips ②内置项(痛风发作部位/用药)选项可编辑:fh_builtin_opts覆盖层(add/del差集,随app_meta云同步key=builtin_opts),历史用过的选项只在记录里保留不再进快捷列表 ③AI建议字段与可填项去重(修口腔溃疡字段重复两遍):AI渲染跳过defs已有label+墓碑label ④删除字段统一在tombstoneExtraField清AI建议缓存(任何路径不留残影) ⑤所有弹窗注入固定右上角✕关闭键(sticky吸附,内容下滑不消失;uiConfirm✕=取消);sw缓存v38 -->
 <!-- v123: ①app_meta同步防丢三重加固:extra_fields改合并式应用(label并集+时间戳墓碑_tombs,任何设备旧map不再灭掉他端新字段如月经的用药) ②上传时间戳改为成功后写+失败记pending下次启动强制补传+防抖900→300ms+切后台立即冲刷 ③月经合并卡片聚合可填项(10.1用药布洛芬+10.2用药双氯芬酸钠→用药布洛芬、双氯芬酸钠),AI建议合并无新增时不再触发上传;sw缓存v37 -->
@@ -875,13 +876,15 @@
 
     <div class="card">
       <div class="card-header">
-        <div class="card-title">🎢 各项趋势 <span class="badge" id="chartBadge">全部</span>
-          <button class="btn-secondary" id="btnToggleCharts" style="font-size:11px;padding:4px 10px;margin-left:8px;">⇕ 收起</button>
-        </div>
-        <div class="tabs" id="chartTabs">
-          <button class="tab active" data-range="all">全部</button>
-          <button class="tab" data-range="365">近一年</button>
-          <button class="tab" data-range="30">近一个月</button>
+        <div class="card-title">🎢 各项趋势 <span class="badge" id="chartBadge">全部</span></div>
+        <!-- v126：收起键统一移到标题行最右（同身体页趋势分析） -->
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="tabs" id="chartTabs">
+            <button class="tab active" data-range="all">全部</button>
+            <button class="tab" data-range="365">近一年</button>
+            <button class="tab" data-range="30">近一个月</button>
+          </div>
+          <button class="btn-secondary" id="btnToggleCharts" style="font-size:11px;padding:4px 10px;">⇕ 收起</button>
         </div>
       </div>
       <!-- v95：类别选择框移到所有图表最上面；v96：「显示中」行删除，整合进选择面板 -->
@@ -905,10 +908,11 @@
             <option value="fill-desc">填写时间 新→旧</option>
             <option value="fill-asc">填写时间 旧→新</option>
           </select>
-          <button class="btn-secondary" id="btnToggleHistory" style="font-size:11px;padding:4px 10px;">⇕ 收起</button>
           <span class="time-filter-chip" id="timeFilterChip" style="display:none;">📅 <span id="timeFilterLabel"></span> <button class="time-filter-clear" id="timeFilterClear" title="清除时间筛选">✕</button></span>
           <!-- v109：导出键移到 设置→数据导出与导入 -->
           <button class="btn-danger" id="btnDelete">🗑 删除</button>
+          <!-- v126：收起键统一移到标题行最右（同身体页趋势分析） -->
+          <button class="btn-secondary" id="btnToggleHistory" style="font-size:11px;padding:4px 10px;">⇕ 收起</button>
         </div>
       </div>
       <div id="historyWrap">
@@ -997,8 +1001,11 @@
 
       <!-- 全部记录（原"详细信息"，v75 改名 + 可收起）：大框（v50，同日历记录框样式） -->
       <div style="margin-top:16px;background:white;border-radius:12px;padding:14px;border:1px solid var(--border);">
-        <!-- v118：标题单独一行，控制键移到第二行右对齐 -->
-        <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:8px;">📋 全部记录</div>
+        <!-- v118：标题单独一行；v126 收起键统一移到标题行最右（同身体页趋势分析） -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div style="font-weight:700;font-size:13px;color:var(--text);">📋 全部记录</div>
+          <button class="btn-secondary" id="btnToggleEventsList" style="font-size:11px;padding:4px 10px;">⇕ 收起</button>
+        </div>
         <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-bottom:12px;">
             <select id="eventsSort" class="preview-input" style="width:auto;font-size:12px;padding:4px 8px;" title="排序方式">
               <option value="actual-desc">实际时间 新→旧</option>
@@ -1008,7 +1015,6 @@
             </select>
             <!-- v109：导出键移到 设置→数据导出与导入；新增批量删除 -->
             <button class="btn-danger" id="btnDeleteBody" style="font-size:11px;padding:4px 10px;">🗑 删除</button>
-            <button class="btn-secondary" id="btnToggleEventsList" style="font-size:11px;padding:4px 10px;">⇕ 收起</button>
         </div>
 
         <div id="eventsListWrap">
@@ -3116,7 +3122,6 @@ function openFieldEditModal(key, name) {
           <button class="fld-row-edit" data-kind="ex" data-i="${i}" style="${editBtnStyle}">编辑</button>
           <span class="fld-ed-del" data-i="${i}" style="cursor:pointer;font-size:15px;flex-shrink:0;" title="删除这个填项（永久）">🗑</span>
         </div>
-        ${f.source === 'ai' ? '<div style="font-size:10px;color:#8b5cf6;margin-top:3px;">🤖 来自 AI 建议</div>' : ''}
       </div>`).join('');
     return (builtinRows + extraRows) || '<div style="font-size:12px;color:var(--text-3);padding:8px 0;">暂无可填项，点下方「➕ 添加可填项」</div>';
   };
@@ -3124,7 +3129,7 @@ function openFieldEditModal(key, name) {
   mask.innerHTML = `
     <div class="modal" style="max-width:440px;width:92%;max-height:80vh;overflow-y:auto;">
       <div style="font-weight:700;font-size:15px;margin-bottom:4px;">🧩 编辑可填项 · ${escapeHtml(name)}</div>
-      <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;">AI 建议字段已合并进来统一管理；内置项（标「内置」）也可删除，在「➕ 添加可填项」可恢复；改动立即生效并同步云端</div>
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;">内置项（标「内置」）也可删除，在「➕ 添加可填项」可恢复；改动立即生效并同步云端</div>
       <div id="fldEdList">${renderRows()}</div>
       <button id="fldEdOpenAdd" style="width:100%;margin-top:12px;padding:8px 0;font-size:13px;border:1.5px dashed #c4b5fd;border-radius:10px;background:#faf5ff;color:#7c3aed;cursor:pointer;font-weight:600;">➕ 添加可填项</button>
       <div style="display:flex;justify-content:flex-end;margin-top:12px;"><button class="btn-secondary" id="fldEdClose">关闭</button></div>
@@ -3376,7 +3381,6 @@ function openFieldEditorModal(key, listName, biDef, exLabel, onDone) {
             <button class="fe1-opt-add" style="font-size:12px;padding:0 12px;border:1px solid var(--border);border-radius:8px;background:#f8fafc;cursor:pointer;">➕ 添加</button>
           </div>
         </div>` : ''}
-      ${f.source === 'ai' ? '<div style="font-size:10px;color:#8b5cf6;margin-top:8px;">🤖 来自 AI 建议</div>' : ''}
       <div style="font-size:10px;color:var(--text-3);margin-top:10px;">切到自由填写时选项会暂存，切回选项即恢复；改名会同步更新所有历史记录</div>`;
   };
 
@@ -3653,6 +3657,9 @@ async function saveBodyEvent(event) {
           if (idx >= 0) bodyEvents[idx] = inserted;
           else bodyEvents.unshift(inserted);
           saveBodyEventsCache();
+          // v126：云端确认换 id 后立即重渲染——否则列表按钮还挂着 pending-xxx 旧 id，
+          // 点编辑/删除按 id 找不到记录 → 静默无效（刚添加的痛风记录删不掉的根因）
+          try { renderEvents(); } catch (e) { console.error('render after id swap failed', e); }
         }
       } catch (e) {
         console.error('push body event failed', e);
@@ -6389,7 +6396,7 @@ function isMenstrualOngoing(periods) {
   if (!periods || !periods.length) return false;
   const last = periods[periods.length - 1];
   const today = startOfDay(Date.now()).getTime();
-  const pendEnd = Math.max(last.end_ts, last.ts + (MENSTRUAL_PRED_DAYS - 1) * 86400000);
+  const pendEnd = Math.max(last.end_ts, last.ts + (DEFAULT_PRED_DAYS - 1) * 86400000);
   return today >= last.ts && today <= pendEnd;
 }
 
@@ -6843,6 +6850,7 @@ function cancelMenstrualSelection() {
         dS = document.getElementById('dtD'), hS = document.getElementById('dtH'),
         minS = document.getElementById('dtMin');
   let targetId = null;
+  let timeTouched = false;  // v126：用户手动改过时/分后，日期变化不再自动覆盖时间
   const pad2 = n => String(n).padStart(2, '0');
   const fill = (sel, from, to, cur, suffix) => {
     let html = '';
@@ -6856,6 +6864,7 @@ function cancelMenstrualSelection() {
   }
   function openFor(inputId) {
     targetId = inputId;
+    timeTouched = false;
     const raw = document.getElementById(inputId).value;
     let d = raw ? new Date(raw) : new Date();
     if (isNaN(d.getTime())) d = new Date();
@@ -6869,8 +6878,26 @@ function cancelMenstrualSelection() {
     fill(minS, 0, 55, Math.floor(d.getMinutes() / 5) * 5, '分');
     mask.classList.add('show');
   }
-  yS.addEventListener('change', () => updateDays(true));
-  mS.addEventListener('change', () => updateDays(true));
+  // v126：改日期时自动对齐时间——选今天 → 当前时间；选非今天 → 06:00。
+  // 用户在本次弹窗里手动改过时/分后不再自动覆盖；打开弹窗时保持输入框原值不动
+  function autoAdjustTime() {
+    if (timeTouched) return;
+    const sel = new Date(+yS.value, +mS.value - 1, +dS.value);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (sel.getTime() === today.getTime()) {
+      const n = new Date();
+      fill(hS, 0, 23, n.getHours(), '时');
+      fill(minS, 0, 55, Math.floor(n.getMinutes() / 5) * 5, '分');
+    } else {
+      fill(hS, 0, 23, 6, '时');
+      fill(minS, 0, 55, 0, '分');
+    }
+  }
+  yS.addEventListener('change', () => { updateDays(true); autoAdjustTime(); });
+  mS.addEventListener('change', () => { updateDays(true); autoAdjustTime(); });
+  dS.addEventListener('change', autoAdjustTime);
+  hS.addEventListener('change', () => { timeTouched = true; });
+  minS.addEventListener('change', () => { timeTouched = true; });
   document.getElementById('dtOk').addEventListener('click', () => {
     if (!targetId) return;
     const v = `${+yS.value}-${pad2(+mS.value)}-${pad2(+dS.value)}T${pad2(+hS.value)}:${pad2(+minS.value)}`;
@@ -7756,7 +7783,7 @@ function renderEventsList() {
     btn.onclick = async () => {
       const id = btn.dataset.evId;
       const ev = bodyEvents.find(e => e.id === id);
-      if (!ev) return;
+      if (!ev) { showToast('记录状态已变化，正在刷新', 'warning'); try { renderEvents(); } catch (e) {} return; }
       if (btn.dataset.evAction === 'edit') openEventModal(ev);
       else if (btn.dataset.evAction === 'delete') {
         if (await uiConfirm({ title: '删除这条记录？', message: `${formatDateTime(ev.ts)} · ${ev.member}`, icon: '🗑' })) removeBodyEvent(id);

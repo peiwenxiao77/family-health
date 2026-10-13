@@ -199,9 +199,11 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                                     val w = (i + 1 + (6 - recent.size)).toDouble()
                                     ws += w; vs += v * w
                                 }
-                                (vs / ws).toInt().coerceIn(15, 45)
+                                // v126：四舍五入对齐网页（原 toInt() 截断，5.5→5，网页 5.5→6，
+                                // 导致小组件红点数与日历预测天数不一致）
+                                Math.round(vs / ws).toInt().coerceIn(15, 45)
                             }
-                            else -> (validGaps.sum().toDouble() / validGaps.size).toInt().coerceIn(15, 45)
+                            else -> Math.round(validGaps.sum().toDouble() / validGaps.size).toInt().coerceIn(15, 45)
                         }
                         val last0 = merged.last().first
                         val lastDur = merged.last().second
@@ -225,9 +227,10 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                                     val w = (i + 1 + (6 - list.size)).toDouble()
                                     ws += w; vs += v * w
                                 }
-                                (vs / ws).toInt().coerceIn(1, 14)
+                                // v126：四舍五入对齐网页 Math.round（原 toInt() 截断导致红点数偏少）
+                                Math.round(vs / ws).toInt().coerceIn(1, 14)
                             }
-                            else -> (list.sum().toDouble() / list.size).toInt().coerceIn(1, 14)
+                            else -> Math.round(list.sum().toDouble() / list.size).toInt().coerceIn(1, 14)
                         }
                         val predPrev = avgDur(merged.dropLast(1).map { it.second })  // 待定窗天数（不含本轮）
                         val PRED = avgDur(merged.map { it.second })                  // 下次预测窗天数（全部已判定历史）
