@@ -1,7 +1,7 @@
 /* 家庭健康记录 Service Worker
  * 缓存策略：network-first（HTML/JS/CSS，避免新版本被旧缓存遮蔽）+ stale-while-revalidate（CDN 资源）
  */
-const CACHE = 'family-health-v53';  // v140：App端恢复角标原尺寸+缩字规则(html.in-app分端)+test成员墓碑过滤+刷新键改↻裸图标
+const CACHE = 'family-health-v54';  // v141：异常胶囊已选20%红(fcc5be)+刷新键贴最右防窄屏两行+统计卡本周→今年/今年→全部+自定义项目图标覆盖层(custom_icons云同步,修手选图标被旧列表冲掉)
 const CORE = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {

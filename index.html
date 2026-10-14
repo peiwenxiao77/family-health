@@ -10,6 +10,7 @@
 <!-- v123: ①app_meta同步防丢三重加固:extra_fields改合并式应用(label并集+时间戳墓碑_tombs,任何设备旧map不再灭掉他端新字段如月经的用药) ②上传时间戳改为成功后写+失败记pending下次启动强制补传+防抖900→300ms+切后台立即冲刷 ③月经合并卡片聚合可填项(10.1用药布洛芬+10.2用药双氯芬酸钠→用药布洛芬、双氯芬酸钠),AI建议合并无新增时不再触发上传;sw缓存v37 -->
 <!-- v122: 修复云同步延迟感——SW对supabase API响应绝不再缓存(原stale-while-revalidate实际cache-first,删除/修改后APP启动被旧缓存遮蔽);deleteFromCloud失败改可见提示;sw缓存v36 -->
 <!-- v120: ①app_meta启动双向合并补传:云端缺/旧的key把本机推上去,修复v118之前旧数据(口腔溃疡+嘴巴图标)不同步 ②删除可填项同时清AI建议缓存,修复重开弹窗回弹(删除名存实亡) ③内置项目专属填项(痛经日期/发作部位/疼痛等级/触发食物/用药)可在编辑弹窗删除(停用)并在添加弹窗恢复,成员/时间固定;停用列表存_builtin_off随云同步,保存时跳过停用项 -->
+<!-- v141: ①趋势异常胶囊已选态底色fbd399→fcc5be(未选fde5dc再混20%红,用户色谱定档,文字色不动) ②App刷新键margin-left:auto贴brand最右+brand-text弹性占位+标题超长省略号(防窄屏两行) ③健康页统计卡:本周记录→今年记录、今年记录→全部记录(teal配色,openTimeRecordsModal加all档) ④自定义项目手选图标覆盖层wb_custom_icons_ov+app_meta键custom_icons云同步——custom_types整键后写覆盖冲不掉手选图标(修口腔溃疡嘴巴图标回退温度计) -->
 <!-- v118: ①管理项目编辑键样式对齐全部记录(ev-mini-btn同风格) ②身体页全部记录标题单独一行 ③云同步大补全:新增app_meta表同步成员/自定义项目+图标/自定义类别/可填项定义(含AI建议)/已删标记/AI建议缓存,改动即推+启动即拉+realtime实时收(后写覆盖) ④编辑可填项弹窗重做:AI建议字段自动合并,每项可改名/增删选项/填写⇄选项/删除,底部添加可填项独立弹窗 ⑤卧床时间→用药一次性迁移(定义+AI缓存+历史记录) ⑥本周记录去掉今天还没记录提示 ⑦AI/规则识别人名模糊匹配(龙龙体温37→龙龙,文体温37→文文)并自动选中 ⑧体温37判异常=预期行为:参考区间一律用AI按通用医学常识给出的区间(用户确认),AI给36-37.0则37判偏高 -->
 <!-- v117: 网页功能无变化(微增部署,sw缓存v31)——APK v1.10: APP内下载更新增加进度条+每源重试3次+HTTP状态码检查+文件完整性校验+jsDelivr备用源兜底,修复连续下载失败 -->
 <!-- v115: ①趋势分析恢复图标原高度,改为图表容器压矮1/2(200/160px→100/80px) ②APK v1.8: 修复信封小组件白底灰圈(v114误用RemoteViews不支持的Space控件致布局加载失败,改空TextView占位) + 新增跨天自动刷新链(每天00:02自动刷新小组件,无需打开APP;原3小时周期任务保留兜底) -->
@@ -102,9 +103,12 @@
 
   /* 顶部 */
   header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding: 16px 20px; background: linear-gradient(135deg, #fffefb 0%, #fff7ed 100%); border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--border); }
-  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  /* v141：刷新键防窄屏两行——标题块弹性占位(flex:1)，↻ 用 margin-left:auto 贴 brand 最右；
+     宽屏间距自动拉大、窄屏自动收缩，标题超长省略号，整行永不折行 */
+  .brand-text { flex: 1; min-width: 0; }
   .logo { width: 44px; height: 44px; background: linear-gradient(135deg, #fbbf24, #f59e0b 50%, #fb923c); border-radius: 14px; display: flex; align-items: center; justify-content: center; color: white; font-size: 22px; box-shadow: 0 6px 16px rgba(245, 158, 11, 0.35); }
-  .brand h1 { font-size: 22px; font-weight: 700; color: #78350f; }
+  .brand h1 { font-size: 22px; font-weight: 700; color: #78350f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .brand .subtitle { font-size: 12px; color: #a16207; margin-top: 2px; }
   .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .sync-indicator { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; background: #fff7ed; color: #9a3412; }
@@ -128,7 +132,7 @@
   .ai-indicator.on .dot { background: #8b5cf6; }
   .settings-btn { width: 36px; height: 36px; border-radius: 12px; border: 1px solid var(--border); background: white; color: var(--text-2); cursor: pointer; font-size: 16px; transition: all 0.2s; }
   /* v140：App 专属刷新键——裸图标（无边框/底色），透明热区约 40×40 便于点击 */
-  .brand-refresh { width: 40px; height: 40px; border: none; background: transparent; cursor: pointer; font-size: 22px; color: var(--text-2); transition: transform 0.15s, opacity 0.15s; flex-shrink: 0; margin-left: 2px; display: none; align-items: center; justify-content: center; line-height: 1; padding: 0; }
+  .brand-refresh { width: 40px; height: 40px; border: none; background: transparent; cursor: pointer; font-size: 22px; color: var(--text-2); transition: transform 0.15s, opacity 0.15s; flex-shrink: 0; margin-left: auto; display: none; align-items: center; justify-content: center; line-height: 1; padding: 0; }
   .brand-refresh:hover { opacity: 0.7; transform: scale(1.1); }
   .brand-refresh.spinning { animation: v139spin 0.9s linear infinite; pointer-events: none; }
   @keyframes v139spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -279,14 +283,14 @@
   .stat-card.active { background: linear-gradient(135deg, #fff7ed, #ffedd5); border-color: var(--primary); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2); }
   .stat-card::after { content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%; background: var(--accent, var(--primary)); }
   .stat-card.s-year { --accent: #f59e0b; }
-  .stat-card.s-week { --accent: #fb923c; }
+  .stat-card.s-all { --accent: #14b8a6; }  /* v141：本周卡换全部记录卡，teal 青绿 */
   .stat-card.s-cats { --accent: #f472b6; }
   .stat-card.s-members { --accent: #84cc16; }
   .stat-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
   .stat-title { font-size: 11px; color: var(--text-2); font-weight: 500; }
   .stat-icon { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 13px; }
   .stat-card.s-year .stat-icon { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #b45309; }
-  .stat-card.s-week .stat-icon { background: linear-gradient(135deg, #fed7aa, #fdba74); color: #c2410c; }
+  .stat-card.s-all .stat-icon { background: linear-gradient(135deg, #ccfbf1, #99f6e4); color: #0f766e; }  /* v141：全部记录卡 teal */
   .stat-card.s-cats .stat-icon { background: linear-gradient(135deg, #fce7f3, #fbcfe8); color: #be185d; }
   .stat-card.s-members .stat-icon { background: linear-gradient(135deg, #ecfccb, #d9f99d); color: #4d7c0f; }
   .stat-value { font-size: 24px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.1; }
@@ -316,7 +320,7 @@
   .cat-toggle-chip small { color:var(--text-3);font-size:10px; }
   /* v138：异常类别胶囊——未选中=原底#fff7ed混10%红；选中=原选中底(#fef3c7~#fde68a中值#fdeca8)混15%红。仅底色，文字边框沿用原样式 */
   .cat-toggle-chip.abn-chip { background:#fde5dc; }
-  .cat-toggle-chip.abn-chip.on { background:#fbd399; }
+  .cat-toggle-chip.abn-chip.on { background:#fcc5be; }  /* v141：已选异常=未选底fde5dc再混20%红（用户选色谱20%档），文字色保持琥珀 */
   /* v139：置顶钉——未置顶🔝半透明可点，置顶📌不透明；不影响胶囊配色 */
   .cat-toggle-chip .cat-pin { cursor: pointer; opacity: 0.4; font-size: 11px; line-height: 1; transition: opacity 0.15s, transform 0.15s; }
   .cat-toggle-chip .cat-pin:hover { opacity: 0.8; transform: scale(1.2); }
@@ -795,7 +799,7 @@
     <header class="area-header">
       <div class="brand">
         <div class="logo">🏠</div>
-        <div>
+        <div class="brand-text">
           <h1>龙龙＆文文の小家</h1>
           <div class="subtitle">健康数据记录</div>
         </div>
@@ -862,14 +866,6 @@
     </section>
 
     <div class="stats-grid">
-      <div class="stat-card s-week" data-action="week" title="点击查看本周记录">
-        <div class="stat-head">
-          <div class="stat-title">本周记录</div>
-          <div class="stat-icon">📅</div>
-        </div>
-        <div class="stat-value"><span id="statWeekCount">0</span><span class="unit">条</span></div>
-        <div class="stat-sub" id="statWeekSub">--</div>
-      </div>
       <div class="stat-card s-year" data-action="year" title="点击查看今年记录">
         <div class="stat-head">
           <div class="stat-title">今年记录</div>
@@ -877,6 +873,14 @@
         </div>
         <div class="stat-value"><span id="statYearCount">0</span><span class="unit">条</span></div>
         <div class="stat-sub" id="statYearSub">--</div>
+      </div>
+      <div class="stat-card s-all" data-action="all" title="点击查看全部记录">
+        <div class="stat-head">
+          <div class="stat-title">全部记录</div>
+          <div class="stat-icon">📚</div>
+        </div>
+        <div class="stat-value"><span id="statAllCount">0</span><span class="unit">条</span></div>
+        <div class="stat-sub" id="statAllSub">--</div>
       </div>
       <div class="stat-card s-cats" data-action="cats" title="点击管理类别">
         <div class="stat-head">
@@ -1587,6 +1591,7 @@ function syncCustomTypesFromEvents() {
     customEventTypes.push({ id: cat, name, icon: CUSTOM_ICONS[h % CUSTOM_ICONS.length], color: CUSTOM_PALETTE[h % CUSTOM_PALETTE.length] });
     added = true;
   });
+  applyCustomIconOv(customEventTypes);  // v141：重建时手选图标覆盖层优先，防哈希默认图标顶掉
   if (added) { saveCustomEventTypes(); console.log('[sync] 从云端事件重建自定义类型:', customEventTypes.map(c => c.name).join('、')); }
 }
 let records = [];
@@ -1652,6 +1657,29 @@ let menstrualSelectStart = null;  // 正在选择范围时的起始日（毫秒�
 let menstrualSelectEnd = null;    // 结束日（毫秒）
 let currentBodyType = 'menstrual'; // 类型选择器当前选中（menstrual/gout/anomaly/custom）
 let customEventTypes = JSON.parse(localStorage.getItem('wb_custom_event_types') || '[]'); // 用户自定义项目 [{id, name, icon, color}]
+
+// v141：自定义项目「图标手选覆盖层」——项目id → 用户手选图标。
+// 背景：custom_types 云同步是整键后写覆盖，任何一台设备本地存着旧项目列表再触发保存
+// 都会把用户手选的图标（如口腔溃疡改的嘴巴）冲回温度计。覆盖层单独存+单独上云，
+// 项目列表无论被旧值覆盖多少次，应用时都会用手选图标盖回来。
+const CUSTOM_ICONS_OV_KEY = 'wb_custom_icons_ov';
+function getCustomIconsOv() {
+  try { return JSON.parse(localStorage.getItem(CUSTOM_ICONS_OV_KEY) || '{}'); } catch (e) { return {}; }
+}
+function setCustomIconOv(id, icon) {
+  const ov = getCustomIconsOv();
+  ov[id] = icon;
+  localStorage.setItem(CUSTOM_ICONS_OV_KEY, JSON.stringify(ov));
+  syncMetaKey('custom_icons');
+}
+// 把覆盖层图标应用到项目列表（列表被云端旧值覆盖后调用，手选图标自动回来）
+function applyCustomIconOv(list) {
+  const ov = getCustomIconsOv();
+  let touched = false;
+  (list || []).forEach(c => { if (ov[c.id] && c.icon !== ov[c.id]) { c.icon = ov[c.id]; touched = true; } });
+  return touched;
+}
+applyCustomIconOv(customEventTypes);
 let realtimeChannel = null;
 let realtimeEventsChannel = null;
 let realtimeMetaChannel = null;
@@ -2609,6 +2637,7 @@ function collectMetaValue(key) {
       case 'builtin_opts': return getBuiltinOptsOv();
       case 'builtin_labels': return getBuiltinLabelsOv();
       case 'chart_pins': return JSON.parse(localStorage.getItem('chartCatPins') || '[]');  // v139：趋势类别置顶
+      case 'custom_icons': return getCustomIconsOv();  // v141：自定义项目手选图标覆盖层
     }
   } catch (e) {}
   return null;
@@ -2622,7 +2651,15 @@ function applyMetaValue(key, d) {
         if (Array.isArray(d)) { familyMembers = d.map(normalizeMemberName).filter(n => !isTombstoneMember(n)); saveMembers(); render(); }
         break;
       case 'custom_types':
-        if (Array.isArray(d)) { customEventTypes = d; saveCustomEventTypes(); if (typeof renderBodyTypeSelector === 'function') renderBodyTypeSelector(); syncEventsCategoryFilter(); renderEvents(); }
+        // v141：应用云端项目列表后立即用手选图标覆盖层盖回——旧端推送的列表也冲不掉图标
+        if (Array.isArray(d)) { customEventTypes = d; applyCustomIconOv(customEventTypes); saveCustomEventTypes(); if (typeof renderBodyTypeSelector === 'function') renderBodyTypeSelector(); syncEventsCategoryFilter(); renderEvents(); }
+        break;
+      case 'custom_icons':
+        // v141：手选图标覆盖层（对象 id→icon）——应用后同步修正当前列表并刷新
+        if (d && typeof d === 'object') {
+          localStorage.setItem(CUSTOM_ICONS_OV_KEY, JSON.stringify(d));
+          if (applyCustomIconOv(customEventTypes)) { saveCustomEventTypes(); if (typeof renderBodyTypeSelector === 'function') renderBodyTypeSelector(); }
+        }
         break;
       case 'custom_cats':
         if (d && typeof d === 'object') { customCategories = d; saveCustomCategories(); render(); }
@@ -2696,7 +2733,7 @@ async function uploadMetaKey(key) {
     if (!__metaWarned) { __metaWarned = true; console.warn('[app_meta] 同步失败', e); }
   }
 }
-const META_SYNC_KEYS = ['members', 'custom_types', 'custom_cats', 'extra_fields', 'deleted_types', 'ai_fields', 'ai_icons', 'builtin_opts', 'builtin_labels', 'chart_pins'];
+const META_SYNC_KEYS = ['members', 'custom_types', 'custom_icons', 'custom_cats', 'extra_fields', 'deleted_types', 'ai_fields', 'ai_icons', 'builtin_opts', 'builtin_labels', 'chart_pins'];
 async function loadMetaFromCloud() {
   if (LOCAL_MODE || !isConfigured || !dbClient) return;
   try {
@@ -3702,6 +3739,7 @@ function renderTypesMgrList() {
         pick.onmouseleave = () => pick.style.background = '';
         pick.onclick = () => {
           item.icon = pick.dataset.ic;
+          setCustomIconOv(item.id, item.icon);  // v141：手选图标进覆盖层，云端旧列表覆盖也冲不掉
           saveCustomEventTypes();
           renderBodyTypeSelector();
           renderTypesMgrList();
@@ -4809,17 +4847,16 @@ bindClick('btnDeleteBody', () => enterDeleteMode('body'), '身体页批量删除
    渲染
    ============================================================ */
 function renderStats() {
-  const weekAgo = Date.now() - 7 * 86400000;
-  const week = records.filter(r => r.ts >= weekAgo);
+  // v141：本周卡换「全部记录」卡——统计卡变为 今年/全部/类别/成员
   const now = new Date();
   const yearStart = new Date(now.getFullYear(), 0, 1).getTime();
   const year = records.filter(r => r.ts >= yearStart);
   const cats = new Set(records.map(r => r.category.name));
 
-  document.getElementById('statWeekCount').textContent = week.length;
-  document.getElementById('statWeekSub').textContent = week.length > 0 ? `覆盖 ${new Set(week.map(r => r.category.name)).size} 个类别` : '本周还没有记录';
   document.getElementById('statYearCount').textContent = year.length;
   document.getElementById('statYearSub').textContent = year.length > 0 ? `覆盖 ${new Set(year.map(r => r.category.name)).size} 个类别` : '今年还没有记录';
+  document.getElementById('statAllCount').textContent = records.length;
+  document.getElementById('statAllSub').textContent = records.length > 0 ? `覆盖 ${cats.size} 个类别` : '还没有记录';
   document.getElementById('statCatsCount').textContent = cats.size;
   document.getElementById('statCatsSub').textContent = cats.size > 0 ? `点击管理类别` : '还没有类别';
   document.getElementById('statMembersCount').textContent = familyMembers.length;
@@ -5544,11 +5581,11 @@ document.getElementById('timeFilterClear').addEventListener('click', () => {
   renderHistory();
 });
 
-// 4 个小框点击行为：本周/今年弹窗 + 类别/成员管理
+// 4 个小框点击行为：今年/全部弹窗 + 类别/成员管理
 document.querySelectorAll('.stat-card[data-action]').forEach(card => {
   card.addEventListener('click', () => {
     const action = card.dataset.action;
-    if (action === 'week' || action === 'year') {
+    if (action === 'year' || action === 'all') {
       // 直接弹窗显示
       openTimeRecordsModal(action);
     } else if (action === 'cats') {
@@ -5560,17 +5597,22 @@ document.querySelectorAll('.stat-card[data-action]').forEach(card => {
 });
 
 function openTimeRecordsModal(range) {
-  // range: 'week' | 'year'
+  // range: 'year' | 'all'（v141：本周档已下线）
   const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   let startTs, label, rangeText;
   if (range === 'year') {
     // 今年（1月1日 0 点起）
     startTs = new Date(now.getFullYear(), 0, 1).getTime();
     label = '今年';
     rangeText = `${now.getFullYear()}-01-01 至 ${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  } else if (range === 'all') {
+    // 全部记录（v141）
+    startTs = 0;
+    label = '全部';
+    rangeText = '全部时间';
   } else {
-    // 近 7 天（含今天）
+    // 近 7 天（含今天）——保留兜底（旧入口/调试用）
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     startTs = startOfToday - 6 * 86400000;
     const endDate = new Date(startTs);
     rangeText = `${endDate.getFullYear()}-${String(endDate.getMonth()+1).padStart(2,'0')}-${String(endDate.getDate()).padStart(2,'0')} 至 ${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
