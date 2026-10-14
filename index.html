@@ -1508,6 +1508,8 @@ const STANDARD_CATEGORIES = {
   '体温(肛)':   { icon: '🌡', unit: '°C',     defaultRange: [36.5, 37.7] },
   '体温(额)':   { icon: '🌡', unit: '°C',     defaultRange: [35.0, 37.0] },
   '血压':       { icon: '💗', unit: 'mmHg',  multi: true },
+  '收缩压':     { icon: '🫀', unit: 'mmHg',  defaultRange: [90, 139] },
+  '舒张压':     { icon: '🫀', unit: 'mmHg',  defaultRange: [60, 89] },
   '血糖':       { icon: '🍬', unit: 'mmol/L', defaultRange: [3.9, 6.1] },
   '心率':       { icon: '❤️', unit: 'bpm',   defaultRange: [60, 100] },
   '体重':       { icon: '⚖', unit: 'kg' },
@@ -1702,6 +1704,7 @@ function getCategoryInfo(name) {
 function suggestIcon(name) {
   const n = name || '';
   if (/体温|温度|发热|低热|高热/.test(n)) return '🌡';
+  if (/收缩压|舒张压/.test(n)) return '🫀';
   if (/血压|高压|低压|mmHg/.test(n)) return '💗';
   if (/血糖|葡萄糖|糖化/.test(n)) return '🍬';
   if (/心率|脉搏|心跳/.test(n)) return '❤️';
@@ -3906,7 +3909,22 @@ function openPreview(parsed) {
     if (parsed.items.length === 0) {
       document.getElementById('previewItems').innerHTML = '<div style="color:#94a3b8;font-size:13px;padding:10px 0;">全部项目已删除，可点「取消」或重新识别</div>';
     } else {
-    document.getElementById('previewItems').innerHTML = parsed.items.map((it, idx) => {
+    // v137：按最终归属项目分组——同名（含归并后同名）的多项合并为一行展示，
+    // 组内每次出现渲染成一个值 chip（带 🗑），由用户决定删哪个；全部删到只剩一个即恢复普通行
+    const effName = it => (it.mergeTo && !it.mergeOff) ? it.mergeTo : it.category;
+    const groups = [];
+    parsed.items.forEach((it, idx) => {
+      const k = effName(it);
+      let g = groups.find(x => x.name === k);
+      if (!g) { g = { name: k, idxs: [] }; groups.push(g); }
+      g.idxs.push(idx);
+    });
+    const dupGroups = groups.filter(g => g.idxs.length > 1);
+    const dupBanner = dupGroups.length
+      ? `<div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:7px 10px;font-size:11px;color:#854d0e;margin:0 0 6px;">⚠ 输入中含重复项目，已合并显示——请点各值旁的 🗑 删除多余项，每组保留一个后才能保存</div>`
+      : '';
+
+    const renderSingleRow = (it, idx) => {
       const info = getCategoryInfo(it.mergeTo && !it.mergeOff ? it.mergeTo : it.category);
       const v = it.values[0];
       let valDisplay;
@@ -3949,7 +3967,31 @@ function openPreview(parsed) {
           <button class="preview-item-del" data-idx="${idx}" style="margin:0;padding:3px 8px;font-size:11px;flex-shrink:0;cursor:pointer;border:1px solid #fecaca;background:transparent;border-radius:6px;color:#dc2626;" title="删除该项">🗑</button>
         </div>
       `;
-    }).join('');
+    };
+
+    // v137：重复组合并行——项目名 + 每次出现的值 chip（🗑 删除该次出现）
+    const renderDupRow = (g) => {
+      const info = getCategoryInfo(g.name);
+      const chips = g.idxs.map(idx => {
+        const it = parsed.items[idx];
+        const v = it.values[0];
+        const rawDiff = it.category !== g.name ? ` <small style="color:#94a3b8;">（${escapeHtml(it.category)}）</small>` : '';
+        return `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:#fff1f2;border:1px solid #fecaca;border-radius:7px;font-size:12px;color:#991b1b;"><b>${escapeHtml(String(v.value))}</b>${escapeHtml(v.unit || '')}${rawDiff}<button class="preview-item-del" data-idx="${idx}" style="margin:0;padding:0 2px;border:none;background:transparent;cursor:pointer;color:#dc2626;font-size:12px;line-height:1;" title="删除这次出现">🗑</button></span>`;
+      }).join(' ');
+      return `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed #f1f5f9;">
+          <span style="font-size:18px;flex-shrink:0;">${info.icon}</span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:13px;">${escapeHtml(g.name)} <span class="new-badge" style="font-size:9px;background:#fee2e2;color:#b91c1c;">重复 ×${g.idxs.length}</span></div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">${chips}</div>
+          </div>
+        </div>
+      `;
+    };
+
+    document.getElementById('previewItems').innerHTML = dupBanner + groups.map(g =>
+      g.idxs.length > 1 ? renderDupRow(g) : renderSingleRow(parsed.items[g.idxs[0]], g.idxs[0])
+    ).join('');
     // 绑定切换按钮
     document.querySelectorAll('#previewItems .preview-item-toggle').forEach(btn => {
       btn.onclick = () => {
@@ -4230,6 +4272,14 @@ document.getElementById('previewConfirm').onclick = async () => {
   if (!currentParsed) { showToast('暂无数据', 'warning'); return; }
   // v133：多项全部删除后拦截保存
   if (currentParsed.multi && currentParsed.items.length === 0) { showToast('没有可保存的项目，请取消或重新识别', 'warning'); return; }
+  // v137：重复项目每组必须删到只剩一个才能保存（删哪个由用户决定）
+  if (currentParsed.multi && currentParsed.items.length) {
+    const eff = it => (it.mergeTo && !it.mergeOff) ? it.mergeTo : it.category;
+    const cnt = {};
+    currentParsed.items.forEach(it => { const k = eff(it); cnt[k] = (cnt[k] || 0) + 1; });
+    const dupName = Object.keys(cnt).find(k => cnt[k] > 1);
+    if (dupName) { showToast(`「${dupName}」仍有 ${cnt[dupName]} 条重复，请删除多余项后再保存`, 'warning'); return; }
+  }
   const member = document.getElementById('previewMember').value;
   const note = document.getElementById('previewNote').value.trim();
   const ts = fromDatetimeLocal(document.getElementById('previewTime').value);
@@ -4861,9 +4911,11 @@ function renderChartCats() {
   document.getElementById('chartAllCats').innerHTML = `
     <button class="btn-secondary" id="showAllCatsBtn" style="font-size:12px;padding:5px 11px;margin-bottom:6px;">✓ 全部显示 (${allStats.length})</button>
     <button class="btn-secondary" id="hideAllCatsBtn" style="font-size:12px;padding:5px 11px;margin-bottom:6px;">✕ 全部隐藏</button>
-  ` + allStats.map(([name, s]) => {
+  `   + allStats.map(([name, s]) => {
     const shown = chartVisibleCats.includes(name);
-    return `<span class="cat-toggle-chip ${shown ? 'on' : ''}" data-cat="${escapeHtml(name)}" title="${s.count} 条记录">${s.icon} ${escapeHtml(name)} <small>(${s.count})</small></span>`;
+    // v137：异常类别的药丸只改底色（25% 混红浅底），文字边框不动
+    const abnBg = catHasAbnormal(name) ? ` style="background:${mixRed('#fff7ed')};"` : '';
+    return `<span class="cat-toggle-chip ${shown ? 'on' : ''}" data-cat="${escapeHtml(name)}" title="${s.count} 条记录"${abnBg}>${s.icon} ${escapeHtml(name)} <small>(${s.count})</small></span>`;
   }).join('');
 
   document.getElementById('showAllCatsBtn').onclick = () => {
@@ -4953,15 +5005,22 @@ function renderChart() {
     c.points.forEach(p => { if (!memberNames.includes(p.member)) memberNames.push(p.member); });
     const multi = memberNames.length > 1;
     const colors = ['#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#10b981', '#3b82f6', '#ef4444', '#a855f7'];
-    // v136：有过异常的类别整体偏红 25%（含标题图标底色）
-    const color = catHasAbnormal(c.name) ? mixRed(colors[idx % colors.length]) : colors[idx % colors.length];
+    const color = colors[idx % colors.length];
+    // v137：异常类别——整个图表卡片背景改浅红（25% 混红），折线保持成员原色
+    const cardAbn = catHasAbnormal(c.name);
     const latest = c.points[c.points.length - 1];
     const earliest = c.points[0];
     const trend = latest.y - earliest.y;
     const trendArrow = trend > 0.1 ? '↗' : (trend < -0.1 ? '↘' : '→');
     const trendColor = Math.abs(trend) < 0.1 ? 'var(--text-3)' : (trend > 0 ? 'var(--danger)' : 'var(--success, #10b981)');
+    // v137：卡片底部显示正常范围（只显示数值，不带单位——最新值已带单位）
+    const rinfo = getCategoryInfo(c.name).range;
+    const rangeFoot = (Array.isArray(rinfo) && (rinfo[0] != null || rinfo[1] != null))
+      ? `<span class="mini-stat">正常 <b>${rinfo[0] ?? '?'}~${rinfo[1] ?? '?'}</b></span>` : '';
+    // v137：>8 个点 → 容器横向滑动，画布按点数加宽（每点约 44px），全部数值可常驻标注
+    const scrollMode = c.points.length > 8;
     return `
-      <div class="mini-chart-card" data-cat="${escapeHtml(c.name)}">
+      <div class="mini-chart-card" data-cat="${escapeHtml(c.name)}"${cardAbn ? ` style="background:${mixRed('#fffaf3')};border-color:#f5b8b8;"` : ''}>
         <div class="mini-chart-head">
           <div class="mini-chart-title">
             <span class="mini-icon" style="background:${color}22;color:${color};">${c.icon}</span>
@@ -4971,12 +5030,11 @@ function renderChart() {
             ? `<span style="font-size:11px;color:var(--text-3);font-weight:600;">👥${memberNames.length}人</span>`
             : `<div class="mini-chart-trend" style="color:${trendColor};">${trendArrow}</div>`}
         </div>
-        <div class="mini-chart-canvas-wrap">
-          <canvas id="miniChart_${idx}"></canvas>
-        </div>
+        <div class="mini-chart-canvas-wrap"${scrollMode ? ' style="overflow-x:auto;"' : ''}>${scrollMode ? `<div style="min-width:100%;width:${c.points.length * 44}px;">` : ''}<canvas id="miniChart_${idx}"></canvas>${scrollMode ? '</div>' : ''}</div>
         <div class="mini-chart-foot">
           <span class="mini-stat"><b>${c.points.length}</b> 条</span>
           <span class="mini-stat">最新 <b>${multi ? escapeHtml(latest.member) + ' ' : ''}${latest.y}${c.unit || ''}</b></span>
+          ${rangeFoot}
         </div>
       </div>
     `;
@@ -5028,8 +5086,8 @@ function renderChart() {
       const pts = byMember.get(m);
       const valMap = new Map(pts.map(p => [p.x, p.y]));
       const values = allTs.map(ts => valMap.has(ts) ? valMap.get(ts) : null);
-      // v136：异常类别的折线在成员专属色基础上混 25% 红
-      const color = catHasAbnormal(c.name) ? mixRed(getMemberColor(m)) : getMemberColor(m);  // v94：同人恒同色（单人也用成员专属色）
+      // v137：折线恢复成员原色（v136 的折线混红撤销——红色只用于卡片背景）
+      const color = getMemberColor(m);  // v94：同人恒同色（单人也用成员专属色）
       return {
         label: m,
         memberName: m,
@@ -5069,15 +5127,38 @@ function renderChart() {
       }
     };
 
+    // v137：全部数值常驻标注在点上方（成员色 10px 小字）
+    const valLabelPlugin = {
+      id: 'valLabels_' + idx,
+      afterDatasetsDraw(ch) {
+        const c2 = ch.ctx;
+        ch.data.datasets.forEach((ds, di) => {
+          const meta = ch.getDatasetMeta(di);
+          meta.data.forEach((el, i) => {
+            const v = ds.data[i];
+            if (v == null) return;
+            c2.save();
+            c2.font = '10px sans-serif';
+            c2.fillStyle = ds.borderColor;
+            c2.textAlign = 'center';
+            c2.fillText(String(v), el.x, el.y - 8);
+            c2.restore();
+          });
+        });
+      }
+    };
+
     const canvas = document.getElementById('miniChart_' + idx);
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const chart = new Chart(ctx, {
       type: 'line',
       data: { labels, datasets },
-      plugins: [rangePlugin],
+      plugins: [rangePlugin, valLabelPlugin],
       options: {
         responsive: true, maintainAspectRatio: false,
+        // v137：禁用悬停/触摸弹提示框，改由下方 canvas dblclick 手动触发
+        events: [],
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: { display: multi, position: 'top', labels: { font: { size: 10 }, boxWidth: 12, padding: 6, usePointStyle: true } },
@@ -5095,6 +5176,16 @@ function renderChart() {
           x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 6, maxRotation: 0 } }
         }
       }
+    });
+    // v137：双击图表某点 → 弹出详情（时间/人名/数值）；双击空白处关闭
+    canvas.addEventListener('dblclick', (evt) => {
+      const els = chart.getElementsAtEventForMode(evt, 'nearest', { intersect: false }, false);
+      if (els.length) {
+        chart.tooltip.setActiveElements(els, { x: els[0].element.x, y: els[0].element.y });
+      } else {
+        chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+      }
+      chart.update();
     });
     miniCharts[c.name] = chart;
   });
@@ -5797,7 +5888,7 @@ async function callLLM(text, imageBase64) {
 - 对于「正常」「阴性」「阴性(-)」这类值，rangeLow/rangeHigh 填空字符串
 - 数字结果（如 5.0、1.027）尽量转为 JSON number 类型，但如果是「1-3」「0-5」这种范围，原样保留为字符串
 - 参考区间规则：若输入中已给出参考区间，原样提取；若输入中【没有】给出，请根据通用医学常识补上该指标的常用成人正常参考区间（range 填如 "150-430 μmol/L（通用参考）"，rangeLow/rangeHigh 填对应数字）；只有确实无法确定时才留空字符串。这样每条记录都能自带正常范围，便于后续自动判断正常/异常
-- 归并规则：下面会给出「已有项目清单」。对每个指标判断它是否与清单中某个项目测的是【同一个指标】（医学上同一物质/同一检验项目），是则 mergeTo 填该项目的准确名称，否则填空字符串。写法差异不影响判断：「白细胞计数」与「白细胞」是同一指标可并；「血红蛋白浓度」「血红蛋白量」与「血红蛋白」是不同指标，不可并。没把握就不要并。尿检方向：当前输入未出现"尿"字时，禁止并入任何名称含"尿"的项目（默认血检语境）；输入明确为尿检时，只可并入名称含"尿"的项目
+- 归并规则：下面会给出「已有项目清单」。对每个指标判断它是否与清单中某个项目测的是【同一个指标】（医学上同一物质/同一检验项目），是则 mergeTo 填该项目的准确名称，否则填空字符串。写法差异不影响判断：「白细胞计数」与「白细胞」是同一指标可并；「血红蛋白浓度」「血红蛋白量」与「血红蛋白」是不同指标，不可并。没把握就不要并。血压方向：「收缩压」「舒张压」是两个【独立指标】，禁止并入「血压」；输入「血压120/80」这类时，请拆成「收缩压 120」「舒张压 80」两条返回（不必并入任何项目）。尿检方向：当前输入未出现"尿"字时，禁止并入任何名称含"尿"的项目（默认血检语境）；输入明确为尿检时，只可并入名称含"尿"的项目
 - 已有项目清单：${[...Object.keys(STANDARD_CATEGORIES), ...Object.keys(customCategories)].join('、') || '（暂无）'}`;
 
   let userContent;
@@ -5874,11 +5965,13 @@ function aiItemsToParsed(items) {
     // v133：AI 语义归并（代码只做硬校验，不做任何词形变换）：
     // ① mergeTo 必须真实存在于已有项目清单，防 AI 编造名字；
     // ② 尿方向兜底：输入名不含「尿」而目标含「尿」→ 一律拒绝归并
+    // ③ 血压方向兜底（v137）：收缩压/舒张压是独立指标，禁止并入「血压」
     let mergeTo = '';
     if (it.mergeTo && typeof it.mergeTo === 'string') {
       const t = it.mergeTo.trim();
       if (t && t !== name && (STANDARD_CATEGORIES[t] || customCategories[t])) {
-        if (!(!name.includes('尿') && t.includes('尿'))) mergeTo = t;
+        const bpToBp = t === '血压' && /收缩压|舒张压|高压|低压/.test(name);
+        if (!(!name.includes('尿') && t.includes('尿')) && !bpToBp) mergeTo = t;
       }
     }
     // v133：AI 正常判定落库

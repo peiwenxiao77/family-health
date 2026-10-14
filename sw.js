@@ -1,7 +1,7 @@
 /* 家庭健康记录 Service Worker
  * 缓存策略：network-first（HTML/JS/CSS，避免新版本被旧缓存遮蔽）+ stale-while-revalidate（CDN 资源）
  */
-const CACHE = 'family-health-v49';  // v136：搜索"异常"筛异常记录+异常类别面板排前+图表混25%红+AI异常原因+标准参考值覆盖层+换图标下展框+失联自愈+文案
+const CACHE = 'family-health-v50';  // v137：重复项目合并显示(用户删多余)+血压拆收缩压/舒张压+tooltip双击+全点数值标注+>8点横滑+异常卡片/药丸浅红底+卡片正常范围
 const CORE = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
