@@ -1,7 +1,7 @@
 /* 家庭健康记录 Service Worker
  * 缓存策略：network-first（HTML/JS/CSS，避免新版本被旧缓存遮蔽）+ stale-while-revalidate（CDN 资源）
  */
-const CACHE = 'family-health-v50';  // v137：重复项目合并显示(用户删多余)+血压拆收缩压/舒张压+tooltip双击+全点数值标注+>8点横滑+异常卡片/药丸浅红底+卡片正常范围
+const CACHE = 'family-health-v51';  // v138：多条确认窗隐藏"--"占位+胶囊10%/15%混红类+卡片8%红+图表标注留白+输入时间回填(AI路径+N点/短日期+时间)
 const CORE = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {

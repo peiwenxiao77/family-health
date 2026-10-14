@@ -307,6 +307,9 @@
   .cat-toggle-chip { display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:999px;background:#fff7ed;color:var(--text-2);font-size:12px;font-weight:600;cursor:pointer;border:1px solid #fde6c8; }
   .cat-toggle-chip.on { background:linear-gradient(135deg, #fef3c7, #fde68a);color:#92400e;border-color:#fbbf24; }
   .cat-toggle-chip small { color:var(--text-3);font-size:10px; }
+  /* v138：异常类别胶囊——未选中=原底#fff7ed混10%红；选中=原选中底(#fef3c7~#fde68a中值#fdeca8)混15%红。仅底色，文字边框沿用原样式 */
+  .cat-toggle-chip.abn-chip { background:#fde5dc; }
+  .cat-toggle-chip.abn-chip.on { background:#fbd399; }
   .cat-icon-btn:hover { background: #fff7ed !important; transform: scale(1.1); transition: all 0.15s; }
 
   /* 图表 - 多张小图 */
@@ -2107,14 +2110,38 @@ function parseTimeFromText(text) {
   }
 
   // 3) 短日期：8月1日 / 8/1 / 8.1 （默认今年）
+  // v138：①短日期后紧跟的时间（HH:MM 或 N点[半|N分]）一并提取——此前短日期直接 return，
+  // "10.14 8:30" 只取到日期、时间被丢成当前钟点；②合理性校验——此前 "36.5" "12.8" 这类
+  // 检验小数会被当成「月.日」吃掉（36月→滚到2027年），数值和时间解析双双出错
   const shortDate = text.match(/(?<![\d.])(\d{1,2})[-\/.月](\d{1,2})日?/);
   if (shortDate) {
     const m = +shortDate[1]; const day = +shortDate[2];
-    let y = now.getFullYear();
-    let d = new Date(y, m-1, day, now.getHours(), now.getMinutes(), 0, 0);
-    // 如果日期在未来，回退到去年
-    if (d.getTime() > now.getTime() + 86400000) { y--; d = new Date(y, m-1, day, now.getHours(), now.getMinutes(), 0, 0); }
-    return { ts: d.getTime(), matched: shortDate[0] };
+    const sep = shortDate[0].match(/[-\/.月]/)[0];
+    const rest0 = text.slice(text.indexOf(shortDate[0]) + shortDate[0].length);
+    const hasNextTime = /^\s*(?:(\d{1,2}):(\d{2})|(凌晨|清晨|早上|早晨|上午|中午|下午|傍晚|晚上|夜里)?\s*(\d{1,2})\s*点(?:\s*(\d{1,2})\s*分|(?<=点)(\d{1,2})|半)?)/.test(rest0);
+    const plausible = m >= 1 && m <= 12 && day >= 1 && day <= 31 &&
+      (sep !== '.' || shortDate[0].endsWith('日') || day >= 10 || hasNextTime);
+    if (plausible) {
+      let y = now.getFullYear();
+      let hr = now.getHours(), mn = now.getMinutes(), extra = '';
+      const rest = rest0;
+      const tm = rest.match(/^\s*(?:(\d{1,2}):(\d{2})|(凌晨|清晨|早上|早晨|上午|中午|下午|傍晚|晚上|夜里)?\s*(\d{1,2})\s*点(?:\s*(\d{1,2})\s*分|(?<=点)(\d{1,2})|半)?)/);
+      if (tm) {
+        if (tm[1] != null) { hr = +tm[1]; mn = +tm[2]; }
+        else {
+          hr = +tm[4]; mn = tm[5] ? +tm[5] : (tm[6] ? +tm[6] : (tm[0].includes('半') ? 30 : 0));
+          const per = tm[3] || '';
+          if ((/下午|傍晚|晚上|夜里/.test(per)) && hr < 12) hr += 12;
+          else if (/中午/.test(per) && hr < 11) hr = 12;
+        }
+        if (mn > 59) mn = 59; if (hr > 23) hr = 23;
+        extra = tm[0];
+      }
+      let d = new Date(y, m-1, day, hr, mn, 0, 0);
+      // 如果日期在未来，回退到去年
+      if (d.getTime() > now.getTime() + 86400000) { y--; d = new Date(y, m-1, day, hr, mn, 0, 0); }
+      return { ts: d.getTime(), matched: shortDate[0] + extra };
+    }
   }
 
   // 4) 相对月：N个月前 / 半年前 / 1年前
@@ -2157,7 +2184,7 @@ function parseTimeFromText(text) {
   const m2 = text.match(/(\d+)\s*小时前/);
   if (m2) return { ts: now.getTime() - parseInt(m2[1]) * 3600000, matched: m2[0] };
 
-  // 8) 自然日期：今天/明天/后天（带可选上午/下午/晚上）/ 昨天 / 上个月 / 去年
+  // 8) 自然日期：明天/后天（带可选上午/下午/晚上）
   if (/明天/.test(text)) {
     const d = new Date(now); d.setDate(d.getDate() + 1);
     setTimePeriod(d, text); return { ts: d.getTime(), matched: text.match(/明天/)[0] };
@@ -2166,11 +2193,20 @@ function parseTimeFromText(text) {
     const d = new Date(now); d.setDate(d.getDate() + 2);
     setTimePeriod(d, text); return { ts: d.getTime(), matched: text.match(/后天/)[0] };
   }
-  if (/昨天/.test(text)) { const d = new Date(now); d.setDate(d.getDate() - 1); return { ts: d.getTime(), matched: '昨天' }; }
-  if (/今天/.test(text)) {
+  // 8b) v138：昨天/今天/昨晚/今早/今晚 + 可选跟随时间（HH:MM 或 N点系）
+  //     例：昨天 8:30 / 昨天晚上9点 / 昨晚10点 / 今早 体温36.5 / 今晚8点
+  //     裸「昨晚/今晚」= 21:00；裸「今早」= 07:00；裸「今天/昨天」= 保持当前钟点（原行为）
+  const dayM = text.match(/(昨晚|昨天晚上|昨天|今天|今晚|今早)/);
+  if (dayM) {
+    const w = dayM[1];
     const d = new Date(now);
-    setTimePeriod(d, text);
-    return { ts: d.getTime(), matched: text.match(/今天/)[0] };
+    if (/昨/.test(w)) d.setDate(d.getDate() - 1);
+    const t = extractTimeToken(text.slice(text.indexOf(w) + w.length), /晚/.test(w));
+    if (t) d.setHours(t.hr, t.mn, 0, 0);
+    else if (/晚/.test(w)) d.setHours(21, 0, 0, 0);
+    else if (/今早/.test(w)) d.setHours(7, 0, 0, 0);
+    else setTimePeriod(d, text);  // 今天/昨天 + 「今天早上」这类：沿用旧时段映射
+    return { ts: d.getTime(), matched: w + (t ? t.matched : '') };
   }
   if (/上(?:个)?月/.test(text)) {
     const d = new Date(now.getFullYear(), now.getMonth() - 1, 15, 0, 0, 0, 0);
@@ -2189,7 +2225,34 @@ function parseTimeFromText(text) {
     return { ts: d.getTime(), matched: m3[0] };
   }
 
+  // 10) v138：无日期词的口语时间——[时段]N点[半|N分]
+  //     例：8点 / 8点半 / 晚上9点 / 下午3点30（日期词组合已在 8b 处理）
+  const t10 = extractTimeToken(text, false);
+  if (t10) {
+    const d = new Date(now); d.setHours(t10.hr, t10.mn, 0, 0);
+    return { ts: d.getTime(), matched: t10.matched };
+  }
+
   return { ts: null, matched: '' };
+}
+
+// v138：从文本中提取时间 token（HH:MM 或 [时段]N点[半|N分]）→ {hr, mn, matched}
+// impliedEvening=true 时（昨晚/今晚），无显式时段词且小时<12 视为下午/晚上（+12）
+function extractTimeToken(s, impliedEvening) {
+  const tm = s.match(/(\d{1,2}):(\d{2})|(凌晨|清晨|早上|早晨|上午|中午|下午|傍晚|晚上|夜里)?\s*(\d{1,2})\s*点(?:\s*(\d{1,2})\s*分|(?<=点)(\d{1,2})|半)?/);
+  if (!tm) return null;
+  let hr, mn;
+  if (tm[1] != null) { hr = +tm[1]; mn = +tm[2]; }
+  else {
+    hr = +tm[4];
+    mn = tm[5] ? +tm[5] : (tm[6] ? +tm[6] : (tm[0].includes('半') ? 30 : 0));
+    const per = tm[3] || '';
+    if ((/下午|傍晚|晚上|夜里/.test(per)) && hr < 12) hr += 12;
+    else if (/中午/.test(per) && hr < 11) hr = 12;
+    else if (!per && impliedEvening && hr >= 1 && hr < 12) hr += 12;
+  }
+  if (mn > 59) mn = 59; if (hr > 23) hr = 23;
+  return { hr, mn, matched: tm[0] };
 }
 
 // 设置时间段：上午=9点，下午=15点，晚上=20点，凌晨=2点
@@ -3902,6 +3965,8 @@ function openPreview(parsed) {
   document.getElementById('previewValuesRow').style.display = isMulti ? 'none' : '';
   document.getElementById('previewItemsRow').style.display = isMulti ? '' : 'none';
   document.getElementById('previewRangeRow').style.display = isMulti ? 'none' : '';
+  // v138：多条模式状态徽标不参与（单条才由 updatePreviewStatus 更新），不隐藏会露出初始占位「--」
+  document.getElementById('previewStatus').style.display = isMulti ? 'none' : '';
 
   // 多条渲染
   if (isMulti) {
@@ -4913,9 +4978,10 @@ function renderChartCats() {
     <button class="btn-secondary" id="hideAllCatsBtn" style="font-size:12px;padding:5px 11px;margin-bottom:6px;">✕ 全部隐藏</button>
   `   + allStats.map(([name, s]) => {
     const shown = chartVisibleCats.includes(name);
-    // v137：异常类别的药丸只改底色（25% 混红浅底），文字边框不动
-    const abnBg = catHasAbnormal(name) ? ` style="background:${mixRed('#fff7ed')};"` : '';
-    return `<span class="cat-toggle-chip ${shown ? 'on' : ''}" data-cat="${escapeHtml(name)}" title="${s.count} 条记录"${abnBg}>${s.icon} ${escapeHtml(name)} <small>(${s.count})</small></span>`;
+    // v138：异常类别胶囊改 CSS 类——未选中=原底色混10%红，选中=原选中底混15%红
+    // （v137 的内联 background 会把 .on 的选中底色也盖掉，导致选不选没区别）
+    const abnCls = catHasAbnormal(name) ? ' abn-chip' : '';
+    return `<span class="cat-toggle-chip${abnCls} ${shown ? 'on' : ''}" data-cat="${escapeHtml(name)}" title="${s.count} 条记录">${s.icon} ${escapeHtml(name)} <small>(${s.count})</small></span>`;
   }).join('');
 
   document.getElementById('showAllCatsBtn').onclick = () => {
@@ -5020,7 +5086,7 @@ function renderChart() {
     // v137：>8 个点 → 容器横向滑动，画布按点数加宽（每点约 44px），全部数值可常驻标注
     const scrollMode = c.points.length > 8;
     return `
-      <div class="mini-chart-card" data-cat="${escapeHtml(c.name)}"${cardAbn ? ` style="background:${mixRed('#fffaf3')};border-color:#f5b8b8;"` : ''}>
+      <div class="mini-chart-card" data-cat="${escapeHtml(c.name)}"${cardAbn ? ` style="background:${mixRed('#fffaf3', 0.08)};"` : ''}>
         <div class="mini-chart-head">
           <div class="mini-chart-title">
             <span class="mini-icon" style="background:${color}22;color:${color};">${c.icon}</span>
@@ -5157,6 +5223,8 @@ function renderChart() {
       plugins: [rangePlugin, valLabelPlugin],
       options: {
         responsive: true, maintainAspectRatio: false,
+        // v138：顶部/右侧留白——最高点的常驻数值标注不再被画布边缘裁掉
+        layout: { padding: { top: 16, right: 8 } },
         // v137：禁用悬停/触摸弹提示框，改由下方 canvas dblclick 手动触发
         events: [],
         interaction: { mode: 'index', intersect: false },
@@ -6034,6 +6102,9 @@ async function doAI() {
   const restoreBtn = (label) => { if (btn) { btn.disabled = false; btn.textContent = label; } };
   if (btn) { btn.disabled = true; btn.textContent = '🌀 识别中…'; }
   try {
+    // v138：先用与规则路径相同的解析器提取输入中提到的时间——
+    // 此前 AI 路径写死 Date.now()，输入里写的「昨天/8:30/晚上9点」全部被忽略
+    const trAI = parseTimeFromText(text);
     const items = await callLLM(aiText);
     const parsed = aiItemsToParsed(items);
     if (parsed.length === 0) throw new Error('AI 未能提取任何指标，请检查输入');
@@ -6042,7 +6113,7 @@ async function doAI() {
       multi: true,
       isLabReport: true,
       member: aiMember,
-      time: Date.now(),
+      time: (trAI && trAI.ts) ? trAI.ts : Date.now(),
       note: '',
       items: parsed
     };
