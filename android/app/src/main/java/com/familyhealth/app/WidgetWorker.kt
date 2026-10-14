@@ -10,9 +10,11 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.view.View
 import android.widget.RemoteViews
+import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -86,6 +88,60 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             } catch (_: Exception) {}
         }
 
+        // ===== v131：离线缓存——断网时用上次成功拉取的经期列表在本地重算 =====
+        private const val CACHE_KEY = "widget_cache_merged"
+
+        /** v111：合并连续/重叠记录（10.1、10.2、10.3-10.5 → 一次 5 天经期） */
+        private fun mergePeriods(raw: List<Pair<Long, Int>>): ArrayList<Pair<Long, Int>> {
+            val merged = ArrayList<Pair<Long, Int>>()
+            raw.sortedBy { it.first }.forEach { (rawTs, d) ->
+                val s = startOfDay(rawTs)
+                val end = s + (d - 1) * DAY
+                val last = merged.lastOrNull()
+                if (last != null && s <= last.first + (last.second - 1) * DAY + DAY) {
+                    val newEnd = maxOf(last.first + (last.second - 1) * DAY, end)
+                    merged[merged.size - 1] = Pair(last.first, (((newEnd - last.first) / DAY).toInt() + 1).coerceIn(1, 14))
+                } else {
+                    merged.add(Pair(s, d))
+                }
+            }
+            return merged
+        }
+
+        private fun saveMergedCache(prefs: android.content.SharedPreferences, merged: List<Pair<Long, Int>>) {
+            try {
+                val arr = JSONArray()
+                merged.forEach { arr.put(JSONArray().put(it.first).put(it.second)) }
+                prefs.edit().putString(CACHE_KEY, arr.toString())
+                    .putLong("widget_cache_time", System.currentTimeMillis()).apply()
+            } catch (_: Exception) {}
+        }
+
+        /** null = 从未成功联网过；空列表 = 云端确认当前无月经记录 */
+        private fun loadMergedCache(prefs: android.content.SharedPreferences): ArrayList<Pair<Long, Int>>? {
+            return try {
+                val s = prefs.getString(CACHE_KEY, null) ?: return null
+                val arr = JSONArray(s)
+                val out = ArrayList<Pair<Long, Int>>()
+                for (i in 0 until arr.length()) {
+                    val a = arr.getJSONArray(i)
+                    out.add(Pair(a.getLong(0), a.getInt(1)))
+                }
+                out
+            } catch (_: Exception) { null }
+        }
+
+        /** v131：失败后 15 分钟自动重试一次（要求有网络才触发），恢复联网后缓存即自动更新 */
+        fun scheduleRetry(ctx: Context) {
+            try {
+                val req = OneTimeWorkRequestBuilder<WidgetWorker>()
+                    .setInitialDelay(15, TimeUnit.MINUTES)
+                    .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                    .build()
+                WorkManager.getInstance(ctx).enqueueUniqueWork("menstrual_retry", ExistingWorkPolicy.KEEP, req)
+            } catch (_: Exception) {}
+        }
+
         // v80：任何异常都不允许「静默失败」——失败也更新出可见的错误状态
         fun refresh(context: Context) {
             try {
@@ -141,6 +197,114 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             var progTotal = 0 // 预测经期天数
 
             if (url.isNotBlank() && key.isNotBlank()) {
+                // v131：由合并经期列表推导全部界面状态——联网成功与离线缓存两条路共用。
+                // 全部数值用「当前时刻」现算（dayIn 基于今天 0 点），断网时预测随日期自动推进；
+                // 月经期小红点进度图（progDay/progTotal）同样每天前移，与在线渲染完全一致
+                fun applyPeriods(merged: List<Pair<Long, Int>>) {
+                    // 与网页同步——剔除 15~45 天外离群周期 + 最近 6 个有效周期加权平均(6:5:4:3:2:1)
+                    val allGaps = merged.zipWithNext { a, b -> ((b.first - a.first) / DAY).toInt() }
+                    val validGaps = allGaps.filter { it in 15..45 }
+                    val avg = when {
+                        validGaps.isEmpty() -> 28
+                        validGaps.size >= 3 -> {
+                            val recent = validGaps.takeLast(6)
+                            var ws = 0.0; var vs = 0.0
+                            recent.forEachIndexed { i, v ->
+                                val w = (i + 1 + (6 - recent.size)).toDouble()
+                                ws += w; vs += v * w
+                            }
+                            // v126：四舍五入对齐网页（原 toInt() 截断，5.5→5，网页 5.5→6，
+                            // 导致小组件红点数与日历预测天数不一致）
+                            Math.round(vs / ws).toInt().coerceIn(15, 45)
+                        }
+                        else -> Math.round(validGaps.sum().toDouble() / validGaps.size).toInt().coerceIn(15, 45)
+                    }
+                    val last0 = merged.last().first
+                    val lastDur = merged.last().second
+                    val today0 = startOfDay(System.currentTimeMillis())
+                    val dayIn = ((today0 - last0) / DAY).toInt() + 1
+                    val next0 = last0 + avg * DAY
+                    val daysLeft = ((next0 - today0) / DAY).toInt()
+                    // v116：与网页日历对齐——排卵日 = 下次月经前 14 天，即周期第 (avg-13) 天
+                    // （此前 avg-14 少算一天，且排卵窗是±2 与日历「前5后1」不同 → 圆点排列与日历不一致）
+                    val ovu = avg - 13
+                    /* v112 预测规则（与网页同步）：
+                       预存预测经期天数 = 历史经期天数加权平均（最近6次，权重同周期算法，回退5天）；
+                       最新一次未记完的经期不计入 → 待定窗长用「不含本轮」的历史均值（predPrev）；
+                       待定结束后：本轮记满 ≥ 预存天数 → 正常卵泡期/排卵日/排卵期/黄体期预测；
+                       待定结束后：一律给出完整四期预测（v129 与网页 v114 对齐，
+                       删除 v111 简化模式——原「不足→只预测月经窗/中间显示经后期」已删） */
+                    fun avgDur(list: List<Int>): Int = when {
+                        list.isEmpty() -> 5
+                        list.size >= 3 -> {
+                            var ws = 0.0; var vs = 0.0
+                            list.forEachIndexed { i, v ->
+                                val w = (i + 1 + (6 - list.size)).toDouble()
+                                ws += w; vs += v * w
+                            }
+                            // v126：四舍五入对齐网页 Math.round（原 toInt() 截断导致红点数偏少）
+                            Math.round(vs / ws).toInt().coerceIn(1, 14)
+                        }
+                        else -> Math.round(list.sum().toDouble() / list.size).toInt().coerceIn(1, 14)
+                    }
+                    val predPrev = avgDur(merged.dropLast(1).map { it.second })  // 待定窗天数（不含本轮）
+                    val PRED = avgDur(merged.map { it.second })                  // 下次预测窗天数（全部已判定历史）
+                    val phase = when {
+                        dayIn <= lastDur -> "月经期"                    // 已记录的经期
+                        dayIn <= predPrev -> "月经期"                   // 待定窗内（本轮未判定结束）
+                        // v129：删除 v111 简化模式（「本轮没记满预存天数→只预测月经窗/显示经后期」）
+                        // —— v114 起网页端一律给完整四期预测，此处分叉导致小组件显示「经后期」（
+                        //    发明的词，且掉进点阵颜色表死角变灰）。现与网页逐字对齐：
+                        //    经后中间段按周期均值正常进入卵泡期→排卵日/排卵期→黄体期
+                        dayIn == ovu -> "排卵日"
+                        dayIn in (ovu - 5)..(ovu - 1) -> "排卵期"   // v116：排卵窗=排卵日前5天到前1天（与日历一致）
+                        dayIn < ovu - 5 -> "卵泡期"
+                        dayIn < avg -> "黄体期"
+                        else -> "月经期"                                 // 已进入预测窗（下次月经开始/推迟）
+                    }
+                    // 顶部药丸 = 时期（按时期配色）
+                    pillText = phase
+                    pillBgRes = when (phase) {
+                        "月经期" -> R.drawable.pill_menstrual
+                        "卵泡期" -> R.drawable.pill_follicular
+                        "排卵日" -> R.drawable.pill_ovulation_day
+                        "排卵期" -> R.drawable.pill_ovulation
+                        else -> R.drawable.pill_luteal
+                    }
+                    pillTextColorRes = when (phase) {
+                        "月经期" -> R.color.w_menstrual_dark
+                        "卵泡期" -> R.color.w_follicular_dark
+                        "排卵日" -> R.color.w_ovulation_day_dark
+                        "排卵期" -> R.color.w_ovulation_dark
+                        else -> R.color.w_luteal_dark
+                    }
+                    dayColorRes = when (phase) {
+                        "月经期" -> R.color.w_menstrual
+                        "卵泡期" -> R.color.w_follicular
+                        "排卵日" -> R.color.w_ovulation_day
+                        "排卵期" -> R.color.w_ovulation
+                        else -> R.color.w_luteal
+                    }
+                    infoText = "" // v89：正常状态不再显示「上次·周期约」
+                    ringCycle = avg
+                    ringDay = dayIn
+                    ringPeriodDays = lastDur
+                    if (phase == "月经期") {
+                        // v113：月经期/预测月经期中 → 天数位置显示「/」，点阵切为经期进度图
+                        preText = "距下次月经还有"
+                        dayText = "/"
+                        val inPending = dayIn <= predPrev
+                        progTotal = if (inPending) predPrev else PRED
+                        progDay = if (inPending) dayIn else (dayIn - avg + 1).coerceAtLeast(1)
+                    } else {
+                        preText = if (daysLeft < 0) "月经已推迟" else "距下次月经还有"
+                        dayText = abs(daysLeft).toString()
+                    }
+                    // 底部药丸：v89 只保留警告态，「周期规律」绿色药丸移除
+                    if (daysLeft < 0) statusText = "该记录啦"
+                    else if (daysLeft <= 2) statusText = "经期将至"
+                }
+
                 try {
                     val api = url.trimEnd('/') +
                         "/rest/v1/body_events?category=eq.menstrual&select=ts,member,payload&order=ts.asc"
@@ -172,127 +336,25 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                     if (byMember.isEmpty()) {
                         pillText = "暂无记录"
                         infoText = "在APP里记录一次月经"
+                        saveMergedCache(prefs, emptyList())  // v131：同步清空缓存，离线时同样显示「暂无记录」
                     } else {
                         val latest = byMember.values.maxByOrNull { it.maxOfOrNull { p -> p.first } ?: 0L }!!
                         // v111：合并连续/重叠记录（10.1、10.2、10.3-10.5 → 一次 5 天经期）
-                        val merged = ArrayList<Pair<Long, Int>>()
-                        latest.sortedBy { it.first }.forEach { (rawTs, d) ->
-                            val s = startOfDay(rawTs)
-                            val end = s + (d - 1) * DAY
-                            val last = merged.lastOrNull()
-                            if (last != null && s <= last.first + (last.second - 1) * DAY + DAY) {
-                                val newEnd = maxOf(last.first + (last.second - 1) * DAY, end)
-                                merged[merged.size - 1] = Pair(last.first, (((newEnd - last.first) / DAY).toInt() + 1).coerceIn(1, 14))
-                            } else {
-                                merged.add(Pair(s, d))
-                            }
-                        }
-                        // 与网页同步——剔除 15~45 天外离群周期 + 最近 6 个有效周期加权平均(6:5:4:3:2:1)
-                        val allGaps = merged.zipWithNext { a, b -> ((b.first - a.first) / DAY).toInt() }
-                        val validGaps = allGaps.filter { it in 15..45 }
-                        val avg = when {
-                            validGaps.isEmpty() -> 28
-                            validGaps.size >= 3 -> {
-                                val recent = validGaps.takeLast(6)
-                                var ws = 0.0; var vs = 0.0
-                                recent.forEachIndexed { i, v ->
-                                    val w = (i + 1 + (6 - recent.size)).toDouble()
-                                    ws += w; vs += v * w
-                                }
-                                // v126：四舍五入对齐网页（原 toInt() 截断，5.5→5，网页 5.5→6，
-                                // 导致小组件红点数与日历预测天数不一致）
-                                Math.round(vs / ws).toInt().coerceIn(15, 45)
-                            }
-                            else -> Math.round(validGaps.sum().toDouble() / validGaps.size).toInt().coerceIn(15, 45)
-                        }
-                        val last0 = merged.last().first
-                        val lastDur = merged.last().second
-                        val today0 = startOfDay(System.currentTimeMillis())
-                        val dayIn = ((today0 - last0) / DAY).toInt() + 1
-                        val next0 = last0 + avg * DAY
-                        val daysLeft = ((next0 - today0) / DAY).toInt()
-                        // v116：与网页日历对齐——排卵日 = 下次月经前 14 天，即周期第 (avg-13) 天
-                        // （此前 avg-14 少算一天，且排卵窗是±2 与日历「前5后1」不同 → 圆点排列与日历不一致）
-                        val ovu = avg - 13
-                        /* v112 预测规则（与网页同步）：
-                           预存预测经期天数 = 历史经期天数加权平均（最近6次，权重同周期算法，回退5天）；
-                           最新一次未记完的经期不计入 → 待定窗长用「不含本轮」的历史均值（predPrev）；
-                           待定结束后：本轮记满 ≥ 预存天数 → 正常卵泡期/排卵日/排卵期/黄体期预测；
-                           待定结束后：一律给出完整四期预测（v129 与网页 v114 对齐，
-                           删除 v111 简化模式——原「不足→只预测月经窗/中间显示经后期」已删） */
-                        fun avgDur(list: List<Int>): Int = when {
-                            list.isEmpty() -> 5
-                            list.size >= 3 -> {
-                                var ws = 0.0; var vs = 0.0
-                                list.forEachIndexed { i, v ->
-                                    val w = (i + 1 + (6 - list.size)).toDouble()
-                                    ws += w; vs += v * w
-                                }
-                                // v126：四舍五入对齐网页 Math.round（原 toInt() 截断导致红点数偏少）
-                                Math.round(vs / ws).toInt().coerceIn(1, 14)
-                            }
-                            else -> Math.round(list.sum().toDouble() / list.size).toInt().coerceIn(1, 14)
-                        }
-                        val predPrev = avgDur(merged.dropLast(1).map { it.second })  // 待定窗天数（不含本轮）
-                        val PRED = avgDur(merged.map { it.second })                  // 下次预测窗天数（全部已判定历史）
-                        val phase = when {
-                            dayIn <= lastDur -> "月经期"                    // 已记录的经期
-                            dayIn <= predPrev -> "月经期"                   // 待定窗内（本轮未判定结束）
-                            // v129：删除 v111 简化模式（「本轮没记满预存天数→只预测月经窗/显示经后期」）
-                            // —— v114 起网页端一律给完整四期预测，此处分叉导致小组件显示「经后期」（
-                            //    发明的词，且掉进点阵颜色表死角变灰）。现与网页逐字对齐：
-                            //    经后中间段按周期均值正常进入卵泡期→排卵日/排卵期→黄体期
-                            dayIn == ovu -> "排卵日"
-                            dayIn in (ovu - 5)..(ovu - 1) -> "排卵期"   // v116：排卵窗=排卵日前5天到前1天（与日历一致）
-                            dayIn < ovu - 5 -> "卵泡期"
-                            dayIn < avg -> "黄体期"
-                            else -> "月经期"                                 // 已进入预测窗（下次月经开始/推迟）
-                        }
-                        // 顶部药丸 = 时期（按时期配色）
-                        pillText = phase
-                        pillBgRes = when (phase) {
-                            "月经期" -> R.drawable.pill_menstrual
-                            "卵泡期" -> R.drawable.pill_follicular
-                            "排卵日" -> R.drawable.pill_ovulation_day
-                            "排卵期" -> R.drawable.pill_ovulation
-                            else -> R.drawable.pill_luteal
-                        }
-                        pillTextColorRes = when (phase) {
-                            "月经期" -> R.color.w_menstrual_dark
-                            "卵泡期" -> R.color.w_follicular_dark
-                            "排卵日" -> R.color.w_ovulation_day_dark
-                            "排卵期" -> R.color.w_ovulation_dark
-                            else -> R.color.w_luteal_dark
-                        }
-                        dayColorRes = when (phase) {
-                            "月经期" -> R.color.w_menstrual
-                            "卵泡期" -> R.color.w_follicular
-                            "排卵日" -> R.color.w_ovulation_day
-                            "排卵期" -> R.color.w_ovulation
-                            else -> R.color.w_luteal
-                        }
-                        infoText = "" // v89：正常状态不再显示「上次·周期约」
-                        ringCycle = avg
-                        ringDay = dayIn
-                        ringPeriodDays = lastDur
-                        if (phase == "月经期") {
-                            // v113：月经期/预测月经期中 → 天数位置显示「/」，点阵切为经期进度图
-                            preText = "距下次月经还有"
-                            dayText = "/"
-                            val inPending = dayIn <= predPrev
-                            progTotal = if (inPending) predPrev else PRED
-                            progDay = if (inPending) dayIn else (dayIn - avg + 1).coerceAtLeast(1)
-                        } else {
-                            preText = if (daysLeft < 0) "月经已推迟" else "距下次月经还有"
-                            dayText = abs(daysLeft).toString()
-                        }
-                        // 底部药丸：v89 只保留警告态，「周期规律」绿色药丸移除
-                        if (daysLeft < 0) statusText = "该记录啦"
-                        else if (daysLeft <= 2) statusText = "经期将至"
+                        val merged = mergePeriods(latest)
+                        applyPeriods(merged)
+                        // v131：缓存合并后的经期列表（起点=当天0点 + 天数），断网时离线重算
+                        saveMergedCache(prefs, merged)
                     }
                 } catch (e: Exception) {
-                    pillText = "网络错误"
-                    infoText = "重新打开APP即可重试"
+                    // v131：断网/超时 → 用缓存的经期列表在本地完整重算（预测随日期自动推进），
+                    // 只有从未成功联网过才显示「网络错误」；失败后 15 分钟自动重试（有网才触发）
+                    val cached = loadMergedCache(prefs)
+                    when {
+                        cached == null -> { pillText = "网络错误"; infoText = "重新打开APP即可重试" }
+                        cached.isEmpty() -> { pillText = "暂无记录"; infoText = "在APP里记录一次月经" }
+                        else -> applyPeriods(cached)
+                    }
+                    scheduleRetry(context)
                 }
             }
 
