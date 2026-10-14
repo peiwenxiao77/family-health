@@ -2286,7 +2286,9 @@ async function loadFromCloud() {
 async function pushToCloud(record) {
   if (!dbClient) throw new Error('未配置 Supabase');
   // v94：filled_at 只存本地（云端表无此列，入库时间用 created_at 默认 NOW() 表达填写时间）
-  const { id, filled_at, ...data } = record;
+  // v134：顶层 statusAI 一并剔除——该字段已挪入 category（JSONB），本地旧格式
+  // pending 记录重传时若带着它会报 "Could not find the 'statusAI' column"
+  const { id, filled_at, statusAI, ...data } = record;
   const { data: inserted, error } = await dbClient.from('health_records').insert(data).select().single();
   if (error) throw error;
   return inserted;
@@ -4142,6 +4144,9 @@ function buildCategoryData(catName, currentItem) {
 
 async function saveOneRecord(ts, member, catName, currentItem, note) {
   const catData = buildCategoryData(catName, currentItem);
+  // v134：AI 判定挂进 category（JSONB 列可存任意字段）——顶层 statusAI 不在云端表
+  // 结构里，会导致 insert 报 "Could not find the 'statusAI' column"（v133 事故）
+  if (currentItem.statusAI) catData.statusAI = currentItem.statusAI;
   // 用户在弹窗中改的参考区间
   if (!currentItem.multi) {
     const lowInput = document.getElementById('previewRangeLow').value;
@@ -4168,8 +4173,7 @@ async function saveOneRecord(ts, member, catName, currentItem, note) {
     values: currentItem.values,
     note,
     statusLabel: currentItem.manualStatus === 'abnormal' ? '异常' : (currentItem.manualStatus === 'normal' ? '正常' : undefined),
-    statusManual: !!currentItem.manualStatus,
-    statusAI: currentItem.statusAI  // v133：AI 判定随记录落库（历史列表长期可用）
+    statusManual: !!currentItem.manualStatus
   };
   // 过滤 undefined 的字段
   Object.keys(record).forEach(k => record[k] === undefined && delete record[k]);
@@ -5179,7 +5183,8 @@ function computeRecordStatus(r) {
     range: r.category.range,
     rangeText: r.rangeText,
     values: r.values,
-    statusAI: r.statusAI  // v133：AI 判定
+    // v134：AI 判定存于 category.statusAI（云端零改表），回退兼容旧顶层 statusAI
+    statusAI: (r.category && r.category.statusAI) || r.statusAI
   };
   const v = r.values[0];
   if (r.category.name === '血压' && r.values.length === 2) {
@@ -5990,6 +5995,31 @@ function migrateBedtimeField() {
   } catch (e) { console.warn('bedtime rename migration failed', e); }
 }
 
+// v134：健康记录 pending（保存时云端失败）启动自动重传——此前只有身体事件/app_meta
+// 有补传，健康记录的 pending 永远停留在本地。成功后换回云端 id
+async function repushPendingHealthRecords() {
+  if (LOCAL_MODE || !isConfigured || !dbClient) return;
+  const pend = records.filter(r => r.id && String(r.id).startsWith('pending-'));
+  if (!pend.length) return;
+  let ok = 0;
+  for (const rec of pend) {
+    try {
+      const { id, filled_at, statusAI, ...data } = rec;
+      const { data: inserted, error } = await dbClient.from('health_records').insert(data).select().single();
+      if (error) throw error;
+      rec.id = inserted.id;
+      ok++;
+    } catch (e) {
+      console.warn('[v134] pending 健康记录重传失败，下次启动再试', (rec.category && rec.category.name), e.message || e);
+    }
+  }
+  if (ok > 0) {
+    saveLocalCache();
+    render();
+    showToast(`☁️ 已补传 ${ok} 条之前未上云的记录`);
+  }
+}
+
 async function bootstrap() {
   loadLocalCache();
   render();
@@ -6027,6 +6057,8 @@ async function bootstrap() {
     renderEvents();
     updateSyncStatus();
     console.log('✓ 已连接 Supabase，共加载', records.length, '条记录，', bodyEvents.length, '个身体事件');
+    // v134：后台补传 pending 健康记录（不阻塞启动）
+    repushPendingHealthRecords();
   } catch (e) {
     console.error('启动失败', e);
     window.__cloudBootFailed = true;
