@@ -1,7 +1,7 @@
 /* 家庭健康记录 Service Worker
  * 缓存策略：network-first（HTML/JS/CSS，避免新版本被旧缓存遮蔽）+ stale-while-revalidate（CDN 资源）
  */
-const CACHE = 'family-health-v45';  // v132：项目图标选择面板 38→84 个(含嘴巴👄,去重🦷)
+const CACHE = 'family-health-v46';  // v133：确认窗逐项🗑/AI归并+AI判定/图表异常时强制区间可见/多条列表去标签列
 const CORE = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {

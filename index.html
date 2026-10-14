@@ -1260,9 +1260,9 @@
       <div class="preview-values" id="previewValues"></div>
     </div>
 
-    <div class="preview-row" id="previewItemsRow" style="display:none;">
-      <label>📋 体检项目</label>
-      <div id="previewItems" style="flex:1;"></div>
+    <div id="previewItemsRow" style="display:none;">
+      <div style="font-size:12px;color:var(--text-3);font-weight:600;margin:2px 0;">📋 体检项目</div>
+      <div id="previewItems" style="width:100%;"></div>
     </div>
 
     <div class="preview-row">
@@ -1927,6 +1927,8 @@ function parseRange(text) {
 }
 
 // 评估体检结果状态
+// v133 优先级：数值参考区间计算 > AI 判定（statusAI，随识别落库）> 定性值与参考文本吻合 > 默认异常
+// （原「未触及/阴性词表」猜测已按用户要求移除——语义判断交给 AI）
 function evalLabResult(item) {
   const v = item.values[0];
   if (item.range && !v.isQualitative && typeof v.value === 'number') {
@@ -1934,11 +1936,10 @@ function evalLabResult(item) {
     const inRange = (lo == null || v.value >= lo) && (hi == null || v.value <= hi);
     return inRange ? { label: '✓ 正常', cls: 'normal' } : { label: '⚠ 异常', cls: 'abnormal' };
   }
-  if (v.isQualitative && item.rangeText) {
-    if (item.rangeText.includes(v.value)) return { label: '✓ 正常', cls: 'normal' };
-    const refHasNeg = /阴性|正常|透明|淡黄色/.test(item.rangeText);
-    if (refHasNeg && /阳性|升高|黄色|浑浊|\+/.test(v.value)) return { label: '⚠ 异常', cls: 'abnormal' };
-    return { label: '⚠ 异常', cls: 'abnormal' };
+  if (item.statusAI === 'normal') return { label: '✓ 正常', cls: 'normal' };
+  if (item.statusAI === 'abnormal') return { label: '⚠ 异常', cls: 'abnormal' };
+  if (v.isQualitative && item.rangeText && item.rangeText.includes(v.value)) {
+    return { label: '✓ 正常', cls: 'normal' };
   }
   return { label: '⚠ 异常', cls: 'abnormal' };
 }
@@ -3875,8 +3876,11 @@ function openPreview(parsed) {
   // 多条渲染
   if (isMulti) {
     const isLab = parsed.isLabReport;
+    if (parsed.items.length === 0) {
+      document.getElementById('previewItems').innerHTML = '<div style="color:#94a3b8;font-size:13px;padding:10px 0;">全部项目已删除，可点「取消」或重新识别</div>';
+    } else {
     document.getElementById('previewItems').innerHTML = parsed.items.map((it, idx) => {
-      const info = getCategoryInfo(it.category);
+      const info = getCategoryInfo(it.mergeTo && !it.mergeOff ? it.mergeTo : it.category);
       const v = it.values[0];
       let valDisplay;
       if (v.isQualitative) valDisplay = escapeHtml(v.value);
@@ -3886,6 +3890,14 @@ function openPreview(parsed) {
       if (it.range && (it.range[0] != null || it.range[1] != null)) {
         refDisplay = `参考 ${it.range[0] != null ? it.range[0] : '?'}~${it.range[1] != null ? it.range[1] : '?'}`;
       } else if (it.rangeText) refDisplay = `参考 ${escapeHtml(it.rangeText)}`;
+
+      // v133：AI 语义归并提示（默认自动并入，可逐项切换不并入）
+      let mergeDisplay = '';
+      if (it.mergeTo) {
+        mergeDisplay = it.mergeOff
+          ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px;">↳ 不并入，按新项目「${escapeHtml(it.category)}」保存 <button class="preview-item-merge" data-idx="${idx}" style="margin:0 0 0 4px;padding:1px 6px;font-size:10px;border:1px solid currentColor;background:transparent;border-radius:5px;cursor:pointer;color:inherit;">改回并入</button></div>`
+          : `<div style="font-size:11px;color:#0891b2;margin-top:2px;">↳ 将并入已有项目「${escapeHtml(it.mergeTo)}」 <button class="preview-item-merge" data-idx="${idx}" style="margin:0 0 0 4px;padding:1px 6px;font-size:10px;border:1px solid currentColor;background:transparent;border-radius:5px;cursor:pointer;color:inherit;">不并入</button></div>`;
+      }
 
       const status = evalItemStatus(it);
       const nextCls = status.cls === 'normal' ? 'abnormal' : 'normal';
@@ -3899,9 +3911,11 @@ function openPreview(parsed) {
               <span style="color:var(--text);">${valDisplay}</span>
               ${refDisplay ? ` · <span>${refDisplay}</span>` : ''}
             </div>
+            ${mergeDisplay}
           </div>
           <button class="preview-item-toggle" data-idx="${idx}" data-next="${nextCls}" style="margin:0;padding:3px 8px;font-size:11px;flex-shrink:0;cursor:pointer;border:1px solid currentColor;background:transparent;border-radius:6px;color:${status.cls === 'normal' ? '#065f46' : '#991b1b'};" title="切换状态">${status.cls === 'normal' ? '✓' : '⚠'}</button>
           <span class="preview-status ${status.cls}" style="margin:0;padding:3px 8px;font-size:11px;flex-shrink:0;">${status.label}</span>
+          <button class="preview-item-del" data-idx="${idx}" style="margin:0;padding:3px 8px;font-size:11px;flex-shrink:0;cursor:pointer;border:1px solid #fecaca;background:transparent;border-radius:6px;color:#dc2626;" title="删除该项">🗑</button>
         </div>
       `;
     }).join('');
@@ -3915,8 +3929,25 @@ function openPreview(parsed) {
         openPreview(currentParsed);
       };
     });
+    // v133：归并切换（并入 ⇄ 不并入）
+    document.querySelectorAll('#previewItems .preview-item-merge').forEach(btn => {
+      btn.onclick = () => {
+        const i = parseInt(btn.dataset.idx);
+        const item = currentParsed.items[i];
+        item.mergeOff = !item.mergeOff;
+        openPreview(currentParsed);
+      };
+    });
+    // v133：删除该项
+    document.querySelectorAll('#previewItems .preview-item-del').forEach(btn => {
+      btn.onclick = () => {
+        const i = parseInt(btn.dataset.idx);
+        currentParsed.items.splice(i, 1);
+        openPreview(currentParsed);
+      };
+    });
     // 体检报告模式下显示总结
-    if (isLab) {
+    if (isLab && parsed.items.length > 0) {
       const ok = parsed.items.filter(i => evalItemStatus(i).cls === 'normal').length;
       const bad = parsed.items.filter(i => evalItemStatus(i).cls === 'warning').length;
       const summary = `<div style="margin-top:12px;padding:10px 12px;border-radius:8px;font-size:13px;${bad>0?'background:#fef3c7;color:#92400e;':'background:#d1fae5;color:#065f46;'}">
@@ -3924,6 +3955,7 @@ function openPreview(parsed) {
       </div>`;
       document.getElementById('previewItems').insertAdjacentHTML('beforeend', summary);
     }
+    }  // v133：items 为空 else 分支闭合
   } else {
     document.getElementById('previewCategory').value = parsed.category || '';
     document.getElementById('previewCategoryNew').style.display = parsed.isNewCategory ? 'inline-block' : 'none';
@@ -4136,7 +4168,8 @@ async function saveOneRecord(ts, member, catName, currentItem, note) {
     values: currentItem.values,
     note,
     statusLabel: currentItem.manualStatus === 'abnormal' ? '异常' : (currentItem.manualStatus === 'normal' ? '正常' : undefined),
-    statusManual: !!currentItem.manualStatus
+    statusManual: !!currentItem.manualStatus,
+    statusAI: currentItem.statusAI  // v133：AI 判定随记录落库（历史列表长期可用）
   };
   // 过滤 undefined 的字段
   Object.keys(record).forEach(k => record[k] === undefined && delete record[k]);
@@ -4162,6 +4195,8 @@ async function saveOneRecord(ts, member, catName, currentItem, note) {
 
 document.getElementById('previewConfirm').onclick = async () => {
   if (!currentParsed) { showToast('暂无数据', 'warning'); return; }
+  // v133：多项全部删除后拦截保存
+  if (currentParsed.multi && currentParsed.items.length === 0) { showToast('没有可保存的项目，请取消或重新识别', 'warning'); return; }
   const member = document.getElementById('previewMember').value;
   const note = document.getElementById('previewNote').value.trim();
   const ts = fromDatetimeLocal(document.getElementById('previewTime').value);
@@ -4176,11 +4211,12 @@ document.getElementById('previewConfirm').onclick = async () => {
       // 多条保存
       let saved = 0;
       for (const item of currentParsed.items) {
-        // checkbox 勾选 → 创建新类别
-        if (item.isNewCategory && !STANDARD_CATEGORIES[item.category] && !customCategories[item.category]) {
-          customCategories[item.category] = { icon: suggestIcon(item.category), unit: item.values[0]?.unit || '' };
+        // v133：AI 语义归并——默认并入已有项目，逐项可反悔（mergeOff）
+        const catName = (item.mergeTo && !item.mergeOff) ? item.mergeTo : item.category;
+        if (!STANDARD_CATEGORIES[catName] && !customCategories[catName]) {
+          customCategories[catName] = { icon: suggestIcon(catName), unit: item.values[0]?.unit || '' };
         }
-        await saveOneRecord(ts, member, item.category, item, note);
+        await saveOneRecord(ts, member, catName, item, note);
         saved++;
       }
       saveCustomCategories();
@@ -4897,6 +4933,21 @@ function renderChart() {
     const info = getCategoryInfo(c.name);
     const rangeInfo = info.range;
 
+    // v133：仅当存在越界数据（有点低于下限或高于上限）时，强制 y 轴把参考区间
+    // 上下限都包进来——保证绿色区间带和两条边界虚线始终完整可见；数据全正常时不干预
+    let yExtra = null;
+    if (Array.isArray(rangeInfo) && (rangeInfo[0] != null || rangeInfo[1] != null) && c.points.length) {
+      const vals = c.points.map(p => p.y);
+      const dMin = Math.min(...vals), dMax = Math.max(...vals);
+      const lo = rangeInfo[0], hi = rangeInfo[1];
+      if ((lo != null && dMin < lo) || (hi != null && dMax > hi)) {
+        yExtra = {
+          min: Math.min(dMin, lo != null ? lo : dMin),
+          max: Math.max(dMax, hi != null ? hi : dMax)
+        };
+      }
+    }
+
     // v90：按家人分组，一人一条折线（x 轴 = 所有人时间点并集，缺的时间点为 null，spanGaps 各自连线）
     const byMember = new Map();
     c.points.forEach(p => {
@@ -4983,7 +5034,7 @@ function renderChart() {
           }
         },
         scales: {
-          y: { grid: { color: 'rgba(148, 163, 184, 0.12)', drawBorder: false }, ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 4 } },
+          y: { ...(yExtra || {}), grid: { color: 'rgba(148, 163, 184, 0.12)', drawBorder: false }, ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 4 } },
           x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 6, maxRotation: 0 } }
         }
       }
@@ -5127,7 +5178,8 @@ function computeRecordStatus(r) {
   const item = {
     range: r.category.range,
     rangeText: r.rangeText,
-    values: r.values
+    values: r.values,
+    statusAI: r.statusAI  // v133：AI 判定
   };
   const v = r.values[0];
   if (r.category.name === '血压' && r.values.length === 2) {
@@ -5679,7 +5731,9 @@ async function callLLM(text, imageBase64) {
   "unit": "单位（如 mmol/L、个/HPF，无则空字符串）",
   "range": "参考区间原始描述（如 4.5-8.0、阴性(-)、0-5个/HPF）",
   "rangeLow": "参考区间下限（数字类型时填，文字描述时填空字符串）",
-  "rangeHigh": "参考区间上限（同上）"
+  "rangeHigh": "参考区间上限（同上）",
+  "mergeTo": "见下方归并规则，不并入时填空字符串",
+  "status": "normal 或 abnormal（按医学常识判断该结果是否正常，如 身高154→normal、心脏杂音：无→normal、浅表淋巴结：未触及肿大→normal、心律不齐→abnormal；实在无法判断填空字符串）"
 }
 
 严格要求：
@@ -5688,7 +5742,9 @@ async function callLLM(text, imageBase64) {
 - 如果某行无法解析为「指标+值」，跳过
 - 对于「正常」「阴性」「阴性(-)」这类值，rangeLow/rangeHigh 填空字符串
 - 数字结果（如 5.0、1.027）尽量转为 JSON number 类型，但如果是「1-3」「0-5」这种范围，原样保留为字符串
-- 参考区间规则：若输入中已给出参考区间，原样提取；若输入中【没有】给出，请根据通用医学常识补上该指标的常用成人正常参考区间（range 填如 "150-430 μmol/L（通用参考）"，rangeLow/rangeHigh 填对应数字）；只有确实无法确定时才留空字符串。这样每条记录都能自带正常范围，便于后续自动判断正常/异常`;
+- 参考区间规则：若输入中已给出参考区间，原样提取；若输入中【没有】给出，请根据通用医学常识补上该指标的常用成人正常参考区间（range 填如 "150-430 μmol/L（通用参考）"，rangeLow/rangeHigh 填对应数字）；只有确实无法确定时才留空字符串。这样每条记录都能自带正常范围，便于后续自动判断正常/异常
+- 归并规则：下面会给出「已有项目清单」。对每个指标判断它是否与清单中某个项目测的是【同一个指标】（医学上同一物质/同一检验项目），是则 mergeTo 填该项目的准确名称，否则填空字符串。写法差异不影响判断：「白细胞计数」与「白细胞」是同一指标可并；「血红蛋白浓度」「血红蛋白量」与「血红蛋白」是不同指标，不可并。没把握就不要并。尿检方向：当前输入未出现"尿"字时，禁止并入任何名称含"尿"的项目（默认血检语境）；输入明确为尿检时，只可并入名称含"尿"的项目
+- 已有项目清单：${[...Object.keys(STANDARD_CATEGORIES), ...Object.keys(customCategories)].join('、') || '（暂无）'}`;
 
   let userContent;
   if (imageBase64) {
@@ -5761,6 +5817,18 @@ function aiItemsToParsed(items) {
     const stdDef = STANDARD_CATEGORIES[name];
     const range = (lo != null || hi != null) ? [lo, hi] : null;
     const rangeText = it.range || '';
+    // v133：AI 语义归并（代码只做硬校验，不做任何词形变换）：
+    // ① mergeTo 必须真实存在于已有项目清单，防 AI 编造名字；
+    // ② 尿方向兜底：输入名不含「尿」而目标含「尿」→ 一律拒绝归并
+    let mergeTo = '';
+    if (it.mergeTo && typeof it.mergeTo === 'string') {
+      const t = it.mergeTo.trim();
+      if (t && t !== name && (STANDARD_CATEGORIES[t] || customCategories[t])) {
+        if (!(!name.includes('尿') && t.includes('尿'))) mergeTo = t;
+      }
+    }
+    // v133：AI 正常判定落库
+    const statusAI = (it.status === 'normal' || it.status === 'abnormal') ? it.status : null;
     out.push({
       category: name,
       values: [{
@@ -5772,6 +5840,8 @@ function aiItemsToParsed(items) {
       }],
       range,
       rangeText,
+      mergeTo,
+      statusAI,
       isNewCategory: !stdDef && !customCategories[name]
     });
   }
