@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v139: ①App专属刷新键——brand标题右侧🔄(UA含FamilyHealthApp才渲染,网页不可见),点击全量重拉健康记录+身体事件+元数据并重渲染,旋转动画+防重入 ②身体月历记录角标放大2倍(正常13→26px/compact 8→16px/tiny 7→14px) ③取消「点击月历保存为」项目名>3字缩字规则(btsTextCls恒空,删bts-t34/t47) ④各项趋势类别可置顶:chip内未置顶🔝可点/置顶📌排大框最前(按钉选顺序),置顶只改排序不动配色;置顶顺序存localStorage chartCatPins+app_meta键chart_pins多端云同步 -->
 <!-- v129: ①保存为按钮字号行盒固定line-height:14px+按钮内容justify-content:center(修v128缩字后文字基线偏上) ②Kotlin:删v111简化模式(经后期)与网页v114对齐——数据不足也完整四期预测,待定窗月经期+红点进度图不变;点阵todayColor五态列全,else=黄体绿(消灭灰色兜底) -->
 <!-- v128: 「点击月历保存为」项目名按字数自动缩字号——≤3字不变(11px)；4-5字=3/5(6.6px,bts-t34)；6字及以上=4/7(6.3px,bts-t47)；btsTextCls挂类于自定义项目渲染+静态添加项目按钮(4字)；月经/痛风2字不受影响 -->
 <!-- v127: ①日历角标删除「已记录月经优先」顺序依赖拦截(老设计残留,时间戳巧合吞同日其他角标如9.24痛风)——月经底色仍由recordedKeys渲染,v110起渲染端本就支持同显 ②健康页各项趋势:收起键从tabs捆绑容器拆出独立钉标题行最右,范围tabs移到标题行下方单独一行(修复展开时收起键被挤到第二行) ③健康页全部记录:收起键从actions组拆出钉标题行最右,排序/筛选/删除留第二行右对齐(修复展开收起都在第二行) -->
@@ -125,6 +126,11 @@
   .ai-indicator.on { background: #f5f3ff; color: #6d28d9; }
   .ai-indicator.on .dot { background: #8b5cf6; }
   .settings-btn { width: 36px; height: 36px; border-radius: 12px; border: 1px solid var(--border); background: white; color: var(--text-2); cursor: pointer; font-size: 16px; transition: all 0.2s; }
+  /* v139：App 专属刷新键——brand 标题最右，不参与 header-right 折叠 */
+  .brand-refresh { width: 36px; height: 36px; border-radius: 12px; border: 1px solid #fde6c8; background: white; cursor: pointer; font-size: 18px; transition: all 0.2s; flex-shrink: 0; margin-left: 4px; display: none; align-items: center; justify-content: center; line-height: 1; }
+  .brand-refresh:hover { background: #fff7ed; transform: scale(1.06); }
+  .brand-refresh.spinning { animation: v139spin 0.9s linear infinite; pointer-events: none; }
+  @keyframes v139spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   .settings-btn:hover { border-color: var(--primary); color: var(--primary); background: #fff7ed; }
   .clock { background: linear-gradient(135deg, #fff7ed, #ffedd5); padding: 8px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); text-align: right; }
   .clock .time { font-size: 20px; font-weight: 700; color: #9a3412; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; }
@@ -310,6 +316,10 @@
   /* v138：异常类别胶囊——未选中=原底#fff7ed混10%红；选中=原选中底(#fef3c7~#fde68a中值#fdeca8)混15%红。仅底色，文字边框沿用原样式 */
   .cat-toggle-chip.abn-chip { background:#fde5dc; }
   .cat-toggle-chip.abn-chip.on { background:#fbd399; }
+  /* v139：置顶钉——未置顶🔝半透明可点，置顶📌不透明；不影响胶囊配色 */
+  .cat-toggle-chip .cat-pin { cursor: pointer; opacity: 0.4; font-size: 11px; line-height: 1; transition: opacity 0.15s, transform 0.15s; }
+  .cat-toggle-chip .cat-pin:hover { opacity: 0.8; transform: scale(1.2); }
+  .cat-toggle-chip .cat-pin.pinned { opacity: 1; }
   .cat-icon-btn:hover { background: #fff7ed !important; transform: scale(1.1); transition: all 0.15s; }
 
   /* 图表 - 多张小图 */
@@ -638,12 +648,12 @@
   @keyframes mcPulse { 0%, 100% { box-shadow: inset 0 0 0 2px #ec4899, 0 0 0 0 rgba(236, 72, 153, 0.5); } 50% { box-shadow: inset 0 0 0 2px #ec4899, 0 0 0 4px rgba(236, 72, 153, 0); } }
   .menstrual-day .marker { position: absolute; top: 1px; right: 2px; font-size: 6px; line-height: 1; }  /* v108：符号整体缩小 1/4 */
   .menstrual-day .other-marker-row { position: absolute; bottom: 1px; right: 2px; display: flex; flex-direction: row-reverse; gap: 1px; max-width: calc(100% - 4px); flex-wrap: wrap; justify-content: flex-end; }
-  /* v108：符号整体再缩小 1/4（13.5→13px 基准档同理下调） */
-  .menstrual-day .other-marker-row.compact .other-marker { width: 8px; height: 8px; font-size: 7px; }
+  /* v139：记录角标整体放大 2 倍（原正常13/compact 8/tiny 7px） */
+  .menstrual-day .other-marker-row.compact .other-marker { width: 16px; height: 16px; font-size: 14px; }
   /* v106：9 个以上再缩一档(tiny)，防溢出被裁剪 */
   .menstrual-day .other-marker-row.tiny { gap: 0; }
-  .menstrual-day .other-marker-row.tiny .other-marker { width: 7px; height: 7px; font-size: 5px; }
-  .menstrual-day .other-marker { font-size: 10px; line-height: 1; width: 13px; height: 13px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+  .menstrual-day .other-marker-row.tiny .other-marker { width: 14px; height: 14px; font-size: 10px; }
+  .menstrual-day .other-marker { font-size: 20px; line-height: 1; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
 
   /* 月经选择操作条（更显眼的反馈） */
   .menstrual-select-bar { margin-top: 10px; padding: 10px 14px; border-radius: 10px; background: linear-gradient(135deg, #fce7f3, #fbcfe8); border: 2px dashed #ec4899; display: none; align-items: center; flex-wrap: wrap; gap: 10px; }
@@ -686,11 +696,8 @@
   .mgr-fld-btn:hover { background: #e2e8f0; transform: scale(1.06); }
   .body-type-selector .bts-icon { font-size: 20px; line-height: 1; }
   .body-type-selector .bts-text { font-size: 11px; line-height: 14px; }
-  /* v129：固定文字行盒高度——三档字号共用同一行高，文字基线对齐、按钮内容垂直居中，
-     修复 v128 缩小字号后文字视觉中心偏上（原行高随字号缩，内容贴顶底部留白） */
-  /* v128：项目名超长自动缩字号（基准11px）——4-5字=3/5，6字及以上=4/7 */
-  .body-type-selector .bts-text.bts-t34 { font-size: calc(11px * 3 / 5); }
-  .body-type-selector .bts-text.bts-t47 { font-size: calc(11px * 4 / 7); }
+  /* v129：固定文字行盒高度——文字基线对齐、按钮内容垂直居中 */
+  /* v139：v128 的 >3 字缩字规则已取消，所有项目名统一 11px */
   .body-type-selector .bts-hint { margin-top: 8px; font-size: 11px; color: var(--text-3); text-align: center; }
   @media (max-width: 500px) {
     .body-type-selector .bts-grid { grid-template-columns: repeat(5, 1fr); gap: 6px; }
@@ -785,6 +792,7 @@
           <h1>龙龙＆文文の小家</h1>
           <div class="subtitle">健康数据记录</div>
         </div>
+        <button class="brand-refresh" id="brandRefreshBtn" title="重新从云端拉取全部数据" type="button">🔄</button>
       </div>
       <div class="header-right">
         <div class="sync-stack">
@@ -968,7 +976,7 @@
           </button>
           <button class="bts-btn bts-btn-add" data-action="add-custom" data-color="#64748b" title="点击添加新的自定义项目">
             <span class="bts-icon">＋</span>
-            <span class="bts-text bts-t34">添加项目</span>
+            <span class="bts-text">添加项目</span>
           </button>
         </div>
         <div class="bts-hint" id="btsHint">点击月历上的日期，弹出确认弹窗 → 保存为「月经」</div>
@@ -2583,6 +2591,7 @@ function collectMetaValue(key) {
       case 'ai_icons': return JSON.parse(localStorage.getItem(AI_ICON_SUGGEST_KEY) || '{}');
       case 'builtin_opts': return getBuiltinOptsOv();
       case 'builtin_labels': return getBuiltinLabelsOv();
+      case 'chart_pins': return JSON.parse(localStorage.getItem('chartCatPins') || '[]');  // v139：趋势类别置顶
     }
   } catch (e) {}
   return null;
@@ -2627,6 +2636,13 @@ function applyMetaValue(key, d) {
           if (typeof refreshBuiltinPills === 'function') refreshBuiltinPills();
         }
         break;
+      case 'chart_pins':
+        // v139：趋势类别置顶顺序（数组）——应用后重渲染趋势面板
+        if (Array.isArray(d)) {
+          localStorage.setItem('chartCatPins', JSON.stringify(d));
+          if (typeof chartCatPins !== 'undefined') { chartCatPins = d; if (typeof renderChart === 'function') renderChart(); }
+        }
+        break;
     }
   } catch (e) { console.warn('applyMetaValue failed', key, e); }
 }
@@ -2662,7 +2678,7 @@ async function uploadMetaKey(key) {
     if (!__metaWarned) { __metaWarned = true; console.warn('[app_meta] 同步失败', e); }
   }
 }
-const META_SYNC_KEYS = ['members', 'custom_types', 'custom_cats', 'extra_fields', 'deleted_types', 'ai_fields', 'ai_icons', 'builtin_opts', 'builtin_labels'];
+const META_SYNC_KEYS = ['members', 'custom_types', 'custom_cats', 'extra_fields', 'deleted_types', 'ai_fields', 'ai_icons', 'builtin_opts', 'builtin_labels', 'chart_pins'];
 async function loadMetaFromCloud() {
   if (LOCAL_MODE || !isConfigured || !dbClient) return;
   try {
@@ -2933,10 +2949,9 @@ function getCustomEventType(id) {
   return customEventTypes.find(c => c.id === id);
 }
 
-// v128：项目名按字数缩字号——≤3字不变；4-5字=3/5档；6字及以上=4/7档
+// v139：取消 v128 的「项目名>3字缩字号」规则——所有项目名统一 11px（函数保留避免调用处报错）
 function btsTextCls(name) {
-  const len = (name || '').length;
-  return len <= 3 ? '' : (len <= 5 ? ' bts-t34' : ' bts-t47');
+  return '';
 }
 
 function renderBodyTypeSelector() {
@@ -4907,6 +4922,13 @@ function openMemberManager() {
 
 // 用户手动选择要显示的类别（默认：按数据量取前 4）
 let chartVisibleCats = JSON.parse(localStorage.getItem('chartVisibleCats') || 'null');
+// v139：置顶类别（数组，顺序=钉选先后）——影响类别选择面板与大框排序，随 app_meta(chart_pins) 多端云同步
+let chartCatPins = JSON.parse(localStorage.getItem('chartCatPins') || '[]');
+
+function saveChartPins() {
+  localStorage.setItem('chartCatPins', JSON.stringify(chartCatPins));
+  syncMetaKey('chart_pins');
+}
 
 function getCategoryColor(name, idx) {
   const colors = ['#0891b2', '#f59e0b', '#8b5cf6', '#ec4899', '#10b981', '#3b82f6', '#ef4444', '#06b6d4'];
@@ -4943,8 +4965,15 @@ function getCategoryStats() {
       stats[n].lastUnit = r.values[0]?.unit || '';
     }
   });
-  // v136：有过异常的类别排在最前（其余仍按记录数降序）
+  // v139：置顶类别排最前（按钉选顺序），其余：异常类别优先 → 记录数降序
+  const pins = Array.isArray(chartCatPins) ? chartCatPins : [];
   return Object.entries(stats).sort((a, b) => {
+    const pa = pins.indexOf(a[0]), pb = pins.indexOf(b[0]);
+    if (pa !== -1 || pb !== -1) {
+      if (pa === -1) return 1;   // 未置顶靠后
+      if (pb === -1) return -1;
+      return pa - pb;            // 都置顶按钉选顺序
+    }
     const ab = catHasAbnormal(b[0]) - catHasAbnormal(a[0]);
     return ab !== 0 ? ab : b[1].count - a[1].count;
   });
@@ -4972,6 +5001,9 @@ function renderChartCats() {
   moreBtn.style.display = '';
   moreBtn.textContent = `☰ 选择要显示的类别（已选 ${chartVisibleCats.length}/${allStats.length}）`;
 
+  // v139：过滤已不存在的置顶项
+  chartCatPins = (Array.isArray(chartCatPins) ? chartCatPins : []).filter(n => allStats.some(([m]) => m === n));
+
   // 渲染可选类别（已折叠，未显示在面板中）
   document.getElementById('chartAllCats').innerHTML = `
     <button class="btn-secondary" id="showAllCatsBtn" style="font-size:12px;padding:5px 11px;margin-bottom:6px;">✓ 全部显示 (${allStats.length})</button>
@@ -4981,7 +5013,11 @@ function renderChartCats() {
     // v138：异常类别胶囊改 CSS 类——未选中=原底色混10%红，选中=原选中底混15%红
     // （v137 的内联 background 会把 .on 的选中底色也盖掉，导致选不选没区别）
     const abnCls = catHasAbnormal(name) ? ' abn-chip' : '';
-    return `<span class="cat-toggle-chip${abnCls} ${shown ? 'on' : ''}" data-cat="${escapeHtml(name)}" title="${s.count} 条记录">${s.icon} ${escapeHtml(name)} <small>(${s.count})</small></span>`;
+    // v139：置顶钉——未置顶显示半透明🔝可点击，置顶后显示📌并排大框最前；配色一律不动
+    const pinned = chartCatPins.includes(name);
+    const pinIcon = pinned ? '📌' : '🔝';
+    const pinCls = pinned ? ' pinned' : '';
+    return `<span class="cat-toggle-chip${abnCls} ${shown ? 'on' : ''}" data-cat="${escapeHtml(name)}" title="${s.count} 条记录${pinned ? '·已置顶' : ''}"><span class="cat-pin${pinCls}" data-pin="${escapeHtml(name)}" title="${pinned ? '取消置顶' : '置顶显示'}">${pinIcon}</span> ${s.icon} ${escapeHtml(name)} <small>(${s.count})</small></span>`;
   }).join('');
 
   document.getElementById('showAllCatsBtn').onclick = () => {
@@ -5005,6 +5041,22 @@ function renderChartCats() {
         chartVisibleCats = [...chartVisibleCats, name];
       }
       localStorage.setItem('chartVisibleCats', JSON.stringify(chartVisibleCats));
+      renderChart();
+    };
+  });
+  // v139：置顶钉点击——stopPropagation 避免触发 chip 的显示/隐藏切换；重排后重渲染
+  document.querySelectorAll('#chartAllCats .cat-pin').forEach(el => {
+    el.onclick = (ev) => {
+      ev.stopPropagation();
+      const name = el.dataset.pin;
+      if (chartCatPins.includes(name)) {
+        chartCatPins = chartCatPins.filter(n => n !== name);
+        showToast('已取消置顶：' + name);
+      } else {
+        chartCatPins = [...chartCatPins, name];
+        showToast('📌 已置顶：' + name);
+      }
+      saveChartPins();
       renderChart();
     };
   });
@@ -6272,6 +6324,39 @@ document.getElementById('btnRepushNow').onclick = async () => {
   }
 };
 
+// v139：App 环境判断——Android 壳在 UA 里追加 FamilyHealthApp 标识（MainActivity.kt）。
+// 仅 App 渲染 brand 区刷新键；网页版不显示。
+const IS_APP = navigator.userAgent.includes('FamilyHealthApp');
+if (IS_APP) {
+  const btn = document.getElementById('brandRefreshBtn');
+  if (btn) btn.style.display = 'flex';
+}
+
+// v139：App 专属手动刷新——全量重拉健康记录+身体事件+元数据并重渲染。
+// 防重入（旋转中忽略）；realtime 订阅已存在则不重复建立。
+async function refreshAllData() {
+  const btn = document.getElementById('brandRefreshBtn');
+  if (!btn || btn.classList.contains('spinning')) return;
+  btn.classList.add('spinning');
+  try {
+    if (LOCAL_MODE || !isConfigured || !dbClient) {
+      render(); renderEvents();
+      showToast('✓ 已刷新（本地模式）');
+      return;
+    }
+    await loadFromCloud();
+    try { await loadBodyEventsFromCloud(); } catch (e) { console.warn('[v139] 身体事件刷新失败', e); }
+    try { await loadMetaFromCloud(); } catch (e) { console.warn('[v139] 元数据刷新失败', e); }
+    render(); renderEvents();
+    showToast('✓ 已刷新');
+  } catch (e) {
+    console.error('[v139] 手动刷新失败', e);
+    showToast('刷新失败：' + (e.message || e), 'error');
+  } finally {
+    btn.classList.remove('spinning');
+  }
+}
+
 async function bootstrap() {
   loadLocalCache();
   render();
@@ -6337,6 +6422,11 @@ async function bootstrap() {
 }
 
 bootstrap();
+// v139：App 专属刷新键事件绑定
+{
+  const rb = document.getElementById('brandRefreshBtn');
+  if (rb && IS_APP) rb.addEventListener('click', refreshAllData);
+}
 // v118：脚本全部解析完成后执行「卧床时间→用药」迁移（依赖后面的常量定义）
 setTimeout(migrateBedtimeField, 0);
 

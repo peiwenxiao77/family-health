@@ -21,6 +21,8 @@ class MainActivity : Activity() {
         web.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
+            // v139：UA 追加 App 标识——网页端据此判断 App 环境（App 专属 brand 刷新键）
+            userAgentString = "$userAgentString FamilyHealthApp/1.14"
             // v82：每次打开都拉最新页面——排除 WebView 缓存旧版页面导致
             // pushConfigToNative 等新逻辑不生效的变量
             cacheMode = android.webkit.WebSettings.LOAD_NO_CACHE

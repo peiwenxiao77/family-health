@@ -1,7 +1,7 @@
 /* 家庭健康记录 Service Worker
  * 缓存策略：network-first（HTML/JS/CSS，避免新版本被旧缓存遮蔽）+ stale-while-revalidate（CDN 资源）
  */
-const CACHE = 'family-health-v51';  // v138：多条确认窗隐藏"--"占位+胶囊10%/15%混红类+卡片8%红+图表标注留白+输入时间回填(AI路径+N点/短日期+时间)
+const CACHE = 'family-health-v52';  // v139：App专属标题刷新键+日历角标2倍+取消>3字缩字+趋势类别🔝/📌置顶(chart_pins云同步)
 const CORE = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
