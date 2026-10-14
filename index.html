@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v140: ①补v139疏漏——「日历角标×2」与「取消>3字缩字」原属网页版分区却改了全局：现加html.in-app覆盖，App端恢复v108角标原尺寸(13/8/7px)与v128缩字规则(btsTextCls按IN_APP分端,添加项目按钮补回bts-t34) ②test成员墓碑:MEMBER_TOMBSTONES=['__test__','test'],syncMembersFromData/applyMetaValue(members)/familyMembers初始三处滤除,测试名永不再进成员列表(真实成员删+重加不受影响) ③App刷新键改↻裸图标(无边框底色,透明热区40×40,旋转动画保留) -->
 <!-- v139: ①App专属刷新键——brand标题右侧🔄(UA含FamilyHealthApp才渲染,网页不可见),点击全量重拉健康记录+身体事件+元数据并重渲染,旋转动画+防重入 ②身体月历记录角标放大2倍(正常13→26px/compact 8→16px/tiny 7→14px) ③取消「点击月历保存为」项目名>3字缩字规则(btsTextCls恒空,删bts-t34/t47) ④各项趋势类别可置顶:chip内未置顶🔝可点/置顶📌排大框最前(按钉选顺序),置顶只改排序不动配色;置顶顺序存localStorage chartCatPins+app_meta键chart_pins多端云同步 -->
 <!-- v129: ①保存为按钮字号行盒固定line-height:14px+按钮内容justify-content:center(修v128缩字后文字基线偏上) ②Kotlin:删v111简化模式(经后期)与网页v114对齐——数据不足也完整四期预测,待定窗月经期+红点进度图不变;点阵todayColor五态列全,else=黄体绿(消灭灰色兜底) -->
 <!-- v128: 「点击月历保存为」项目名按字数自动缩字号——≤3字不变(11px)；4-5字=3/5(6.6px,bts-t34)；6字及以上=4/7(6.3px,bts-t47)；btsTextCls挂类于自定义项目渲染+静态添加项目按钮(4字)；月经/痛风2字不受影响 -->
@@ -126,9 +127,9 @@
   .ai-indicator.on { background: #f5f3ff; color: #6d28d9; }
   .ai-indicator.on .dot { background: #8b5cf6; }
   .settings-btn { width: 36px; height: 36px; border-radius: 12px; border: 1px solid var(--border); background: white; color: var(--text-2); cursor: pointer; font-size: 16px; transition: all 0.2s; }
-  /* v139：App 专属刷新键——brand 标题最右，不参与 header-right 折叠 */
-  .brand-refresh { width: 36px; height: 36px; border-radius: 12px; border: 1px solid #fde6c8; background: white; cursor: pointer; font-size: 18px; transition: all 0.2s; flex-shrink: 0; margin-left: 4px; display: none; align-items: center; justify-content: center; line-height: 1; }
-  .brand-refresh:hover { background: #fff7ed; transform: scale(1.06); }
+  /* v140：App 专属刷新键——裸图标（无边框/底色），透明热区约 40×40 便于点击 */
+  .brand-refresh { width: 40px; height: 40px; border: none; background: transparent; cursor: pointer; font-size: 22px; color: var(--text-2); transition: transform 0.15s, opacity 0.15s; flex-shrink: 0; margin-left: 2px; display: none; align-items: center; justify-content: center; line-height: 1; padding: 0; }
+  .brand-refresh:hover { opacity: 0.7; transform: scale(1.1); }
   .brand-refresh.spinning { animation: v139spin 0.9s linear infinite; pointer-events: none; }
   @keyframes v139spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   .settings-btn:hover { border-color: var(--primary); color: var(--primary); background: #fff7ed; }
@@ -654,6 +655,10 @@
   .menstrual-day .other-marker-row.tiny { gap: 0; }
   .menstrual-day .other-marker-row.tiny .other-marker { width: 14px; height: 14px; font-size: 10px; }
   .menstrual-day .other-marker { font-size: 20px; line-height: 1; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+  /* v140：v139 的角标 ×2 只属网页版——App 端（html.in-app）恢复 v108 原尺寸 */
+  html.in-app .menstrual-day .other-marker-row.compact .other-marker { width: 8px; height: 8px; font-size: 7px; }
+  html.in-app .menstrual-day .other-marker-row.tiny .other-marker { width: 7px; height: 7px; font-size: 5px; }
+  html.in-app .menstrual-day .other-marker { font-size: 10px; line-height: 1; width: 13px; height: 13px; }
 
   /* 月经选择操作条（更显眼的反馈） */
   .menstrual-select-bar { margin-top: 10px; padding: 10px 14px; border-radius: 10px; background: linear-gradient(135deg, #fce7f3, #fbcfe8); border: 2px dashed #ec4899; display: none; align-items: center; flex-wrap: wrap; gap: 10px; }
@@ -697,7 +702,9 @@
   .body-type-selector .bts-icon { font-size: 20px; line-height: 1; }
   .body-type-selector .bts-text { font-size: 11px; line-height: 14px; }
   /* v129：固定文字行盒高度——文字基线对齐、按钮内容垂直居中 */
-  /* v139：v128 的 >3 字缩字规则已取消，所有项目名统一 11px */
+  /* v140：v128 缩字规则恢复——但仅 App 端（html.in-app）生效；网页版 v139 起恒 11px */
+  html.in-app .body-type-selector .bts-text.bts-t34 { font-size: calc(11px * 3 / 5); }
+  html.in-app .body-type-selector .bts-text.bts-t47 { font-size: calc(11px * 4 / 7); }
   .body-type-selector .bts-hint { margin-top: 8px; font-size: 11px; color: var(--text-3); text-align: center; }
   @media (max-width: 500px) {
     .body-type-selector .bts-grid { grid-template-columns: repeat(5, 1fr); gap: 6px; }
@@ -792,7 +799,7 @@
           <h1>龙龙＆文文の小家</h1>
           <div class="subtitle">健康数据记录</div>
         </div>
-        <button class="brand-refresh" id="brandRefreshBtn" title="重新从云端拉取全部数据" type="button">🔄</button>
+        <button class="brand-refresh" id="brandRefreshBtn" title="重新从云端拉取全部数据" type="button">↻</button>
       </div>
       <div class="header-right">
         <div class="sync-stack">
@@ -976,7 +983,7 @@
           </button>
           <button class="bts-btn bts-btn-add" data-action="add-custom" data-color="#64748b" title="点击添加新的自定义项目">
             <span class="bts-icon">＋</span>
-            <span class="bts-text">添加项目</span>
+            <span class="bts-text bts-t34">添加项目</span>
           </button>
         </div>
         <div class="bts-hint" id="btsHint">点击月历上的日期，弹出确认弹窗 → 保存为「月经」</div>
@@ -1536,6 +1543,14 @@ const STORAGE_KEYS = { CACHE: 'sb_local_cache', CATS: 'sb_custom_cats', MEMBERS:
 const MEMBER_ALIASES = { '文': '文文', '龙': '龙龙' };
 function normalizeMemberName(m) { return MEMBER_ALIASES[m] || m; }
 
+// v140：测试成员墓碑——用户确认绝不会添加此类人名，任何通道进成员列表前一律滤除。
+// 注意：只对测试名生效；真实成员的删除+重加不受影响（不加通用墓碑机制）。
+const MEMBER_TOMBSTONES = ['__test__', 'test'];
+function isTombstoneMember(m) { return MEMBER_TOMBSTONES.includes(String(m || '').toLowerCase()); }
+function filterTombstoneMembers(list) {
+  return (Array.isArray(list) ? list : []).filter(n => !isTombstoneMember(n));
+}
+
 // v93：成员列表此前只存本机(localStorage)——新加成员其它设备看不到。
 // 改为「跟数据走」：从云端健康记录+身体事件的 member 字段自动合并成员。
 function syncMembersFromData() {
@@ -1545,6 +1560,7 @@ function syncMembersFromData() {
     if (!m) return;
     m = normalizeMemberName(m);
     if (m === '未分类') return;
+    if (isTombstoneMember(m)) return;  // v140：test 类测试名永不并入
     if (!known.has(m)) { familyMembers.push(m); known.add(m); added = true; }
   };
   records.forEach(r => consider(r.member));
@@ -1605,7 +1621,8 @@ Object.keys(customCategories).forEach(name => {
     customCategories[name].icon = m[1];
   }
 });
-let familyMembers = JSON.parse(localStorage.getItem(STORAGE_KEYS.MEMBERS) || '["文文"]');
+// v140：初始成员列表滤除 test 类测试名（本地缓存残留直接清掉）
+let familyMembers = filterTombstoneMembers(JSON.parse(localStorage.getItem(STORAGE_KEYS.MEMBERS) || '["文文"]')).map(normalizeMemberName);
 // 一次性迁移：老用户的"我"统一改为"文文"
 (function migrateMemberName() {
   const saved = localStorage.getItem(STORAGE_KEYS.MEMBERS);
@@ -2601,7 +2618,8 @@ function applyMetaValue(key, d) {
   try {
     switch (key) {
       case 'members':
-        if (Array.isArray(d)) { familyMembers = d.map(normalizeMemberName); saveMembers(); render(); }
+        // v140：应用云端成员列表时滤除 test 类测试名（哪台设备本地缓存还带着也会被清掉）
+        if (Array.isArray(d)) { familyMembers = d.map(normalizeMemberName).filter(n => !isTombstoneMember(n)); saveMembers(); render(); }
         break;
       case 'custom_types':
         if (Array.isArray(d)) { customEventTypes = d; saveCustomEventTypes(); if (typeof renderBodyTypeSelector === 'function') renderBodyTypeSelector(); syncEventsCategoryFilter(); renderEvents(); }
@@ -2949,9 +2967,11 @@ function getCustomEventType(id) {
   return customEventTypes.find(c => c.id === id);
 }
 
-// v139：取消 v128 的「项目名>3字缩字号」规则——所有项目名统一 11px（函数保留避免调用处报错）
+// v140：缩字规则分端——App 端（IN_APP）恢复 v128 逻辑（>3字缩小），网页版恒 11px（v139 决定）
 function btsTextCls(name) {
-  return '';
+  if (!IN_APP) return '';
+  const len = (name || '').length;
+  return len <= 3 ? '' : (len <= 5 ? ' bts-t34' : ' bts-t47');
 }
 
 function renderBodyTypeSelector() {
