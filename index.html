@@ -1371,6 +1371,11 @@
         <div id="restoreList">加载中…</div>
         <div style="margin-top:8px;color:#94a3b8;">♻️ 恢复 = 把备份里本地缺少的记录按 id 补回来（<b>不会删除</b>现有记录，可放心点）</div>
       </div>
+      <!-- v135：本地待补传记录（保存时云端失败滞留本地的记录）——可见可控 -->
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;font-size:12px;color:#1e40af;margin:0 0 10px;display:flex;align-items:center;gap:8px;">
+        <span id="repushStatus" style="flex:1;">⬆️ 本地待补传记录：检查中…</span>
+        <button class="btn-secondary" id="btnRepushNow" type="button" style="padding:4px 10px;font-size:11px;flex-shrink:0;display:none;">立即补传</button>
+      </div>
     </details>
 
     <!-- 板块二：数据导出与导入 -->
@@ -4290,6 +4295,7 @@ function openConfig() {
   document.getElementById('aiApiKey').value = aiConfig.apiKey || '';
   document.getElementById('aiModel').value = aiConfig.model || AI_PRESETS.dashscope.model;
   document.getElementById('configMask').classList.add('show');
+  updateRepushStatus();  // v135：刷新「本地待补传」状态行
   console.log('✓ 配置弹窗已打开');
 }
 
@@ -5997,10 +6003,31 @@ function migrateBedtimeField() {
 
 // v134：健康记录 pending（保存时云端失败）启动自动重传——此前只有身体事件/app_meta
 // 有补传，健康记录的 pending 永远停留在本地。成功后换回云端 id
+// v135：加诊断日志（F12 可查每条成败原因）+ 返回成功条数 + 同步设置弹窗状态行
+function countPendingHealthRecords() {
+  return records.filter(r => r.id && String(r.id).startsWith('pending-')).length;
+}
+
+function updateRepushStatus() {
+  const el = document.getElementById('repushStatus');
+  if (!el) return;
+  const n = countPendingHealthRecords();
+  const btn = document.getElementById('btnRepushNow');
+  if (n > 0) {
+    el.textContent = `⬆️ 本地待补传：${n} 条未上云记录`;
+    if (btn) btn.style.display = '';
+  } else {
+    el.textContent = '✓ 无待补传记录';
+    if (btn) btn.style.display = 'none';
+  }
+}
+
 async function repushPendingHealthRecords() {
-  if (LOCAL_MODE || !isConfigured || !dbClient) return;
+  updateRepushStatus();
+  if (LOCAL_MODE || !isConfigured || !dbClient) return 0;
   const pend = records.filter(r => r.id && String(r.id).startsWith('pending-'));
-  if (!pend.length) return;
+  if (!pend.length) return 0;
+  console.log(`[v135] 开始补传 ${pend.length} 条 pending 健康记录`);
   let ok = 0;
   for (const rec of pend) {
     try {
@@ -6009,8 +6036,9 @@ async function repushPendingHealthRecords() {
       if (error) throw error;
       rec.id = inserted.id;
       ok++;
+      console.log(`[v135] 补传成功：${(rec.category && rec.category.name) || '?'} → ${inserted.id.slice(0, 8)}`);
     } catch (e) {
-      console.warn('[v134] pending 健康记录重传失败，下次启动再试', (rec.category && rec.category.name), e.message || e);
+      console.warn(`[v135] 补传失败（下次启动/手动再试）：${(rec.category && rec.category.name) || '?'}`, e.message || e);
     }
   }
   if (ok > 0) {
@@ -6018,7 +6046,21 @@ async function repushPendingHealthRecords() {
     render();
     showToast(`☁️ 已补传 ${ok} 条之前未上云的记录`);
   }
+  updateRepushStatus();
+  return ok;
 }
+
+document.getElementById('btnRepushNow').onclick = async () => {
+  const btn = document.getElementById('btnRepushNow');
+  const old = btn.textContent;
+  btn.disabled = true; btn.textContent = '补传中…';
+  try {
+    const ok = await repushPendingHealthRecords();
+    if (ok === 0) showToast(countPendingHealthRecords() > 0 ? '⚠️ 补传未成功，详情见控制台日志' : '✓ 无待补传记录', 'warning');
+  } finally {
+    btn.disabled = false; btn.textContent = old;
+  }
+};
 
 async function bootstrap() {
   loadLocalCache();
@@ -6057,14 +6099,15 @@ async function bootstrap() {
     renderEvents();
     updateSyncStatus();
     console.log('✓ 已连接 Supabase，共加载', records.length, '条记录，', bodyEvents.length, '个身体事件');
-    // v134：后台补传 pending 健康记录（不阻塞启动）
-    repushPendingHealthRecords();
   } catch (e) {
     console.error('启动失败', e);
     window.__cloudBootFailed = true;
     showToast('云端连接失败：' + (e.message || e), 'error');
     updateSyncStatus();
   }
+  // v135：无论云端连接成败都尝试补传（此前挂在成功分支里，网络波动即整个跳过；
+  // 连接失败时 dbClient 直插仍可能成功，失败则下次启动/手动再试）
+  repushPendingHealthRecords();
 }
 
 bootstrap();
