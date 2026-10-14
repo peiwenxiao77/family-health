@@ -896,9 +896,8 @@
       </div>
       <!-- v95：类别选择框移到所有图表最上面；v96：「显示中」行删除，整合进选择面板 -->
       <div style="margin-bottom:12px;" id="chartCatsWrap">
-        <button class="btn-secondary" id="chartMoreCatsBtn" style="font-size:12px;display:none;">☰ 点开选择 / 一键全显</button>
+        <button class="btn-secondary" id="chartMoreCatsBtn" style="font-size:12px;display:none;">☰ 选择要显示的类别</button>
         <div id="chartMoreCatsPanel" style="margin-top:10px;display:none;padding:10px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);">
-          <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;">勾选要显示的类别：</div>
           <div id="chartAllCats" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
         </div>
       </div>
@@ -1675,10 +1674,23 @@ let dbClient = null;
 /* ============================================================
    工具
    ============================================================ */
+// v136：标准类别参考区间覆盖层——用户在类别管理里改过标准类别的参考值时，
+// 持久到 localStorage（此前直接改内存对象，刷新即丢，且写入 undefined.range 会报错）
+function getStdRangeOv() {
+  try { return JSON.parse(localStorage.getItem('stdRangeOv') || '{}'); } catch (e) { return {}; }
+}
+function setStdRangeOv(name, idx, val) {
+  const ov = getStdRangeOv();
+  const base = ov[name] || (STANDARD_CATEGORIES[name] && STANDARD_CATEGORIES[name].defaultRange ? [...STANDARD_CATEGORIES[name].defaultRange] : [null, null]);
+  base[idx] = val;
+  ov[name] = base;
+  localStorage.setItem('stdRangeOv', JSON.stringify(ov));
+}
 function getCategoryInfo(name) {
   if (STANDARD_CATEGORIES[name]) {
     const s = STANDARD_CATEGORIES[name];
-    return { ...s, name, range: s.defaultRange || null, isStandard: true };
+    const ov = getStdRangeOv()[name];
+    return { ...s, name, range: ov || s.defaultRange || null, isStandard: true };
   }
   if (customCategories[name]) {
     return { ...customCategories[name], name, isStandard: false };
@@ -2334,7 +2346,15 @@ function setupRealtime() {
       saveLocalCache();
       render();
     })
-    .subscribe();
+    .subscribe((status) => {
+      // v136：实时通道真正连上时自动清除失联标记——修复「启动时一次请求失败后
+      // 顶栏永远显示云端失联，直到手动刷新」的问题
+      if (status === 'SUBSCRIBED' && window.__cloudBootFailed) {
+        window.__cloudBootFailed = false;
+        updateSyncStatus();
+        console.log('✓ 实时通道已连上，失联状态自动解除');
+      }
+    });
 }
 
 // ===== 身体事件（body_events）数据层 =====
@@ -3907,6 +3927,9 @@ function openPreview(parsed) {
       }
 
       const status = evalItemStatus(it);
+      // v136：判定为异常且 AI 给了原因 → 展示异常原因说明
+      const reasonDisplay = (status.cls === 'abnormal' && it.reason)
+        ? `<div style="font-size:11px;color:#b45309;margin-top:3px;line-height:1.5;">💡 ${escapeHtml(it.reason)}</div>` : '';
       const nextCls = status.cls === 'normal' ? 'abnormal' : 'normal';
       const nextLabel = status.cls === 'normal' ? '⚠ 标异常' : '✓ 标正常';
       return `
@@ -3918,6 +3941,7 @@ function openPreview(parsed) {
               <span style="color:var(--text);">${valDisplay}</span>
               ${refDisplay ? ` · <span>${refDisplay}</span>` : ''}
             </div>
+            ${reasonDisplay}
             ${mergeDisplay}
           </div>
           <button class="preview-item-toggle" data-idx="${idx}" data-next="${nextCls}" style="margin:0;padding:3px 8px;font-size:11px;flex-shrink:0;cursor:pointer;border:1px solid currentColor;background:transparent;border-radius:6px;color:${status.cls === 'normal' ? '#065f46' : '#991b1b'};" title="切换状态">${status.cls === 'normal' ? '✓' : '⚠'}</button>
@@ -4774,6 +4798,19 @@ function getCategoryColor(name, idx) {
   return colors[idx % colors.length];
 }
 
+// v136：把颜色混入红色 #ef4444（ratio=0.25 即用户选定的「偏红一点点」）
+function mixRed(hex, ratio = 0.25) {
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex || '')) return hex;
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  const mix = (a, c) => Math.round(a * (1 - ratio) + c * ratio);
+  return '#' + [mix(r, 0xef), mix(g, 0x44), mix(b, 0x44)].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+// v136：该类别下是否有过异常记录（与全部记录同一套判定：手动 > 血压 > 区间 > AI > 默认）
+function catHasAbnormal(name) {
+  return records.some(r => r.category.name === name && computeRecordStatus(r).cls === 'abnormal');
+}
+
 function getCategoryStats() {
   // 每个类别中**可画图**（数值类）的数据量 + 最近值
   // 定性类（阴性/阳性等）不计入，避免出现在图表选择器里
@@ -4791,7 +4828,11 @@ function getCategoryStats() {
       stats[n].lastUnit = r.values[0]?.unit || '';
     }
   });
-  return Object.entries(stats).sort((a, b) => b[1].count - a[1].count);
+  // v136：有过异常的类别排在最前（其余仍按记录数降序）
+  return Object.entries(stats).sort((a, b) => {
+    const ab = catHasAbnormal(b[0]) - catHasAbnormal(a[0]);
+    return ab !== 0 ? ab : b[1].count - a[1].count;
+  });
 }
 
 function renderChartCats() {
@@ -4814,7 +4855,7 @@ function renderChartCats() {
   // v96：「显示中」行已删除，只保留选择面板按钮（常显）
   const moreBtn = document.getElementById('chartMoreCatsBtn');
   moreBtn.style.display = '';
-  moreBtn.textContent = `☰ 点开选择 / 一键全显（已选 ${chartVisibleCats.length}/${allStats.length}）`;
+  moreBtn.textContent = `☰ 选择要显示的类别（已选 ${chartVisibleCats.length}/${allStats.length}）`;
 
   // 渲染可选类别（已折叠，未显示在面板中）
   document.getElementById('chartAllCats').innerHTML = `
@@ -4883,7 +4924,11 @@ function renderChart() {
     byCat[n].points.push({ x: r.ts, y: v, member: r.member, values: r.values, note: r.note });
   });
 
-  const allCats = Object.values(byCat).sort((a, b) => b.points.length - a.points.length);
+  const allCats = Object.values(byCat).sort((a, b) => {
+    // v136：与类别选择面板同序——有过异常的类别排前
+    const ab = catHasAbnormal(b.name) - catHasAbnormal(a.name);
+    return ab !== 0 ? ab : b.points.length - a.points.length;
+  });
 
   // 默认显示全部有数据的类别（仅首次；用户手动隐藏后保持隐藏）
   if (chartVisibleCats === null || chartVisibleCats === undefined) {
@@ -4908,7 +4953,8 @@ function renderChart() {
     c.points.forEach(p => { if (!memberNames.includes(p.member)) memberNames.push(p.member); });
     const multi = memberNames.length > 1;
     const colors = ['#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#10b981', '#3b82f6', '#ef4444', '#a855f7'];
-    const color = colors[idx % colors.length];
+    // v136：有过异常的类别整体偏红 25%（含标题图标底色）
+    const color = catHasAbnormal(c.name) ? mixRed(colors[idx % colors.length]) : colors[idx % colors.length];
     const latest = c.points[c.points.length - 1];
     const earliest = c.points[0];
     const trend = latest.y - earliest.y;
@@ -4982,7 +5028,8 @@ function renderChart() {
       const pts = byMember.get(m);
       const valMap = new Map(pts.map(p => [p.x, p.y]));
       const values = allTs.map(ts => valMap.has(ts) ? valMap.get(ts) : null);
-      const color = getMemberColor(m);  // v94：同人恒同色（单人也用成员专属色）
+      // v136：异常类别的折线在成员专属色基础上混 25% 红
+      const color = catHasAbnormal(c.name) ? mixRed(getMemberColor(m)) : getMemberColor(m);  // v94：同人恒同色（单人也用成员专属色）
       return {
         label: m,
         memberName: m,
@@ -5080,6 +5127,8 @@ function renderHistory() {
       if ((r.note || '').toLowerCase().includes(q)) return true;
       const valStr = r.values.map(v => `${v.value}${v.unit || ''}`).join(' ');
       if (valStr.toLowerCase().includes(q)) return true;
+      // v136：搜索词含「异常」时，额外命中所有判定为异常的记录
+      if (q.includes('异常') && computeRecordStatus(r).cls === 'abnormal') return true;
       return false;
     });
   }
@@ -5400,37 +5449,62 @@ function openCategoryManager() {
       const info = getCategoryInfo(name);
       const isStandard = !!STANDARD_CATEGORIES[name];
       const count = records.filter(r => r.category.name === name).length;
-      const [lo, hi] = info.range || [null, null];
+      // v136：参考值显示优先级 = 该类别最近一条带区间记录的区间（AI 实际判定所用）
+      // > 用户改过的覆盖层/内置默认
+      const lastRanged = records
+        .filter(r => r.category.name === name && Array.isArray(r.category.range) && (r.category.range[0] != null || r.category.range[1] != null))
+        .sort((a, b) => b.ts - a.ts)[0];
+      const [lo, hi] = lastRanged ? lastRanged.category.range : (info.range || [null, null]);
       const currentIcon = pendingIcons[name] || info.icon;
       return `
-        <div style="padding:10px;background:#fff7ed;border-radius:10px;border:1px solid #fde6c8;">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-            <button class="cat-icon-btn" data-name="${escapeHtml(name)}" style="width:32px;height:32px;border-radius:8px;border:1.5px solid #fdba74;background:white;font-size:18px;cursor:pointer;flex-shrink:0;line-height:1;" title="点击更换图标">${currentIcon}</button>
-            <input type="text" class="preview-input cat-name" data-orig="${escapeHtml(name)}" value="${escapeHtml(name)}" style="flex:1;padding:5px 10px;font-weight:600;">
-            <span style="font-size:10px;background:${isStandard ? '#dbeafe' : '#fef3c7'};color:${isStandard ? '#1e40af' : '#92400e'};padding:1px 6px;border-radius:4px;">${isStandard ? '标准' : '自定义'}</span>
-            <span style="font-size:11px;color:var(--text-3);">${count} 条</span>
-            <button class="cat-del-btn" data-name="${escapeHtml(name)}" data-std="${isStandard}" style="background:#fee2e2;color:var(--danger);border:1px solid #fecaca;padding:3px 8px;border-radius:6px;cursor:pointer;font-size:11px;">删除</button>
+        <div data-catwrap="${escapeHtml(name)}">
+          <div style="padding:10px;background:#fff7ed;border-radius:10px;border:1px solid #fde6c8;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <button class="cat-icon-btn" data-name="${escapeHtml(name)}" style="width:32px;height:32px;border-radius:8px;border:1.5px solid #fdba74;background:white;font-size:18px;cursor:pointer;flex-shrink:0;line-height:1;" title="点击更换图标">${currentIcon}</button>
+              <input type="text" class="preview-input cat-name" data-orig="${escapeHtml(name)}" value="${escapeHtml(name)}" style="flex:1;padding:5px 10px;font-weight:600;">
+              <span style="font-size:10px;background:${isStandard ? '#dbeafe' : '#fef3c7'};color:${isStandard ? '#1e40af' : '#92400e'};padding:1px 6px;border-radius:4px;">${isStandard ? '标准' : '自定义'}</span>
+              <span style="font-size:11px;color:var(--text-3);">${count} 条</span>
+              <button class="cat-del-btn" data-name="${escapeHtml(name)}" data-std="${isStandard}" style="background:#fee2e2;color:var(--danger);border:1px solid #fecaca;padding:3px 8px;border-radius:6px;cursor:pointer;font-size:11px;">删除</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-3);">
+              <span>单位</span>
+              <input type="text" class="preview-input cat-unit" data-orig="${escapeHtml(name)}" value="${escapeHtml(info.unit || '')}" style="width:80px;padding:3px 8px;font-size:12px;">
+              <span>参考</span>
+              <input type="number" step="any" class="preview-input cat-lo" data-orig="${escapeHtml(name)}" data-oval="${lo ?? ''}" value="${lo ?? ''}" placeholder="下限" style="width:60px;padding:3px 6px;font-size:12px;">
+              <span>~</span>
+              <input type="number" step="any" class="preview-input cat-hi" data-orig="${escapeHtml(name)}" data-oval="${hi ?? ''}" value="${hi ?? ''}" placeholder="上限" style="width:60px;padding:3px 6px;font-size:12px;">
+            </div>
           </div>
-          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-3);">
-            <span>单位</span>
-            <input type="text" class="preview-input cat-unit" data-orig="${escapeHtml(name)}" value="${escapeHtml(info.unit || '')}" style="width:80px;padding:3px 8px;font-size:12px;">
-            <span>参考</span>
-            <input type="number" step="any" class="preview-input cat-lo" data-orig="${escapeHtml(name)}" value="${lo ?? ''}" placeholder="下限" style="width:60px;padding:3px 6px;font-size:12px;">
-            <span>~</span>
-            <input type="number" step="any" class="preview-input cat-hi" data-orig="${escapeHtml(name)}" value="${hi ?? ''}" placeholder="上限" style="width:60px;padding:3px 6px;font-size:12px;">
+          <div class="cat-icon-panel" style="display:none;padding:8px;background:#fffbeb;border:1px solid #fde6c8;border-radius:10px;margin-top:4px;">
+            <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;">为「${escapeHtml(name)}」选个温馨图标：</div>
+            <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:4px;max-height:180px;overflow-y:auto;">
+              ${WARM_ICON_OPTIONS.map(ic => `<button class="icon-pick-btn" data-ic="${ic}" style="width:30px;height:30px;border-radius:6px;border:1px solid #fde6c8;background:#fff7ed;font-size:16px;cursor:pointer;padding:0;line-height:1;">${ic}</button>`).join('')}
+            </div>
           </div>
         </div>
       `;
     }).join('');
 
-    // 图标选择器
+    // v136：图标选择器改为卡片下方展开框——点原图标展开/收起，点任意图标选中并收起
     list.querySelectorAll('.cat-icon-btn').forEach(btn => {
       btn.onclick = (e) => {
         e.stopPropagation();
-        showIconPicker(btn, btn.dataset.name, (newIcon) => {
-          pendingIcons[btn.dataset.name] = newIcon;
-          btn.textContent = newIcon;
-        });
+        const wrap = btn.closest('[data-catwrap]');
+        const panel = wrap.querySelector('.cat-icon-panel');
+        const opening = panel.style.display === 'none';
+        // 收起其它展开的面板
+        list.querySelectorAll('.cat-icon-panel').forEach(p => { p.style.display = 'none'; });
+        panel.style.display = opening ? '' : 'none';
+      };
+    });
+    list.querySelectorAll('.cat-icon-panel .icon-pick-btn').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const wrap = btn.closest('[data-catwrap]');
+        const name = wrap.dataset.catwrap;
+        pendingIcons[name] = btn.dataset.ic;
+        wrap.querySelector('.cat-icon-btn').textContent = btn.dataset.ic;
+        wrap.querySelector('.cat-icon-panel').style.display = 'none';
       };
     });
 
@@ -5512,10 +5586,13 @@ function openCategoryManager() {
         customCategories[orig].unit = inp.value.trim();
       }
     });
+    // v136：参考值——只在用户真的改动了输入框时才写入（data-oval = 打开时显示的值），
+    // 标准类别写入 localStorage 覆盖层（原直接写 .range 会因 undefined 报错且刷新即丢）
     list.querySelectorAll('.cat-lo').forEach(inp => {
       const orig = inp.dataset.orig;
+      if (inp.value.trim() === (inp.dataset.oval ?? '')) return;
       const v = inp.value.trim() ? parseFloat(inp.value) : null;
-      if (STANDARD_CATEGORIES[orig]) STANDARD_CATEGORIES[orig].range[0] = v;
+      if (STANDARD_CATEGORIES[orig]) setStdRangeOv(orig, 0, v);
       else if (customCategories[orig]) {
         if (!customCategories[orig].range) customCategories[orig].range = [null, null];
         customCategories[orig].range[0] = v;
@@ -5523,8 +5600,9 @@ function openCategoryManager() {
     });
     list.querySelectorAll('.cat-hi').forEach(inp => {
       const orig = inp.dataset.orig;
+      if (inp.value.trim() === (inp.dataset.oval ?? '')) return;
       const v = inp.value.trim() ? parseFloat(inp.value) : null;
-      if (STANDARD_CATEGORIES[orig]) STANDARD_CATEGORIES[orig].range[1] = v;
+      if (STANDARD_CATEGORIES[orig]) setStdRangeOv(orig, 1, v);
       else if (customCategories[orig]) {
         if (!customCategories[orig].range) customCategories[orig].range = [null, null];
         customCategories[orig].range[1] = v;
@@ -5538,43 +5616,7 @@ function openCategoryManager() {
   };
 }
 
-// 图标选择器：弹出小面板选择温馨图标
-function showIconPicker(anchorBtn, catName, onSelect) {
-  // 移除已有面板
-  document.getElementById('iconPickerPanel')?.remove();
-  const panel = document.createElement('div');
-  panel.id = 'iconPickerPanel';
-  panel.style.cssText = 'position:absolute;background:white;border:1px solid #fdba74;border-radius:12px;padding:10px;box-shadow:0 8px 24px rgba(245,158,11,0.25);z-index:10001;max-width:280px;';
-  panel.innerHTML = `
-    <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;">为「${escapeHtml(catName)}」选个温馨图标：</div>
-    <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:4px;max-height:180px;overflow-y:auto;">
-      ${WARM_ICON_OPTIONS.map(ic => `<button class="icon-pick-btn" data-ic="${ic}" style="width:30px;height:30px;border-radius:6px;border:1px solid #fde6c8;background:#fff7ed;font-size:16px;cursor:pointer;padding:0;line-height:1;">${ic}</button>`).join('')}
-    </div>
-  `;
-  document.body.appendChild(panel);
-  // 定位到按钮下方
-  const r = anchorBtn.getBoundingClientRect();
-  panel.style.left = Math.min(window.innerWidth - 290, r.left) + 'px';
-  panel.style.top = (r.bottom + 6) + 'px';
-  // 选图标
-  panel.querySelectorAll('.icon-pick-btn').forEach(btn => {
-    btn.onclick = (e) => {
-      e.stopPropagation();
-      onSelect(btn.dataset.ic);
-      panel.remove();
-    };
-  });
-  // 点击外部关闭
-  setTimeout(() => {
-    const onClickOutside = (ev) => {
-      if (!panel.contains(ev.target) && ev.target !== anchorBtn) {
-        panel.remove();
-        document.removeEventListener('click', onClickOutside);
-      }
-    };
-    document.addEventListener('click', onClickOutside);
-  }, 50);
-}
+// v136：旧浮动图标面板已移除——换图标改为类别卡片下方展开框（见 openCategoryManager）
 
 function getCategoryColor(name) {
   const colors = { '体温': '#ef4444', '血压': '#f59e0b', '血糖': '#8b5cf6', '心率': '#ec4899', '体重': '#10b981', '血氧': '#06b6d4', '身高': '#3b82f6' };
@@ -5744,7 +5786,8 @@ async function callLLM(text, imageBase64) {
   "rangeLow": "参考区间下限（数字类型时填，文字描述时填空字符串）",
   "rangeHigh": "参考区间上限（同上）",
   "mergeTo": "见下方归并规则，不并入时填空字符串",
-  "status": "normal 或 abnormal（按医学常识判断该结果是否正常，如 身高154→normal、心脏杂音：无→normal、浅表淋巴结：未触及肿大→normal、心律不齐→abnormal；实在无法判断填空字符串）"
+  "status": "normal 或 abnormal（按医学常识判断该结果是否正常，如 身高154→normal、心脏杂音：无→normal、浅表淋巴结：未触及肿大→normal、心律不齐→abnormal；实在无法判断填空字符串）",
+  "reason": "status 为 abnormal 时，用一句话说明判定为异常的原因（如：白细胞 12.8 高于参考上限 10，提示可能存在感染）；normal 或无法判断时填空字符串"
 }
 
 严格要求：
@@ -5840,6 +5883,8 @@ function aiItemsToParsed(items) {
     }
     // v133：AI 正常判定落库
     const statusAI = (it.status === 'normal' || it.status === 'abnormal') ? it.status : null;
+    // v136：AI 异常原因（仅确认窗口展示，不入库）
+    const reason = (typeof it.reason === 'string' && it.reason.trim()) ? it.reason.trim().slice(0, 80) : '';
     out.push({
       category: name,
       values: [{
@@ -5853,6 +5898,7 @@ function aiItemsToParsed(items) {
       rangeText,
       mergeTo,
       statusAI,
+      reason,
       isNewCategory: !stdDef && !customCategories[name]
     });
   }
@@ -6104,6 +6150,22 @@ async function bootstrap() {
     window.__cloudBootFailed = true;
     showToast('云端连接失败：' + (e.message || e), 'error');
     updateSyncStatus();
+    // v136：20 秒后静默重试一次加载——网络抖动恢复后自动解除「云端失联」，
+    // 不再要求用户手动刷新；仍失败则保持失联显示，等下次打开页面
+    setTimeout(async () => {
+      if (!window.__cloudBootFailed) return;
+      try {
+        await loadFromCloud();
+        window.__cloudBootFailed = false;
+        if (!realtimeChannel) setupRealtime();
+        render();
+        updateSyncStatus();
+        showToast('☁️ 云端已恢复连接');
+        console.log('✓ 云端重试成功，失联状态已解除');
+      } catch (e2) {
+        console.warn('[v136] 云端重试仍失败', e2);
+      }
+    }, 20000);
   }
   // v135：无论云端连接成败都尝试补传（此前挂在成功分支里，网络波动即整个跳过；
   // 连接失败时 dbClient 直插仍可能成功，失败则下次启动/手动再试）

@@ -1,7 +1,7 @@
 /* 家庭健康记录 Service Worker
  * 缓存策略：network-first（HTML/JS/CSS，避免新版本被旧缓存遮蔽）+ stale-while-revalidate（CDN 资源）
  */
-const CACHE = 'family-health-v48';  // v135：补传可见化(设置弹窗待补传状态行+立即补传按钮)+启动补传挂载加固+诊断日志
+const CACHE = 'family-health-v49';  // v136：搜索"异常"筛异常记录+异常类别面板排前+图表混25%红+AI异常原因+标准参考值覆盖层+换图标下展框+失联自愈+文案
 const CORE = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
