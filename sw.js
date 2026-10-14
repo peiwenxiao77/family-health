@@ -1,7 +1,7 @@
 /* 家庭健康记录 Service Worker
  * 缓存策略：network-first（HTML/JS/CSS，避免新版本被旧缓存遮蔽）+ stale-while-revalidate（CDN 资源）
  */
-const CACHE = 'family-health-v44';  // v130：日历点击预填时间(当天=now/非当天=06:00)+修编辑回填UTC差8小时
+const CACHE = 'family-health-v45';  // v132：项目图标选择面板 38→84 个(含嘴巴👄,去重🦷)
 const CORE = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
