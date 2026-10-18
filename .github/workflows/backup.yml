@@ -50,29 +50,31 @@ jobs:
           curl -sS -X DELETE "${AUTH[@]}" "$BASE/backups?created_at=lt.$CUT" -o /dev/null -w "cleanup HTTP %{http_code}\n"
 
           # —— 第二落点（v100）：同时存一份到 GitHub 私有仓库，防止 Supabase 单点故障 ——
-          node -e '
-            const fs = require("fs");
-            const p = JSON.parse(fs.readFileSync("payload.json", "utf8")).payload;
-            fs.writeFileSync("backup-file.json", JSON.stringify(p, null, 1));
-          '
+          # v142：base64/请求体全部走文件——备份数据超过 ~128KB 后作为命令行参数传给 node
+          # 会触发 "Argument list too long"（Linux 单参数上限，2026-10-18 run#6 实证失败），
+          # 改为 node 直接读文件算 base64 并写出 body.json，curl 用 -d @body.json 上传
           GH_TOKEN="${{ secrets.BACKUP_REPO_TOKEN }}"
           BDATE=$(date -u +%Y-%m-%d)
+          export BDATE
           BPATH="backup-$BDATE.json"
-          B64=$(base64 -w0 backup-file.json)
           SHA=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" -H "User-Agent: family-health-backup" \
             "https://api.github.com/repos/peiwenxiao77/family-health-backups/contents/$BPATH" \
             | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{console.log(JSON.parse(d).sha||"")}catch(e){console.log("")}})')
-          BODY=$(node -e '
-            const [, bdate, b64, sha] = process.argv;
-            console.log(JSON.stringify({
-              message: "weekly backup " + bdate,
+          echo "$SHA" > sha.txt
+          node -e '
+            const fs = require("fs");
+            const p = JSON.parse(fs.readFileSync("payload.json", "utf8")).payload;
+            const b64 = Buffer.from(JSON.stringify(p, null, 1)).toString("base64");
+            const sha = fs.readFileSync("sha.txt", "utf8").trim();
+            fs.writeFileSync("body.json", JSON.stringify({
+              message: "weekly backup " + process.env.BDATE,
               content: b64,
               branch: "main",
               ...(sha ? { sha } : {})
             }));
-          ' "$BDATE" "$B64" "$SHA")
+          '
           UCODE=$(curl -sS -X PUT -H "Authorization: Bearer $GH_TOKEN" -H "User-Agent: family-health-backup" \
-            -H "Content-Type: application/json" -d "$BODY" \
+            -H "Content-Type: application/json" -d @body.json \
             "https://api.github.com/repos/peiwenxiao77/family-health-backups/contents/$BPATH" -o ghresp.json -w "%{http_code}")
           echo "github upload HTTP $UCODE"
           if [ "$UCODE" != "200" ] && [ "$UCODE" != "201" ]; then echo "上传私有仓库失败:"; cat ghresp.json; exit 1; fi

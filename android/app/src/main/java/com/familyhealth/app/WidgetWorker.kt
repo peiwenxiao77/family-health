@@ -259,7 +259,10 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                         dayIn == ovu -> "排卵日"
                         dayIn in (ovu - 5)..(ovu - 1) -> "排卵期"   // v116：排卵窗=排卵日前5天到前1天（与日历一致）
                         dayIn < ovu - 5 -> "卵泡期"
-                        dayIn < avg -> "黄体期"
+                        // v142：预测日当天（dayIn==avg）仍是黄体期——预测开始日=last0+avg*DAY，
+                        // 其 dayIn=avg+1，此前 dayIn>=avg 提前一天切红点进度图（2026-10-18 实证：
+                        // 网页预测 10-19 月经期，小组件 10-18 就变 6 红点）
+                        dayIn <= avg -> "黄体期"
                         else -> "月经期"                                 // 已进入预测窗（下次月经开始/推迟）
                     }
                     // 顶部药丸 = 时期（按时期配色）
@@ -295,7 +298,9 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                         dayText = "/"
                         val inPending = dayIn <= predPrev
                         progTotal = if (inPending) predPrev else PRED
-                        progDay = if (inPending) dayIn else (dayIn - avg + 1).coerceAtLeast(1)
+                        // v142：预测窗红点位置 = dayIn - avg（预测开始日=第1天），
+                        // 原 +1 提前一天（预测窗从 dayIn=avg+1 开始，第1天应为 26-25=1）
+                        progDay = if (inPending) dayIn else (dayIn - avg).coerceAtLeast(1)
                     } else {
                         preText = if (daysLeft < 0) "月经已推迟" else "距下次月经还有"
                         dayText = abs(daysLeft).toString()
