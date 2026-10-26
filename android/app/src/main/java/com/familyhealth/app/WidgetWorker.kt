@@ -192,6 +192,7 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             var ringCycle = 28
             var ringDay = 0 // 0 = 不高亮任何点
             var ringPeriodDays = 5
+            var ringOvuStart = 15  // v143：环形点阵排卵日位置（周期第几天），与日历一致
             // v113：经期进度图（phase=月经期时启用）——圆点数=预测经期天数，从12点顺时针均布全红，每天走到下一个点
             var progDay = 0   // 经期内第几天（1 起）；0 = 用正常周期点阵
             var progTotal = 0 // 预测经期天数
@@ -204,8 +205,10 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                     // 与网页同步——剔除 15~45 天外离群周期 + 最近 6 个有效周期加权平均(6:5:4:3:2:1)
                     val allGaps = merged.zipWithNext { a, b -> ((b.first - a.first) / DAY).toInt() }
                     val validGaps = allGaps.filter { it in 15..45 }
-                    val avg = when {
-                        validGaps.isEmpty() -> 28
+                    // v143：均值保留小数（网页 computeAvgCycle 用 24.5 这类小数推日期）——
+                    // 此前四舍五入取整，出现 .5 时下次月经/排卵日/倒计时整体漂移一天（2026-10-26 实证）
+                    val avgFrac = when {
+                        validGaps.isEmpty() -> 28.0
                         validGaps.size >= 3 -> {
                             val recent = validGaps.takeLast(6)
                             var ws = 0.0; var vs = 0.0
@@ -213,21 +216,21 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                                 val w = (i + 1 + (6 - recent.size)).toDouble()
                                 ws += w; vs += v * w
                             }
-                            // v126：四舍五入对齐网页（原 toInt() 截断，5.5→5，网页 5.5→6，
-                            // 导致小组件红点数与日历预测天数不一致）
-                            Math.round(vs / ws).toInt().coerceIn(15, 45)
+                            vs / ws
                         }
-                        else -> Math.round(validGaps.sum().toDouble() / validGaps.size).toInt().coerceIn(15, 45)
-                    }
+                        else -> validGaps.sum().toDouble() / validGaps.size
+                    }.coerceIn(15.0, 45.0)
                     val last0 = merged.last().first
                     val lastDur = merged.last().second
                     val today0 = startOfDay(System.currentTimeMillis())
                     val dayIn = ((today0 - last0) / DAY).toInt() + 1
-                    val next0 = last0 + avg * DAY
-                    val daysLeft = ((next0 - today0) / DAY).toInt()
-                    // v116：与网页日历对齐——排卵日 = 下次月经前 14 天，即周期第 (avg-13) 天
-                    // （此前 avg-14 少算一天，且排卵窗是±2 与日历「前5后1」不同 → 圆点排列与日历不一致）
-                    val ovu = avg - 13
+                    // v143：预测开始日 = last0 + avgFrac*DAY（与网页 nextStart 同款日期），
+                    // 其 dayIn = floor(avgFrac)+1；倒计时按时刻差向下取整（网页显示同值）
+                    val next0 = last0 + (avgFrac * DAY).toLong()
+                    val daysLeft = Math.floor((next0 - today0) / DAY.toDouble()).toInt()
+                    val predStartDayIn = Math.floor(avgFrac).toInt() + 1
+                    // v116：与网页日历对齐——排卵日 = 下次月经前 14 天，即周期第 (predStartDayIn-14) 天
+                    val ovu = predStartDayIn - 14
                     /* v112 预测规则（与网页同步）：
                        预存预测经期天数 = 历史经期天数加权平均（最近6次，权重同周期算法，回退5天）；
                        最新一次未记完的经期不计入 → 待定窗长用「不含本轮」的历史均值（predPrev）；
@@ -248,7 +251,8 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                         else -> Math.round(list.sum().toDouble() / list.size).toInt().coerceIn(1, 14)
                     }
                     val predPrev = avgDur(merged.dropLast(1).map { it.second })  // 待定窗天数（不含本轮）
-                    val PRED = avgDur(merged.map { it.second })                  // 下次预测窗天数（全部已判定历史）
+                    // v143：对齐网页 v114——上次实际经期 <5 天时，下次预测窗按实际天数（原一律用加权均值）
+                    val PRED = if (lastDur < 5) lastDur else avgDur(merged.map { it.second })
                     val phase = when {
                         dayIn <= lastDur -> "月经期"                    // 已记录的经期
                         dayIn <= predPrev -> "月经期"                   // 待定窗内（本轮未判定结束）
@@ -259,10 +263,9 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                         dayIn == ovu -> "排卵日"
                         dayIn in (ovu - 5)..(ovu - 1) -> "排卵期"   // v116：排卵窗=排卵日前5天到前1天（与日历一致）
                         dayIn < ovu - 5 -> "卵泡期"
-                        // v142：预测日当天（dayIn==avg）仍是黄体期——预测开始日=last0+avg*DAY，
-                        // 其 dayIn=avg+1，此前 dayIn>=avg 提前一天切红点进度图（2026-10-18 实证：
-                        // 网页预测 10-19 月经期，小组件 10-18 就变 6 红点）
-                        dayIn <= avg -> "黄体期"
+                        // v142/v143：预测开始日之前（含 dayIn==floor(avg)）都是黄体期——
+                        // dayIn=avg+1 起才进入预测窗（与网页 nextStart 日期一致）
+                        dayIn < predStartDayIn -> "黄体期"
                         else -> "月经期"                                 // 已进入预测窗（下次月经开始/推迟）
                     }
                     // 顶部药丸 = 时期（按时期配色）
@@ -289,7 +292,8 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                         else -> R.color.w_luteal
                     }
                     infoText = "" // v89：正常状态不再显示「上次·周期约」
-                    ringCycle = avg
+                    ringCycle = predStartDayIn
+                    ringOvuStart = ovu.coerceIn(1, predStartDayIn)  // v143：环形点阵排卵日位置与日历一致
                     ringDay = dayIn
                     ringPeriodDays = lastDur
                     if (phase == "月经期") {
@@ -298,9 +302,8 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                         dayText = "/"
                         val inPending = dayIn <= predPrev
                         progTotal = if (inPending) predPrev else PRED
-                        // v142：预测窗红点位置 = dayIn - avg（预测开始日=第1天），
-                        // 原 +1 提前一天（预测窗从 dayIn=avg+1 开始，第1天应为 26-25=1）
-                        progDay = if (inPending) dayIn else (dayIn - avg).coerceAtLeast(1)
+                        // v142/v143：预测窗红点位置 = dayIn - predStartDayIn + 1（预测开始日=第1天）
+                        progDay = if (inPending) dayIn else (dayIn - predStartDayIn + 1).coerceAtLeast(1)
                     } else {
                         preText = if (daysLeft < 0) "月经已推迟" else "距下次月经还有"
                         dayText = abs(daysLeft).toString()
@@ -386,7 +389,7 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             }
             // 环形点阵单独兜底：即使绘制失败也不影响文字更新
             try {
-                views.setImageViewBitmap(R.id.iv_ring, buildRingBitmap(ringCycle, ringDay, pillText, ringPeriodDays, progDay, progTotal))
+                views.setImageViewBitmap(R.id.iv_ring, buildRingBitmap(ringCycle, ringDay, pillText, ringPeriodDays, progDay, progTotal, ringOvuStart))
             } catch (_: Exception) {}
 
             // 点击小组件打开 APP
@@ -427,7 +430,7 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
          *   从 12 点方向顺时针均匀分布、全部红色，每过一天走到下一个点；经期结束后恢复正常点阵
          * 256px（≈256KB，远小于 Binder 1MB 限制）
          */
-        private fun buildRingBitmap(cycleLen: Int, today: Int, phase: String, periodDays: Int, progDay: Int = 0, progTotal: Int = 0): Bitmap {
+        private fun buildRingBitmap(cycleLen: Int, today: Int, phase: String, periodDays: Int, progDay: Int = 0, progTotal: Int = 0, ovuStartIn: Int = 0): Bitmap {
             val size = 256
             val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bmp)
@@ -466,8 +469,9 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             val n = cycleLen.coerceIn(18, 45)
             val baseR = size * (if (n > 34) 0.017f else 0.021f)
             val pDays = periodDays.coerceIn(1, 14)
-            // v116：与网页日历对齐——排卵日 = 周期第 (n-13) 天；排卵窗 = 排卵日前5天到前1天
-            val ovuStart = n - 13
+            // v143：排卵日位置改为上游传入（predStartDayIn-14），与网页日历逐日一致
+            //（原硬编码 n-13，均值取整漂移时点阵跟着错位）
+            val ovuStart = if (ovuStartIn in 1..n) ovuStartIn else n - 13
 
             // v97：圆点恢复明亮配色——v93 的浅马卡龙（奶黄/开心果）在小组件浅色背景上几乎
             // 看不见（用户反馈"圆点全消失"）。日历格保持浅马卡龙，圆点单独用明亮马卡龙
