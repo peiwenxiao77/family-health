@@ -224,19 +224,12 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                     val lastDur = merged.last().second
                     val today0 = startOfDay(System.currentTimeMillis())
                     val dayIn = ((today0 - last0) / DAY).toInt() + 1
-                    // v143：预测开始日 = last0 + avgFrac*DAY（与网页 nextStart 同款日期），
-                    // 其 dayIn = floor(avgFrac)+1；倒计时按时刻差向下取整（网页显示同值）
-                    val next0 = last0 + (avgFrac * DAY).toLong()
-                    val daysLeft = Math.floor((next0 - today0) / DAY.toDouble()).toInt()
-                    val predStartDayIn = Math.floor(avgFrac).toInt() + 1
-                    // v116：与网页日历对齐——排卵日 = 下次月经前 14 天，即周期第 (predStartDayIn-14) 天
-                    val ovu = predStartDayIn - 14
                     /* v112 预测规则（与网页同步）：
                        预存预测经期天数 = 历史经期天数加权平均（最近6次，权重同周期算法，回退5天）；
                        最新一次未记完的经期不计入 → 待定窗长用「不含本轮」的历史均值（predPrev）；
-                       待定结束后：本轮记满 ≥ 预存天数 → 正常卵泡期/排卵日/排卵期/黄体期预测；
-                       待定结束后：一律给出完整四期预测（v129 与网页 v114 对齐，
-                       删除 v111 简化模式——原「不足→只预测月经窗/中间显示经后期」已删） */
+                       待定结束后：一律给出完整四期预测（v129 与网页 v114 对齐）；
+                       v144：预测窗日期到达仍无新记录 → 视为该周期按预测结束，锚点前移一个周期，
+                       预测无限滚动（无「已推迟/真空」态）；虚拟周期只在计算里，真实记录一票否决 */
                     fun avgDur(list: List<Int>): Int = when {
                         list.isEmpty() -> 5
                         list.size >= 3 -> {
@@ -253,20 +246,29 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                     val predPrev = avgDur(merged.dropLast(1).map { it.second })  // 待定窗天数（不含本轮）
                     // v143：对齐网页 v114——上次实际经期 <5 天时，下次预测窗按实际天数（原一律用加权均值）
                     val PRED = if (lastDur < 5) lastDur else avgDur(merged.map { it.second })
+                    // 待定窗：真实记录未判定结束（今天落在 [起点, max(真实结束, 起点+predPrev-1)] 区间）
+                    val pendEnd = maxOf(last0 + (lastDur - 1) * DAY, last0 + (predPrev - 1) * DAY)
+                    val inPending = today0 >= last0 && today0 <= pendEnd
+                    // v144：滚动锚点——下一个预测经期日期到达即前移一个周期（日期级比较，与网页同款）
+                    var anchor = last0
+                    var rolls = 0
+                    while (startOfDay(anchor + (avgFrac * DAY).toLong()) <= today0) {
+                        anchor += (avgFrac * DAY).toLong()
+                        rolls++
+                    }
+                    val next0 = anchor + (avgFrac * DAY).toLong()
+                    val daysLeft = Math.floor((next0 - today0) / DAY.toDouble()).toInt()
+                    val anchorDay0 = startOfDay(anchor)
+                    // 本周期经期窗结束（日期级）：第一圈=真实经期结束；假定圈=锚点日起 PRED 天
+                    val periodEnd = if (rolls == 0) last0 + (lastDur - 1) * DAY else anchorDay0 + (PRED - 1) * DAY
+                    val ovuDay = startOfDay(next0 - 14 * DAY)   // v116：排卵日 = 下次月经前 14 天
                     val phase = when {
-                        dayIn <= lastDur -> "月经期"                    // 已记录的经期
-                        dayIn <= predPrev -> "月经期"                   // 待定窗内（本轮未判定结束）
-                        // v129：删除 v111 简化模式（「本轮没记满预存天数→只预测月经窗/显示经后期」）
-                        // —— v114 起网页端一律给完整四期预测，此处分叉导致小组件显示「经后期」（
-                        //    发明的词，且掉进点阵颜色表死角变灰）。现与网页逐字对齐：
-                        //    经后中间段按周期均值正常进入卵泡期→排卵日/排卵期→黄体期
-                        dayIn == ovu -> "排卵日"
-                        dayIn in (ovu - 5)..(ovu - 1) -> "排卵期"   // v116：排卵窗=排卵日前5天到前1天（与日历一致）
-                        dayIn < ovu - 5 -> "卵泡期"
-                        // v142/v143：预测开始日之前（含 dayIn==floor(avg)）都是黄体期——
-                        // dayIn=avg+1 起才进入预测窗（与网页 nextStart 日期一致）
-                        dayIn < predStartDayIn -> "黄体期"
-                        else -> "月经期"                                 // 已进入预测窗（下次月经开始/推迟）
+                        inPending -> "月经期"                            // 真实记录未判定结束
+                        today0 >= anchorDay0 && today0 <= periodEnd -> "月经期"   // 预测窗内（假定经期中）
+                        today0 == ovuDay -> "排卵日"
+                        today0 >= ovuDay - 5 * DAY && today0 < ovuDay -> "排卵期"   // 排卵窗=排卵日前5天到前1天
+                        today0 < ovuDay - 5 * DAY -> "卵泡期"
+                        else -> "黄体期"                                  // 排卵日后到下次经期前
                     }
                     // 顶部药丸 = 时期（按时期配色）
                     pillText = phase
@@ -292,25 +294,25 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                         else -> R.color.w_luteal
                     }
                     infoText = "" // v89：正常状态不再显示「上次·周期约」
-                    ringCycle = predStartDayIn
-                    ringOvuStart = ovu.coerceIn(1, predStartDayIn)  // v143：环形点阵排卵日位置与日历一致
-                    ringDay = dayIn
-                    ringPeriodDays = lastDur
+                    val cycleDay = ((today0 - anchorDay0) / DAY).toInt() + 1   // 周期内第几天（滚动锚点起）
+                    ringCycle = Math.round(avgFrac).toInt().coerceIn(18, 45)
+                    ringOvuStart = (((ovuDay - anchorDay0) / DAY).toInt() + 1).coerceIn(1, ringCycle)
+                    ringDay = cycleDay
+                    ringPeriodDays = if (rolls == 0) lastDur else PRED
                     if (phase == "月经期") {
                         // v113：月经期/预测月经期中 → 天数位置显示「/」，点阵切为经期进度图
                         preText = "距下次月经还有"
                         dayText = "/"
-                        val inPending = dayIn <= predPrev
                         progTotal = if (inPending) predPrev else PRED
-                        // v142/v143：预测窗红点位置 = dayIn - predStartDayIn + 1（预测开始日=第1天）
-                        progDay = if (inPending) dayIn else (dayIn - predStartDayIn + 1).coerceAtLeast(1)
+                        // 红点位置：待定窗=真实经期第几天；假定窗=周期内第几天（锚点日起）
+                        progDay = if (inPending) dayIn else cycleDay
                     } else {
-                        preText = if (daysLeft < 0) "月经已推迟" else "距下次月经还有"
+                        // v144：滚动预测后倒计时永远为正，「已推迟」态不复存在
+                        preText = "距下次月经还有"
                         dayText = abs(daysLeft).toString()
                     }
-                    // 底部药丸：v89 只保留警告态，「周期规律」绿色药丸移除
-                    if (daysLeft < 0) statusText = "该记录啦"
-                    else if (daysLeft <= 2) statusText = "经期将至"
+                    // 底部药丸：滚动后 daysLeft 恒 ≥1，「该记录啦」不再触发；经期将至保留
+                    if (daysLeft <= 2) statusText = "经期将至"
                 }
 
                 try {

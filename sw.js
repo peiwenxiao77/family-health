@@ -1,7 +1,7 @@
 /* 家庭健康记录 Service Worker
  * 缓存策略：network-first（HTML/JS/CSS，避免新版本被旧缓存遮蔽）+ stale-while-revalidate（CDN 资源）
  */
-const CACHE = 'family-health-v54';  // v141：异常胶囊已选20%红(fcc5be)+刷新键贴最右防窄屏两行+统计卡本周→今年/今年→全部+自定义项目图标覆盖层(custom_icons云同步,修手选图标被旧列表冲掉)
+const CACHE = 'family-health-v55';  // v144：滚动预测——预测窗过后锚点自动前移继续排后续周期(无推迟/真空态)+月历滚动生成全部预测周期四期色+全离群回落28天默认
 const CORE = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {

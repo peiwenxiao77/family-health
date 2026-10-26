@@ -11,6 +11,7 @@
 <!-- v122: 修复云同步延迟感——SW对supabase API响应绝不再缓存(原stale-while-revalidate实际cache-first,删除/修改后APP启动被旧缓存遮蔽);deleteFromCloud失败改可见提示;sw缓存v36 -->
 <!-- v120: ①app_meta启动双向合并补传:云端缺/旧的key把本机推上去,修复v118之前旧数据(口腔溃疡+嘴巴图标)不同步 ②删除可填项同时清AI建议缓存,修复重开弹窗回弹(删除名存实亡) ③内置项目专属填项(痛经日期/发作部位/疼痛等级/触发食物/用药)可在编辑弹窗删除(停用)并在添加弹窗恢复,成员/时间固定;停用列表存_builtin_off随云同步,保存时跳过停用项 -->
 <!-- v141: ①趋势异常胶囊已选态底色fbd399→fcc5be(未选fde5dc再混20%红,用户色谱定档,文字色不动) ②App刷新键margin-left:auto贴brand最右+brand-text弹性占位+标题超长省略号(防窄屏两行) ③健康页统计卡:本周记录→今年记录、今年记录→全部记录(teal配色,openTimeRecordsModal加all档) ④自定义项目手选图标覆盖层wb_custom_icons_ov+app_meta键custom_icons云同步——custom_types整键后写覆盖冲不掉手选图标(修口腔溃疡嘴巴图标回退温度计) -->
+<!-- v144: ①滚动预测:预测窗日期到达仍无新记录→视为该周期按预测结束,锚点前移一个周期,预测无限滚动(无「已推迟/数据真空」态,该记录啦不再触发,经期将至保留);虚拟周期只在计算里绝不落库,真实记录一票否决 ②computeCyclePrediction加锚点滚动+cycleDays/rolledCycles/periodEndTs字段+全离群回落28天默认 ③月历四期颜色滚动循环生成(覆盖可见两个月所有预测周期,假定圈经期整体涂预测红) ④与网页/小部件逐日对照模拟25+天全一致 -->
 <!-- v118: ①管理项目编辑键样式对齐全部记录(ev-mini-btn同风格) ②身体页全部记录标题单独一行 ③云同步大补全:新增app_meta表同步成员/自定义项目+图标/自定义类别/可填项定义(含AI建议)/已删标记/AI建议缓存,改动即推+启动即拉+realtime实时收(后写覆盖) ④编辑可填项弹窗重做:AI建议字段自动合并,每项可改名/增删选项/填写⇄选项/删除,底部添加可填项独立弹窗 ⑤卧床时间→用药一次性迁移(定义+AI缓存+历史记录) ⑥本周记录去掉今天还没记录提示 ⑦AI/规则识别人名模糊匹配(龙龙体温37→龙龙,文体温37→文文)并自动选中 ⑧体温37判异常=预期行为:参考区间一律用AI按通用医学常识给出的区间(用户确认),AI给36-37.0则37判偏高 -->
 <!-- v117: 网页功能无变化(微增部署,sw缓存v31)——APK v1.10: APP内下载更新增加进度条+每源重试3次+HTTP状态码检查+文件完整性校验+jsDelivr备用源兜底,修复连续下载失败 -->
 <!-- v115: ①趋势分析恢复图标原高度,改为图表容器压矮1/2(200/160px→100/80px) ②APK v1.8: 修复信封小组件白底灰圈(v114误用RemoteViews不支持的Space控件致布局加载失败,改空TextView占位) + 新增跨天自动刷新链(每天00:02自动刷新小组件,无需打开APP;原3小时周期任务保留兜底) -->
@@ -6950,8 +6951,9 @@ function isMenstrualOngoing(periods) {
 
 function computeCyclePrediction(periods) {
   if (!periods || periods.length < 2) return null;
-  const stat = computeAvgCycle(periods);
-  if (!stat) return null;  // v66：所有周期间隔都被判为离群时无法预测
+  // v144：所有周期间隔都被判离群时不再「无预测」，回落 28 天默认继续滚动（与小部件统一）
+  const stat = computeAvgCycle(periods)
+    || { avg: 28, cycles: [], allCycles: [], min: 28, max: 28, sd: 0, excluded: periods.length - 1 };
   const last = periods[periods.length - 1];
   const today = startOfDay(Date.now()).getTime();
 
@@ -6973,27 +6975,41 @@ function computeCyclePrediction(periods) {
 
   const lastDays = last.days;   // 已判定的本轮经期实际天数
   const cycle = stat.avg;
-  const nextStart = new Date(last.ts + cycle * 86400000);
+  // v144：滚动预测——预测窗日期到达仍无新记录 → 视为该周期按预测结束，锚点前移一个周期，
+  // 预测永远向前滚动（不再出现「已推迟/数据真空」）。虚拟周期只活在计算里，绝不写入数据；
+  // 真实记录永远一票否决（新记录一到，锚点从真实记录重推）。循环次数有界（间隔≥15天）
+  let anchor = last.ts;
+  let rolledCycles = 0;
+  while (startOfDay(anchor + cycle * 86400000).getTime() <= today) {
+    anchor += cycle * 86400000;
+    rolledCycles++;
+  }
+  const nextStart = new Date(anchor + cycle * 86400000);
   // v114：下次经期预测天数——上次实际记录 <5 天 → 按实际记录天数；否则按历史加权平均
   const predDays = lastDays < 5 ? lastDays : weightedAvgPeriodDays(periods);
+  // 本周期经期窗结束：第一圈=真实经期结束日；滚动后的假定圈=锚点日起 predDays 天
+  const periodEndTs = rolledCycles === 0 ? last.end_ts : (startOfDay(anchor).getTime() + (predDays - 1) * 86400000);
   const base = {
     avgCycle: Math.round(cycle),
     minCycle: Math.round(stat.min),
     maxCycle: Math.round(stat.max),
-    lastPeriodDays: lastDays,
-    lastStart: new Date(last.ts),
+    lastPeriodDays: rolledCycles === 0 ? lastDays : predDays,
+    lastStart: new Date(anchor),
     nextStart,
     predDays,
     cycleCount: stat.cycles.length,   // v66：有效周期数
     excludedCount: stat.excluded,     // v66：被剔除的离群周期数
     cycleSd: stat.sd,                 // v66：标准差（规律度）
+    cycleDays: cycle,                 // v144：未取整周期长度（日历滚动生成用）
+    rolledCycles,                     // v144：滚动过的假定周期数（0=仍在真实记录周期内）
+    periodEndTs,                      // v144：本周期经期窗结束时刻
   };
   // ② 完整预测（v114：上次经期已判定结束后，无论天数多少都给出各期预测；
   //    「只预测月经窗」仅适用于经期进行中的待定期）
   const ovulationDay = new Date(nextStart.getTime() - 14 * 86400000);
   const ovulationWindowStart = new Date(ovulationDay.getTime() - 5 * 86400000);
   const ovulationWindowEnd = new Date(ovulationDay.getTime() + 1 * 86400000);
-  const follicularStart = new Date(last.end_ts + 86400000);  // 经期结束次日
+  const follicularStart = new Date(periodEndTs + 86400000);  // 经期结束次日
   const lutealStart = new Date(ovulationDay.getTime() + 1 * 86400000);
   return { ...base, mode: 'full', follicularStart, ovulationDay, ovulationWindowStart, ovulationWindowEnd, lutealStart };
 }
@@ -7046,16 +7062,27 @@ function renderMenstrualCalendar() {
         phases.push({ from: new Date(from), to: prediction.pendingEnd, phase: 'menstrual-predicted' });
       }
     } else {
-      // 预测的下次月经窗 = 开始日起预存 5 天（v111 固定）
-      phases.push({ from: prediction.nextStart, to: new Date(prediction.nextStart.getTime() + (prediction.predDays - 1) * 86400000), phase: 'menstrual-predicted' });
-      if (prediction.mode === 'full') {
-        // v111：仅当上次经期记满 5 天才出现各期预测
-        phases.push(
-          { from: prediction.follicularStart, to: new Date(prediction.ovulationWindowStart.getTime() - 86400000), phase: 'follicular' },
-          { from: prediction.ovulationWindowStart, to: new Date(prediction.ovulationWindowEnd.getTime() - 86400000), phase: 'ovulation-window' },
-          { from: prediction.ovulationDay, to: prediction.ovulationDay, phase: 'ovulation-day' },
-          { from: prediction.lutealStart, to: new Date(prediction.nextStart.getTime() - 86400000), phase: 'luteal' },
-        );
+      // v144：滚动预测——循环生成可见范围内所有预测周期的四期颜色，
+      // 不再只有一个「下次月经窗」；锚点每圈前移一个周期，直到超出日历可见范围
+      const horizon = new Date(m2.getFullYear(), m2.getMonth() + 1, 0, 23, 59, 59).getTime(); // 第二个月月末
+      let anchorTs = prediction.lastStart.getTime();
+      let firstCycle = prediction.rolledCycles === 0;   // 第一圈=真实记录周期（经期由 recordedKeys 涂色）
+      for (let guard = 0; guard < 80; guard++) {
+        const nextTs = anchorTs + prediction.cycleDays * 86400000;
+        const pEnd = firstCycle ? prediction.periodEndTs
+                                : (startOfDay(anchorTs).getTime() + (prediction.predDays - 1) * 86400000);
+        // 假定圈经期窗整体涂预测红
+        if (!firstCycle) {
+          phases.push({ from: new Date(startOfDay(anchorTs).getTime()), to: new Date(pEnd), phase: 'menstrual-predicted' });
+        }
+        const ovuDayTs = startOfDay(nextTs - 14 * 86400000).getTime();
+        phases.push({ from: new Date(pEnd + 86400000), to: new Date(ovuDayTs - 6 * 86400000), phase: 'follicular' });
+        phases.push({ from: new Date(ovuDayTs - 5 * 86400000), to: new Date(ovuDayTs - 86400000), phase: 'ovulation-window' });
+        phases.push({ from: new Date(ovuDayTs), to: new Date(ovuDayTs), phase: 'ovulation-day' });
+        phases.push({ from: new Date(ovuDayTs + 86400000), to: new Date(nextTs - 86400000), phase: 'luteal' });
+        if (nextTs > horizon) break;
+        anchorTs = nextTs;
+        firstCycle = false;
       }
     }
     phases.forEach(p => {
