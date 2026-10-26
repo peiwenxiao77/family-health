@@ -1,7 +1,7 @@
 {
-  "version_code": 17,
-  "version_name": "1.16",
+  "version_code": 18,
+  "version_name": "1.17",
   "apk_url": "https://peiwenxiao77.github.io/family-health/releases/latest.apk",
-  "notes": "v143: 小组件周期均值改小数对齐网页(24.5不取整,修预测日/排卵日/倒计时漂移一天)+预测窗按predStartDayIn反推+排卵日点阵位置参数化+上次经期<5天预测窗按实际天数+APK v1.16(17)",
-  "updated_at": "2026-10-26T05:23:50Z"
+  "notes": "v144: 滚动预测——预测窗过后锚点自动前移继续排后续周期(无推迟/真空态)+月历滚动生成全部预测周期四期色+computeCyclePrediction锚点滚动+全离群回落28天+小部件同款引擎逐日对照895天全一致+APK v1.17(18)",
+  "updated_at": "2026-10-26T06:05:57Z"
 }
