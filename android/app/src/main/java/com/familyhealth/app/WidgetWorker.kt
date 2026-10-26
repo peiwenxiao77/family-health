@@ -193,14 +193,12 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             var ringDay = 0 // 0 = 不高亮任何点
             var ringPeriodDays = 5
             var ringOvuStart = 15  // v143：环形点阵排卵日位置（周期第几天），与日历一致
-            // v113：经期进度图（phase=月经期时启用）——圆点数=预测经期天数，从12点顺时针均布全红，每天走到下一个点
-            var progDay = 0   // 经期内第几天（1 起）；0 = 用正常周期点阵
-            var progTotal = 0 // 预测经期天数
+            // v145：经期进度图（progDay/progTotal）已取消——月经期也走正常周期点阵
 
             if (url.isNotBlank() && key.isNotBlank()) {
                 // v131：由合并经期列表推导全部界面状态——联网成功与离线缓存两条路共用。
                 // 全部数值用「当前时刻」现算（dayIn 基于今天 0 点），断网时预测随日期自动推进；
-                // 月经期小红点进度图（progDay/progTotal）同样每天前移，与在线渲染完全一致
+                // v145：月经期取消进度图，走正常周期点阵——红点数 = 经期窗总天数（max(已记,预测)），与日历红格一致
                 fun applyPeriods(merged: List<Pair<Long, Int>>) {
                     // 与网页同步——剔除 15~45 天外离群周期 + 最近 6 个有效周期加权平均(6:5:4:3:2:1)
                     val allGaps = merged.zipWithNext { a, b -> ((b.first - a.first) / DAY).toInt() }
@@ -298,14 +296,16 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                     ringCycle = Math.round(avgFrac).toInt().coerceIn(18, 45)
                     ringOvuStart = (((ovuDay - anchorDay0) / DAY).toInt() + 1).coerceIn(1, ringCycle)
                     ringDay = cycleDay
-                    ringPeriodDays = if (rolls == 0) lastDur else PRED
+                    // v145：红点数 = 本次经期窗总天数（与日历红格完全一致）——
+                    //   待定窗内：max(真实已记 lastDur, 预测 predPrev) 天（= pendEnd - last0 + 1）；
+                    //   滚动假定圈：PRED 天；第一圈非待定（回看旧周期）：真实 lastDur
+                    ringPeriodDays = if (inPending) (((pendEnd - last0) / DAY).toInt() + 1)
+                                     else if (rolls == 0) lastDur else PRED
                     if (phase == "月经期") {
-                        // v113：月经期/预测月经期中 → 天数位置显示「/」，点阵切为经期进度图
-                        preText = "距下次月经还有"
-                        dayText = "/"
-                        progTotal = if (inPending) predPrev else PRED
-                        // 红点位置：待定窗=真实经期第几天；假定窗=周期内第几天（锚点日起）
-                        progDay = if (inPending) dayIn else cycleDay
+                        // v145：月经期倒计时改「距结束还有 X 天」——X = 经期窗结束日 - 今天 + 1（最后一天显示 1）
+                        val endWin = if (inPending) pendEnd else periodEnd
+                        preText = "距结束还有"
+                        dayText = (((endWin - today0) / DAY).toInt() + 1).toString()
                     } else {
                         // v144：滚动预测后倒计时永远为正，「已推迟」态不复存在
                         preText = "距下次月经还有"
@@ -391,7 +391,7 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             }
             // 环形点阵单独兜底：即使绘制失败也不影响文字更新
             try {
-                views.setImageViewBitmap(R.id.iv_ring, buildRingBitmap(ringCycle, ringDay, pillText, ringPeriodDays, progDay, progTotal, ringOvuStart))
+                views.setImageViewBitmap(R.id.iv_ring, buildRingBitmap(ringCycle, ringDay, pillText, ringPeriodDays, ringOvuStart))
             } catch (_: Exception) {}
 
             // 点击小组件打开 APP
@@ -428,11 +428,11 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
          *    排卵日 = 下次月经前14天 = 周期第 n-13 天）
          * - 今天的位置放大高亮
          * - 圆环整体缩小（半径 0.40），点不再碰到边际
-         * - v113：progDay/progTotal > 0 时切换为「经期进度图」——圆点数 = 当前预测经期天数，
-         *   从 12 点方向顺时针均匀分布、全部红色，每过一天走到下一个点；经期结束后恢复正常点阵
+         * - v145：取消「经期进度图」——月经期也走正常周期点阵，
+         *   红点数 = 经期窗总天数（max(已记,预测)），与日历红格完全一致
          * 256px（≈256KB，远小于 Binder 1MB 限制）
          */
-        private fun buildRingBitmap(cycleLen: Int, today: Int, phase: String, periodDays: Int, progDay: Int = 0, progTotal: Int = 0, ovuStartIn: Int = 0): Bitmap {
+        private fun buildRingBitmap(cycleLen: Int, today: Int, phase: String, periodDays: Int, ovuStartIn: Int = 0): Bitmap {
             val size = 256
             val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bmp)
@@ -440,33 +440,6 @@ class WidgetWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             val cy = size / 2f
             val radius = size * 0.40f
             val mensColor = 0xFFF06A92.toInt()     // 月经期 亮粉
-            val todayMensColor = 0xFFD14D78.toInt() // 经期进度图·今天 深粉
-
-            // v113：经期进度图模式
-            if (progTotal >= 1 && progDay >= 1) {
-                val m = progTotal.coerceIn(1, 14)
-                val pr = size * (if (m > 8) 0.034f else 0.048f)
-                val hi = progDay.coerceIn(1, m)
-                for (d in 1..m) {
-                    val ang = Math.toRadians(-90.0 + 360.0 * (d - 1) / m)
-                    val x = cx + radius * cos(ang).toFloat()
-                    val y = cy + radius * sin(ang).toFloat()
-                    val p = Paint(Paint.ANTI_ALIAS_FLAG)
-                    if (d == hi) {
-                        p.style = Paint.Style.STROKE
-                        p.strokeWidth = pr * 0.8f
-                        p.color = 0x2E000000.toInt()
-                        canvas.drawCircle(x, y, pr * 1.9f, p)
-                        p.style = Paint.Style.FILL
-                        p.color = todayMensColor
-                        canvas.drawCircle(x, y, pr * 1.5f, p)
-                    } else {
-                        p.color = mensColor
-                        canvas.drawCircle(x, y, pr, p)
-                    }
-                }
-                return bmp
-            }
 
             val n = cycleLen.coerceIn(18, 45)
             val baseR = size * (if (n > 34) 0.017f else 0.021f)
