@@ -1,7 +1,7 @@
 {
-  "version_code": 18,
-  "version_name": "1.17",
+  "version_code": 19,
+  "version_name": "1.18",
   "apk_url": "https://peiwenxiao77.github.io/family-health/releases/latest.apk",
-  "notes": "v144: 滚动预测——预测窗过后锚点自动前移继续排后续周期(无推迟/真空态)+月历滚动生成全部预测周期四期色+computeCyclePrediction锚点滚动+全离群回落28天+小部件同款引擎逐日对照895天全一致+APK v1.17(18)",
-  "updated_at": "2026-10-26T06:05:57Z"
+  "notes": "v145: 小组件取消经期特殊模式——月经期走正常周期点阵（红点=经期窗总天数 max(已记,预测)，与日历红格一致），月经期倒计时改「距结束还有」且最后一天=1 + APK v1.18(19)",
+  "updated_at": "2026-10-26T07:38:18Z"
 }
