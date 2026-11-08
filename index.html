@@ -30,6 +30,7 @@
 <!-- v99: ①设备密码锁：首次打开需输入访问密码(固定 000717)，通过后本设备 localStorage 记住不再询问；锁屏为全屏遮罩，未解锁时不渲染数据(防闪现)。注意：此为前端门锁，挡"打开网址看数据"，不挡"直接调云端API"——网址请勿外传 ②月经预测提醒：用已有 v66 周期预测算法(computeCyclePrediction)，预测开始日=今天/明天时在身体页顶部显示提醒横幅(该成员月经进行中则跳过) ③配套云端自动化：每周日自动全量备份两张表到 backups 表(保留8周)+每月1日生成健康月报存备份并经 Server酱 推送微信摘要(SERVERCHAN_KEY secret 未配置时只存不推) -->
 <!-- v98: ①删除确认弹窗被管理弹窗挡住——uiConfirmMask 提 z-index 到 10060(原 9999 同层按 DOM 顺序被压在下面) ②频闪终极修复 v2：取消顶栏滚动收纳(v58 功能，display:none 切换在 sticky 顶栏内触发布局抖动=网页/APP 频闪共同嫌疑)+删除顶栏两个无限 pulse 动画(常驻重绘源)，右侧状态区改为常显(顺带修复滑回顶部按键不恢复) ③AI 建议时机前移：新建项目时立刻预生成记录字段(缓存)，之后点日历记录秒显 ④弹窗重构：自定义项目像内置项目一样成为独立类型按钮，选中后进弹窗即默认该项目；事件名输入框/➕添加按钮/提示文字全部删除(项目名由系统内部维护，不再需要确认) -->
 <!-- v97: ①AI建议升级:返回字段+每个字段可选选项(点击填入)+项目图标;修复首次不显示/沿用上次项目的时序bug(setEventType不再用残留值渲染) ②顶栏重影/频闪终极修复:sticky+半透明+backdrop-filter重绘bug,改不透明实色并删blur(网页+APP全局) ③自定义类型按钮去掉内嵌删除键(非法HTML嵌套button导致图标/标题/删除键分离),删除/换图标移入「管理」弹窗 ④「➕添加」改「⚙管理」:管理所有项目(新建/换图标/删除),删除带防云端复活标记 ⑤小组件圆点恢复明亮配色(浅马卡龙在浅底上看不见) -->
+<!-- v146: AI识别多模型自动降级——qwen3.6-flash免费额度耗尽(403 insufficient_quota)后识别全挂；改为候选列表(上次成功>用户配置>qwen3.8-flash/max/27b/kimi/deepseek/qwen3.6-flash兜底)，403/429/404/400自动切换下一个，成功模型记localStorage下次优先；默认预设改qwen3.8-flash；识别与自定义项目建议两条AI通道共用 -->
 <!-- v93: ①日历各时期+小组件圆点统一改为马卡龙配色(已向用户确认)：月经期草莓粉#F7B3BD/卵泡期奶黄#FAEDBF/排卵期杏桃#FDD9B5/排卵日深杏#F5A96B/黄体期开心果#D6E8C8 ②修复新成员不同步——成员列表此前只存本机，现从云端记录+身体事件自动合并 ③自定义事件类型同样从云端事件自动重建 -->
 <!-- v92: ①月经周期&来潮天数图去除每人最后一条记录(最新一次月经没有「下一次」算不出周期天数,整条不进图) ②身体频率图图例常显——单人有数据也显示成员名+次数,让「分人」一眼可见 -->
 <!-- v91: ①修复全部记录出现「文/龙」——早期版本存的单字名，云端已批量改为文文/龙龙(61+18条)，代码加 MEMBER_ALIASES 兜底归一 ②小组件圆点颜色与身体日历各时期统一为莫兰迪配色：月经期红/卵泡期黄/排卵期橙/排卵日深橙/黄体期绿 -->
@@ -1457,7 +1458,7 @@
       </div>
       <div class="cfg-field">
         <label>模型</label>
-        <input type="text" id="aiModel" placeholder="qwen3.6-flash">
+        <input type="text" id="aiModel" placeholder="qwen3.8-flash">
         <div class="hint">已预填默认模型（支持识图），一般无需修改</div>
       </div>
       <div class="cfg-actions-row">
@@ -5976,7 +5977,7 @@ document.getElementById('btnToggleCharts').addEventListener('click', () => {
    AI 智能识别（OpenAI 兼容 API）
    ============================================================ */
 const AI_PRESETS = {
-  dashscope: { baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen3.6-flash', kvLabel: 'API Key (sk-xxx)' }, // v78: qwen-turbo 于 2026-10-10 下线，官方推荐替换 qwen3.6-flash
+  dashscope: { baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen3.8-flash', kvLabel: 'API Key (sk-xxx)' }, // v146: qwen3.6-flash 免费额度耗尽(403 insufficient_quota)，默认切 qwen3.8-flash；qwen-turbo 于 2026-10-10 下线
   deepseek:   { baseUrl: 'https://api.deepseek.com/v1',                  model: 'deepseek-chat', kvLabel: 'API Key (sk-xxx)' },
   openai:     { baseUrl: 'https://api.openai.com/v1',                   model: 'gpt-4o-mini', kvLabel: 'API Key (sk-xxx)' },
   zhipu:      { baseUrl: 'https://open.bigmodel.cn/api/paas/v4',        model: 'glm-4-flash', kvLabel: 'API Key' },
@@ -5992,6 +5993,42 @@ if (AI_DEAD_MODELS.includes(aiConfig.model)) {
   console.warn('[AI] 检测到已下线模型', aiConfig.model, '，自动迁移为', AI_PRESETS.dashscope.model);
   aiConfig.model = AI_PRESETS.dashscope.model;
   localStorage.setItem('ai_config', JSON.stringify(aiConfig));
+}
+
+// v146：AI 请求多模型自动降级——固定单模型免费额度耗尽(403 insufficient_quota)后全部识别失败。
+// 候选顺序：上次成功的模型 > 用户配置模型 > 候选列表（用户百炼账号有免费额度的模型，qwen3.6-flash 兜底）。
+// 403 额度耗尽 / 429 限流 / 404 模型不存在 / 400 该模型不支持图片 → 自动切换下一个；401 鉴权失败与网络异常不换模型直接抛出
+const AI_MODEL_FALLBACKS = ['qwen3.8-flash', 'qwen3.8-max-0902', 'qwen3.8-27b', 'kimi-k3.1-pro', 'deepseek-v4.1-flash-1017', 'qwen3.6-flash'];
+function aiCandidateModels(cfg) {
+  let lastGood = null;
+  try { lastGood = localStorage.getItem('aiLastGoodModel') || null; } catch (e) {}
+  return [...new Set([lastGood, cfg.model, ...AI_MODEL_FALLBACKS].filter(Boolean))];
+}
+async function aiChatFetch(cfg, buildBody) {
+  const models = aiCandidateModels(cfg);
+  let lastErr = null;
+  for (const m of models) {
+    try {
+      const resp = await fetch(cfg.baseUrl.replace(/\/$/, '') + '/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },
+        body: JSON.stringify(buildBody(m))
+      });
+      if (resp.ok) {
+        try { localStorage.setItem('aiLastGoodModel', m); } catch (e) {}
+        if (m !== cfg.model) console.warn('[AI] 模型', cfg.model, '失败，已自动切换为', m);
+        return await resp.json();
+      }
+      const errText = await resp.text().catch(() => '');
+      lastErr = new Error(`HTTP ${resp.status}: ${errText.slice(0, 200)}`);
+      if (resp.status === 401) throw lastErr; // key 无效，换模型没用
+    } catch (e) {
+      if (e instanceof TypeError) { lastErr = e; break; } // 网络异常（同域名换模型也连不上）
+      if (e && /^HTTP 401/.test(e.message)) throw e;
+      lastErr = lastErr || e;
+    }
+  }
+  throw lastErr || new Error('AI 请求失败');
 }
 
 function getAiConfig() {
@@ -6084,34 +6121,20 @@ async function callLLM(text, imageBase64) {
     userContent = text;
   }
 
-  const body = {
-    model: cfg.model,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userContent }
-    ],
-    temperature: 0.1
-  };
-  // v87：qwen3 系混合推理模型默认开「深度思考」，识别慢 4 倍以上——识别任务不需要推理，直接关闭（3.2s → 0.7s）
-  if (cfg.provider === 'dashscope' && /qwen3|3\.6|qwen-flash/i.test(cfg.model || '')) {
-    body.enable_thinking = false;
-  }
-
-  const resp = await fetch(cfg.baseUrl.replace(/\/$/, '') + '/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + cfg.apiKey
-    },
-    body: JSON.stringify(body)
+  // v146：走多模型自动降级通道（额度耗尽自动切换下一个候选模型）
+  const data = await aiChatFetch(cfg, (m) => {
+    const b = {
+      model: m,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent }
+      ],
+      temperature: 0.1
+    };
+    // v87：qwen3 系混合推理模型默认开「深度思考」，识别慢 4 倍以上——识别任务不需要推理，直接关闭（3.2s → 0.7s）
+    if (cfg.provider === 'dashscope' && /qwen3|3\.6|qwen-flash/i.test(m)) b.enable_thinking = false;
+    return b;
   });
-
-  if (!resp.ok) {
-    const err = await resp.text().catch(() => '');
-    throw new Error(`HTTP ${resp.status}: ${err.slice(0, 200)}`);
-  }
-
-  const data = await resp.json();
   let content = data.choices?.[0]?.message?.content || '';
   // 去除 markdown 代码块包裹
   content = content.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
@@ -7639,22 +7662,19 @@ function setAIIconSuggestion(name, icon) {
 async function fetchAISuggestedFields(name) {
   const cfg = aiConfig;
   if (!cfg || !cfg.apiKey || !name) throw new Error('AI 未配置');
-  const body = {
-    model: cfg.model,
-    messages: [
-      { role: 'system', content: '你是家庭健康记录助手。用户添加了一个自定义健康记录项目。请返回JSON对象（不要任何解释）：{"icon":"一个最贴切的emoji图标","fields":[{"label":"字段名","options":["常见选项1","选项2"]}]}。要求：fields 为记录该项目时最有价值的1~3个信息字段（简短中文，如"发作部位""疼痛等级""用药"）；每个字段给2~6个常见可选选项（没有合适选项就给空数组[]）。' },
-      { role: 'user', content: `自定义项目名称：${name}` },
-    ],
-    temperature: 0.2,
-  };
-  if (cfg.provider === 'dashscope' && /qwen3|3\.6|qwen-flash/i.test(cfg.model || '')) body.enable_thinking = false;
-  const resp = await fetch(cfg.baseUrl.replace(/\/$/, '') + '/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },
-    body: JSON.stringify(body),
+  // v146：走多模型自动降级通道（与报告识别同款）
+  const data = await aiChatFetch(cfg, (m) => {
+    const b = {
+      model: m,
+      messages: [
+        { role: 'system', content: '你是家庭健康记录助手。用户添加了一个自定义健康记录项目。请返回JSON对象（不要任何解释）：{"icon":"一个最贴切的emoji图标","fields":[{"label":"字段名","options":["常见选项1","选项2"]}]}。要求：fields 为记录该项目时最有价值的1~3个信息字段（简短中文，如"发作部位""疼痛等级""用药"）；每个字段给2~6个常见可选选项（没有合适选项就给空数组[]）。' },
+        { role: 'user', content: `自定义项目名称：${name}` },
+      ],
+      temperature: 0.2,
+    };
+    if (cfg.provider === 'dashscope' && /qwen3|3\.6|qwen-flash/i.test(m)) b.enable_thinking = false;
+    return b;
   });
-  if (!resp.ok) throw new Error('HTTP ' + resp.status);
-  const data = await resp.json();
   let content = (data.choices?.[0]?.message?.content || '').replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
   let obj;
   try { obj = JSON.parse(content); } catch (e) {
